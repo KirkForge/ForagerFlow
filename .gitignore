@@ -1,0 +1,51 @@
+# --- Dependencies ---
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.*
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+.directory
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Build artifacts ---
+dist/
+build/
+*.tsbuildinfo
+
+# --- Test artifacts ---
+test-results/
+playwright-report/
+coverage/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Caching ---
+CACHEDIR.TAG
+
+# --- LLM planning / AI session notes ---
+llm/
+
+# --- Model snapshots from HuggingFace (generated) ---
+models--*/
+snapshots/
+
+# --- Secrets & credentials ---
+*.pem
+*.key
+*_token*
+credentials*
+secrets*

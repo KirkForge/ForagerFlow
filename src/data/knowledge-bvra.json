@@ -1,0 +1,886 @@
+{
+  "Agaricus altipes": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus arvensis": {
+    "edibility": "Edible",
+    "notes": "Horse mushroom. White to pale yellow cap, anise-like smell, ring on stem. Edible when cooked."
+  },
+  "Agaricus augustus": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus bernardii": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus bisporus": {
+    "edibility": "Edible",
+    "notes": "Common button / portobello. White-to-brown cap, pink-then-brown gills. Widely cultivated."
+  },
+  "Agaricus bitorquis": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus bohusii": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus brunneolus": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus campestris": {
+    "edibility": "Edible",
+    "notes": "Field mushroom. Pink-then-brown gills, white cap with scales. Classic edible."
+  },
+  "Agaricus crocodilinus": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus cupreobrunneus": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus depauperatus": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus devoniensis": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus dulcidulus": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus sylvicola": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus essettei": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus impudicus": {
+    "edibility": "Edible",
+    "notes": "Widely recognized as edible. Always cook thoroughly and verify with an expert."
+  },
+  "Agaricus langei": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus lanipes": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus litoralis": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus moelleri": {
+    "edibility": "Poisonous",
+    "notes": "Inky mushroom. Dark grey-brown cap, unpleasant smell. Poisonous."
+  },
+  "Agaricus subfloccosus": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus subperonatus": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus sylvaticus": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Agaricus xanthodermus": {
+    "edibility": "Poisonous",
+    "notes": "Yellow stainer. Cap and stem base turn bright yellow when bruised. Causes GI distress."
+  },
+  "Amanita ceciliae": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Amanita citrina": {
+    "edibility": "Poisonous",
+    "notes": "Marked as poisonous in the Danish Fungi dataset. Do not consume."
+  },
+  "Amanita crocea": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Amanita franchetii": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Amanita fulva": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Amanita gemmata": {
+    "edibility": "Poisonous",
+    "notes": "Marked as poisonous in the Danish Fungi dataset. Do not consume."
+  },
+  "Amanita huijsmanii": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Amanita lividopallescens": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Amanita muscaria": {
+    "edibility": "Poisonous",
+    "notes": "Fly agaric. Bright red cap with white spots. Contains muscimol/ibotenic acid. Poisonous."
+  },
+  "Amanita olivaceogrisea": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Amanita pantherina": {
+    "edibility": "Poisonous",
+    "notes": "Panther cap. Brown cap with white warts. Contains muscimol. Poisonous."
+  },
+  "Amanita phalloides": {
+    "edibility": "Poisonous",
+    "notes": "Death cap. Greenish cap, white gills, volva at base. Contains amatoxins — potentially FATAL."
+  },
+  "Amanita porphyria": {
+    "edibility": "Poisonous",
+    "notes": "Marked as poisonous in the Danish Fungi dataset. Do not consume."
+  },
+  "Amanita regalis": {
+    "edibility": "Poisonous",
+    "notes": "Marked as poisonous in the Danish Fungi dataset. Do not consume."
+  },
+  "Amanita rubescens": {
+    "edibility": "Edible",
+    "notes": "Blusher. Pinkish cap, flesh bruises reddish. Edible when cooked thoroughly."
+  },
+  "Amanita simulans": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Amanita submembranacea": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Amanita vaginata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Amanita virosa": {
+    "edibility": "Poisonous",
+    "notes": "Destroying angel. All white, volva at base. Contains amatoxins — potentially FATAL."
+  },
+  "Boletus edulis": {
+    "edibility": "Edible",
+    "notes": "King bolete / porcini. Brown cap, white pores, bulbous stem. Highly prized edible."
+  },
+  "Boletus pinophilus": {
+    "edibility": "Edible",
+    "notes": "Pine bolete. Dark brown cap, grows with pine. Excellent edible."
+  },
+  "Boletus reticulatus": {
+    "edibility": "Edible",
+    "notes": "Summer bolete. Net-like pattern on stem. Excellent edible."
+  },
+  "Clitocybe agrestis": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Clitocybe barbularum": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Clitocybe diatreta": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Clitocybe fragrans": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Clitocybe metachroa": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Clitocybe nebularis": {
+    "edibility": "Unknown",
+    "notes": "Clouded funnel. Grey-brown funnel cap. Edible but some report GI issues."
+  },
+  "Clitocybe nitrophila": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Clitocybe amarescens": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Clitocybe obsoleta": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Clitocybe odora": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Clitocybe phyllophila": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Clitocybe rivulosa": {
+    "edibility": "Poisonous",
+    "notes": "False champignon. Ivory white, decurrent gills. Poisonous — contains muscarine."
+  },
+  "Clitocybe subspadicea": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Clitocybe vibecina": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Clitocybe costata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Infundibulicybe costata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena abramsii": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena acicula": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena aetites": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena albidolilacea": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena amicta": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena arcangeliana": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena aurantiomarginata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena belliae": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena bulbosa": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena capillaripes": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena chlorantha": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena cinerella": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena citrinomarginata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena clavicularis": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena clavularis": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena concolor": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena crocata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena epipterygia": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena erubescens": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena filopes": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena flavescens": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena galericulata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena galopus": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena haematopus": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena inclinata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena juniperina": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena latifolia": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena leptocephala": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena luteovariegata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena maculata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena megaspora": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena meliigena": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena metata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena mirata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena mucor": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena olivaceomarginata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena pearsoniana": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena pelianthina": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena picta": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena polyadelpha": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena polygramma": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena pseudocorticola": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena pseudopicta": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena pterigena": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena purpureofusca": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena renati": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena rosea": {
+    "edibility": "Poisonous",
+    "notes": "Rosy bonnet. Pink cap, grows on leaf litter. Poisonous."
+  },
+  "Mycena rosella": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena rubromarginata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena sanguinolenta": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena scirpicola": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena silvae-nigrae": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena smithiana": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena stipata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena stylobates": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena tenerrima": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena tintinnabulum": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena vitilis": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena vulgaris": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena xantholeuca": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena zephirus": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula acrifolia": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula adusta": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula aeruginea": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula albonigra": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula alnetorum": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula amoenolens": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula anthracina": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula aquosa": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula atrorubens": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula aurea": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula betularum": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula brunneoviolacea": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula caerulea": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula carpini": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula cessans": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula chloroides": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula claroflava": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula clavipes": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula cuprea": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula curtipes": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula cyanoxantha": {
+    "edibility": "Edible",
+    "notes": "Charcoal burner. Variable color, brittle flesh, mild taste. Edible."
+  },
+  "Russula decolorans": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula delica": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula densifolia": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula depallens": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula emetica": {
+    "edibility": "Poisonous",
+    "notes": "Sickener. Bright red cap, very hot/peppery taste. Poisonous — causes vomiting."
+  },
+  "Russula emeticicolor": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula faginea": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula farinipes": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula faustiana": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula fellea": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula foetens": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula fragilis": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula maculata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula gracillima": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula grata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula graveolens": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula grisea": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula heterophylla": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula illota": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula insignis": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula integra": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula ionochlora": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula laccata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula laeta": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula rosea": {
+    "edibility": "Edible",
+    "notes": "Rosy brittlegill. Pink cap, mild taste. Edible."
+  },
+  "Russula luteotacta": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula nobilis": {
+    "edibility": "Edible",
+    "notes": "Widely recognized as edible. Always cook thoroughly and verify with an expert."
+  },
+  "Russula melliolens": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula melzeri": {
+    "edibility": "Edible",
+    "notes": "Widely recognized as edible. Always cook thoroughly and verify with an expert."
+  },
+  "Russula mustelina": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula nauseosa": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula nitida": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula ochroleuca": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula odorata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula olivacea": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula paludosa": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula parazurea": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula pelargonia": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula pseudointegra": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula puellaris": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula puellula": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula queletii": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula recondita": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula rhodopus": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula risigallina": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula romellii": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula roseoaurantia": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula sanguinea": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula sardonia": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula seperina": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula silvestris": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula solaris": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula sororia": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula subfoetens": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula subrubens": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula turci": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula atropurpurea": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula velenovskyi": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula aurora": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula versicolor": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula vesca": {
+    "edibility": "Edible",
+    "notes": "Bare-toothed brittlegill. Pale red-brown cap, mild taste. Edible."
+  },
+  "Russula veternosa": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula vinosa": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula violeipes": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula virescens": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula viscida": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula xerampelina": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Mycena pelliculosa": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula globispora": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula lepida": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula mairei": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula nigricans": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula undulata": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Russula velutipes": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Singerocybe phaeophthalma": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  },
+  "Clitocybe phaeophthalma": {
+    "edibility": "Unknown",
+    "notes": "Edibility unknown or unverified. Do not consume without positive identification by a certified mycologist."
+  }
+}

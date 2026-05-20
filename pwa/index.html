@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f1115" />
+  <title>Foragerflow</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <span style="font-size:20px;">&#127812;</span>
+      <h1>Foragerflow</h1>
+      <span id="badge" class="badge">Online</span>
+    </header>
+
+    <div id="controls">
+      <label for="model-select">Model:</label>
+      <select id="model-select">
+        <option value="bvra">Specialist (215 classes, ~90 MB)</option>
+        <option value="dima806">General (100 classes, ~330 MB)</option>
+      </select>
+    </div>
+
+    <div id="camera-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <button id="capture-btn" aria-label="Identify mushroom"></button>
+      <div id="camera-error" style="display:none;">
+        <p>Camera unavailable.</p>
+        <button id="camera-retry">Retry camera</button>
+        <label for="file-input">or choose a photo</label>
+        <input type="file" id="file-input" accept="image/*" />
+      </div>
+    </div>
+
+    <div id="results">
+      <div id="status" class="status">Loading...</div>
+      <div id="predictions"></div>
+      <div id="low-confidence" class="warning" style="display:none;"></div>
+      <div id="knowledge" class="knowledge" style="display:none;"></div>
+      <div id="warning" class="warning" style="display:none;"></div>
+    </div>
+  </div>
+
+  <script src="js/knowledge.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+  />
+  <meta name="theme-color" content="#0f1115" />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self' 'unsafe-inline' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; font-src 'self'"
+  />
+  <title>Foragerflow</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div id="app" role="application" aria-label="Foragerflow mushroom identifier">
+    <header role="banner">
+      <span aria-hidden="true" style="font-size:20px;">&#127812;</span>
+      <h1>Foragerflow</h1>
+      <span id="badge" class="badge" role="status" aria-live="polite">Online</span>
+    </header>
+
+    <div id="controls" role="group" aria-label="Model selection">
+      <label for="model-select">Model:</label>
+      <select id="model-select" aria-label="Select inference model">
+        <option value="bvra">Specialist (215 classes, ~90 MB)</option>
+        <option value="dima806">General (100 classes, ~330 MB)</option>
+      </select>
+    </div>
+
+    <div id="camera-wrap" role="region" aria-label="Camera viewfinder">
+      <video
+        id="video"
+        autoplay
+        playsinline
+        muted
+        aria-label="Live camera preview"
+      ></video>
+      <button
+        id="capture-btn"
+        aria-label="Capture and identify mushroom"
+      ></button>
+      <div
+        id="camera-error"
+        role="alert"
+        aria-live="assertive"
+        style="display:none;"
+      >
+        <p>Camera unavailable.</p>
+        <button id="camera-retry" aria-label="Retry camera access">
+          Retry camera
+        </button>
+        <label for="file-input" aria-label="Choose a photo">or choose a photo</label>
+        <input type="file" id="file-input" accept="image/*" aria-label="Select an image file" />
+      </div>
+    </div>
+
+    <div id="results" role="region" aria-label="Inference results">
+      <div id="status" class="status" role="status" aria-live="polite">
+        Loading...
+      </div>
+      <div id="predictions" aria-label="Top predictions"></div>
+      <div
+        id="low-confidence"
+        class="warning"
+        role="alert"
+        aria-live="assertive"
+        style="display:none;"
+      ></div>
+      <div
+        id="knowledge"
+        class="knowledge"
+        role="region"
+        aria-label="Species details"
+        style="display:none;"
+      ></div>
+      <div
+        id="warning"
+        class="warning"
+        role="alert"
+        aria-live="assertive"
+        style="display:none;"
+      ></div>
+    </div>
+  </div>
+
+  <script type="module" src="/main.ts"></script>
+</body>
+</html>
