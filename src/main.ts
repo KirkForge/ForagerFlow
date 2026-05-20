@@ -6,7 +6,14 @@ import { registerServiceWorker, updateOnlineStatus } from "@/services/connectivi
 import { generatePredictionReport } from "@/inference/results";
 import { modelRegistry } from "@/data/model-registry";
 import { ResultsRenderer } from "@/ui/results";
+import { saveIdentification, getHistory, clearHistory } from "@/services/history";
 import { logger } from "@/core/logger";
+
+function getEdibilityClass(ed: string): string {
+  if (ed === "Poisonous") return "edibility-poisonous";
+  if (ed === "Edible") return "edibility-edible";
+  return "edibility-unknown";
+}
 
 class AppController {
   private camera = new CameraService(224);
@@ -41,6 +48,8 @@ class AppController {
       const model = modelRegistry[modelKey];
       const report = generatePredictionReport(logits, model);
       this.renderer.render(report, model);
+      saveIdentification(report, modelKey).catch(() => {});
+      void this.renderHistory();
     });
 
     inferenceService.on("error", (error) => {
@@ -48,6 +57,7 @@ class AppController {
     });
 
     await this.startCamera();
+    void this.renderHistory();
     inferenceService.switchModel(ModelKey.BVRA);
   }
 
@@ -103,6 +113,49 @@ class AppController {
     updateOnlineStatus(this.badgeEl);
   }
 
+  private async renderHistory(): Promise<void> {
+    const list = document.getElementById("history-list");
+    if (!list) return;
+    try {
+      const entries = await getHistory(20);
+      if (entries.length === 0) {
+        list.innerHTML = '<p class="history-empty">No past identifications yet.</p>';
+        return;
+      }
+      list.innerHTML = entries
+        .map(
+          (e) => `<div class="history-entry">
+          <div class="history-meta">
+            <span class="history-date">${new Date(e.timestamp).toLocaleDateString()}</span>
+            <span class="history-model">${e.modelKey}</span>
+            <span class="history-edibility ${getEdibilityClass(e.top1Edibility)}">${e.top1Edibility}</span>
+          </div>
+          <div class="history-name">${e.top1Species}</div>
+          <div class="history-prob">${(e.top1Probability * 100).toFixed(1)}% confidence</div>
+          <button class="history-delete" data-id="${e.id}" aria-label="Delete this entry">&times;</button>
+        </div>`,
+        )
+        .join("");
+
+      list.querySelectorAll(".history-delete").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const id = (btn as HTMLElement).dataset.id;
+          if (!id) return;
+          const { deleteEntry } = await import("@/services/history");
+          await deleteEntry(id);
+          void this.renderHistory();
+        });
+      });
+    } catch {
+      list.innerHTML = "<p>Unable to load history.</p>";
+    }
+  }
+
+  private async handleClearHistory(): Promise<void> {
+    await clearHistory();
+    void this.renderHistory();
+  }
+
   private bindEvents(): void {
     this.captureBtn.addEventListener("click", () => {
       this.handleCapture();
@@ -111,6 +164,11 @@ class AppController {
     const fileInput = document.getElementById("file-input");
     fileInput?.addEventListener("change", (e) => {
       void this.handleFileSelect(e);
+    });
+
+    const clearBtn = document.getElementById("history-clear");
+    clearBtn?.addEventListener("click", () => {
+      void this.handleClearHistory();
     });
 
     const retryBtn = document.getElementById("camera-retry");

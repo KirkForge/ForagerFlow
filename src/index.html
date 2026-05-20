@@ -84,8 +84,17 @@
         aria-live="assertive"
         style="display:none;"
       ></div>
+
+    <div id="history-panel" role="region" aria-label="Identification history">
+      <div class="history-header">
+        <h2>History</h2>
+        <button id="history-clear" aria-label="Clear all history">Clear</button>
+      </div>
+      <div id="history-list" aria-label="Past identifications"></div>
     </div>
   </div>
+
+  <script type="module" src="/main.ts"></script>
 
   <script type="module" src="/main.ts"></script>
 </body>
