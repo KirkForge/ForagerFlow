@@ -49,3 +49,8 @@ snapshots/
 *_token*
 credentials*
 secrets*
+
+# Type checking
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
