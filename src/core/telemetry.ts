@@ -8,7 +8,7 @@ export interface TelemetryEvent {
 
 type TelemetryHandler = (event: TelemetryEvent) => void;
 
-const handlers: Set<TelemetryHandler> = new Set();
+const handlers = new Set<TelemetryHandler>();
 
 export function addTelemetryHandler(handler: TelemetryHandler): void {
   handlers.add(handler);

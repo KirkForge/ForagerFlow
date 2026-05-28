@@ -1,4 +1,4 @@
-type EventMap = { [key: string]: unknown };
+type EventMap = Record<string, unknown>;
 
 type EventKey<T extends EventMap> = string & keyof T;
 
@@ -15,16 +15,17 @@ export class TypedEmitter<Events extends EventMap> {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
-    this.listeners.get(event)!.add(callback as (...args: unknown[]) => void);
+    const set = this.listeners.get(event);
+    if (set) set.add(callback);
   }
 
   off<K extends EventKey<Events>>(event: K, callback: EventCallback<Events[K]>): void {
-    this.listeners.get(event)?.delete(callback as (...args: unknown[]) => void);
+    this.listeners.get(event)?.delete(callback);
   }
 
   emit<K extends EventKey<Events>>(event: K, ...args: Events[K] extends undefined ? [] : [Events[K]]): void {
     for (const cb of this.listeners.get(event) ?? []) {
-      (cb as (...a: unknown[]) => void)(...args);
+      (cb)(...args);
     }
   }
 

@@ -53,7 +53,7 @@ export class CameraService {
     const imageData = ctx.getImageData(0, 0, size, size);
     const buffer = imageData.data.buffer;
     return {
-      buffer: buffer as ArrayBuffer,
+      buffer: buffer,
       width: size,
       height: size,
     };

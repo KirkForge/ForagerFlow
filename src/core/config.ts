@@ -5,17 +5,19 @@
  */
 
 function envBool(key: string, fallback: boolean): boolean {
-  const val = import.meta.env[key];
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const val: string | undefined = import.meta.env[key];
   if (val === undefined) return fallback;
   return val === "true" || val === "1";
 }
 
 function envString(key: string, fallback: string): string {
-  return import.meta.env[key] ?? fallback;
+  return (import.meta.env[key] as string | undefined) ?? fallback;
 }
 
 function envNumber(key: string, fallback: number): number {
-  const val = import.meta.env[key];
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const val: string | undefined = import.meta.env[key];
   if (val === undefined) return fallback;
   const num = Number(val);
   return Number.isFinite(num) ? num : fallback;

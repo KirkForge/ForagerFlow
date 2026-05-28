@@ -3,7 +3,7 @@
 // Stores past predictions for offline review.
 
 import type { PredictionReport } from "@/inference/results";
-import { ModelKey, Edibility } from "@/core/types";
+import type { ModelKey, Edibility } from "@/core/types";
 import { logger } from "@/core/logger";
 
 const DB_NAME = "foragerflow-history";
@@ -23,7 +23,7 @@ export interface HistoryEntry {
 }
 
 function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+  return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -34,8 +34,8 @@ function openDB(): Promise<IDBDatabase> {
         store.createIndex("edibility", "top1Edibility", { unique: false });
       }
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => { resolve(request.result); };
+    request.onerror = () => { reject(new Error(request.error?.message ?? "IndexedDB open failed")); };
   });
 }
 
@@ -61,7 +61,7 @@ export async function saveIdentification(
 
   try {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
+    return await new Promise<string>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, "readwrite");
       const store = tx.objectStore(STORE_NAME);
       const request = store.add(entry);
@@ -71,7 +71,7 @@ export async function saveIdentification(
       };
       request.onerror = () => {
         db.close();
-        reject(request.error);
+        reject(new Error(request.error?.message ?? "IDB error"));
       };
     });
   } catch (err) {
@@ -85,7 +85,7 @@ export async function getHistory(
 ): Promise<HistoryEntry[]> {
   try {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
+    return await new Promise<HistoryEntry[]>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, "readonly");
       const store = tx.objectStore(STORE_NAME);
       const index = store.index("timestamp");
@@ -104,7 +104,7 @@ export async function getHistory(
       };
       request.onerror = () => {
         db.close();
-        reject(request.error);
+        reject(new Error(request.error?.message ?? "IDB error"));
       };
     });
   } catch (err) {
@@ -116,7 +116,7 @@ export async function getHistory(
 export async function deleteEntry(id: string): Promise<void> {
   try {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, "readwrite");
       const store = tx.objectStore(STORE_NAME);
       const request = store.delete(id);
@@ -126,7 +126,7 @@ export async function deleteEntry(id: string): Promise<void> {
       };
       request.onerror = () => {
         db.close();
-        reject(request.error);
+        reject(new Error(request.error?.message ?? "IDB error"));
       };
     });
   } catch (err) {
@@ -138,7 +138,7 @@ export async function deleteEntry(id: string): Promise<void> {
 export async function clearHistory(): Promise<void> {
   try {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, "readwrite");
       const store = tx.objectStore(STORE_NAME);
       const request = store.clear();
@@ -148,7 +148,7 @@ export async function clearHistory(): Promise<void> {
       };
       request.onerror = () => {
         db.close();
-        reject(request.error);
+        reject(new Error(request.error?.message ?? "IDB error"));
       };
     });
   } catch (err) {

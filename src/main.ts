@@ -57,7 +57,7 @@ class AppController {
       const report = generatePredictionReport(logits, model);
       this.setState(ApplicationState.Done);
       this.renderer.render(report, model);
-      saveIdentification(report, modelKey).catch(() => {});
+      saveIdentification(report, modelKey).catch((_e: unknown) => { /* best-effort save */ });
       void this.renderHistory();
     });
 
@@ -157,12 +157,14 @@ class AppController {
         .join("");
 
       list.querySelectorAll(".history-delete").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-          const id = (btn as HTMLElement).dataset["id"];
-          if (!id) return;
-          const { deleteEntry } = await import("@/services/history");
-          await deleteEntry(id);
-          void this.renderHistory();
+        btn.addEventListener("click", () => {
+          void (async () => {
+            const id = (btn as HTMLElement).dataset["id"];
+            if (!id) return;
+            const { deleteEntry } = await import("@/services/history");
+            await deleteEntry(id);
+            void this.renderHistory();
+          })();
         });
       });
     } catch {

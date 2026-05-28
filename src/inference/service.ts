@@ -36,7 +36,7 @@ export class InferenceService extends TypedEmitter<InferenceEvents> {
   private ready = false;
   private currentModelKey: ModelKey = ModelKey.BVRA;
   private retryCount = 0;
-  private inferQueue: Array<{ pixels: ArrayBuffer; width: number; height: number }> = [];
+  private inferQueue: { pixels: ArrayBuffer; width: number; height: number }[] = [];
 
   initialize(): void {
     try {

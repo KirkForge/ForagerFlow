@@ -24,7 +24,7 @@ export function processFileInput(
 
       const imageData = ctx.getImageData(0, 0, size, size);
       resolve({
-        buffer: imageData.data.buffer as ArrayBuffer,
+        buffer: imageData.data.buffer,
         width: size,
         height: size,
       });
