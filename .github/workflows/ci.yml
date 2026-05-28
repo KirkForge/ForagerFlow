@@ -41,7 +41,7 @@ jobs:
         run: pnpm test -- --coverage
 
       - name: Verify labels
-        run: node scripts/verify-labels.js
+        run: node scripts/verify-labels.cjs
 
       - name: Build
         run: pnpm build

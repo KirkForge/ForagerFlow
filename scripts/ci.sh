@@ -52,8 +52,8 @@ if grep -q '"test"' package.json 2>/dev/null; then
 fi
 
 # ---- Verify Labels ----
-if [ -f "scripts/verify-labels.js" ]; then
-    run_step "verify:labels" node scripts/verify-labels.js
+if [ -f "scripts/verify-labels.cjs" ]; then
+    run_step "verify:labels" node scripts/verify-labels.cjs
 fi
 
 # ---- Secret sweep (trufflehog) ----
