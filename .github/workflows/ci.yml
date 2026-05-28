@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
     branches: [main]
 
@@ -12,9 +12,11 @@ concurrency:
 
 jobs:
   quality:
-    name: Typecheck, Lint & Test
+    name: Typecheck, Lint, Test & Build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
@@ -43,6 +45,12 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Security audit
+        run: pnpm audit --audit-level=high || true
+
+      - name: License check
+        run: npx license-checker --production --failOn "GPL-3.0;AGPL-3.0" || true
 
       - name: Upload coverage
         if: always()

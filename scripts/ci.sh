@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ci-cleandev — universal pre-push CI runner
+# ci-cleandev — universal pre-push CI runner (pnpm)
 set -euo pipefail
 
 RED='\033[0;31m'
@@ -27,23 +27,33 @@ run_step() {
 echo ""
 echo -e "${YELLOW}=== CI: $(basename "$(pwd)") ===${NC}"
 
+# ---- Typecheck ----
+if grep -q '"typecheck"' package.json 2>/dev/null; then
+    run_step "typecheck" pnpm typecheck
+fi
+
 # ---- Build ----
 if [ -f package.json ]; then
     if grep -q '"build"' package.json 2>/dev/null; then
-        run_step "build" npm run build
+        run_step "build" pnpm run build
     elif grep -q '"compile"' package.json 2>/dev/null; then
-        run_step "build" npm run compile
+        run_step "build" pnpm run compile
     fi
 fi
 
 # ---- Lint ----
 if grep -q '"lint"' package.json 2>/dev/null; then
-    run_step "lint" npm run lint
+    run_step "lint" pnpm run lint
 fi
 
 # ---- Test ----
 if grep -q '"test"' package.json 2>/dev/null; then
-    run_step "test" npm test
+    run_step "test" pnpm test
+fi
+
+# ---- Verify Labels ----
+if [ -f "scripts/verify-labels.js" ]; then
+    run_step "verify:labels" node scripts/verify-labels.js
 fi
 
 # ---- Secret sweep (trufflehog) ----

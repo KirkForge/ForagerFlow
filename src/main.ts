@@ -1,4 +1,4 @@
-import { ModelKey } from "@/core/types";
+import { ModelKey, ApplicationState } from "@/core/types";
 import { inferenceService } from "@/inference/service";
 import { CameraService } from "@/services/camera";
 import { processFileInput } from "@/services/image-input";
@@ -7,7 +7,9 @@ import { generatePredictionReport } from "@/inference/results";
 import { modelRegistry } from "@/data/model-registry";
 import { ResultsRenderer } from "@/ui/results";
 import { saveIdentification, getHistory, clearHistory } from "@/services/history";
+import { initWebVitals } from "@/services/web-vitals";
 import { logger } from "@/core/logger";
+import { sanitizeText } from "@/core/sanitize";
 
 function getEdibilityClass(ed: string): string {
   if (ed === "Poisonous") return "edibility-poisonous";
@@ -23,6 +25,7 @@ class AppController {
   private videoEl: HTMLVideoElement;
   private captureBtn: HTMLButtonElement;
   private cameraErrorEl: HTMLElement;
+  #appState: ApplicationState = ApplicationState.Loading;
 
   constructor() {
     this.statusEl = this.require("#status");
@@ -34,7 +37,9 @@ class AppController {
   }
 
   async init(): Promise<void> {
+    this.setState(ApplicationState.Loading);
     registerServiceWorker();
+    initWebVitals();
     this.bindEvents();
     updateOnlineStatus(this.badgeEl);
 
@@ -42,11 +47,15 @@ class AppController {
 
     inferenceService.on("status", (text: string) => {
       this.statusEl.textContent = text;
+      if (text === "Processing...") {
+        this.setState(ApplicationState.Processing);
+      }
     });
 
-    inferenceService.on("result", (logits, modelKey) => {
+    inferenceService.on("result", ({ logits, modelKey }) => {
       const model = modelRegistry[modelKey];
       const report = generatePredictionReport(logits, model);
+      this.setState(ApplicationState.Done);
       this.renderer.render(report, model);
       saveIdentification(report, modelKey).catch(() => {});
       void this.renderHistory();
@@ -54,6 +63,7 @@ class AppController {
 
     inferenceService.on("error", (error) => {
       this.statusEl.textContent = `Error: ${error.message}`;
+      this.setState(ApplicationState.CameraError);
     });
 
     await this.startCamera();
@@ -66,9 +76,11 @@ class AppController {
       await this.camera.start(this.videoEl);
       this.statusEl.textContent = "Camera active. Tap shutter to identify.";
       this.cameraErrorEl.style.display = "none";
+      this.setState(ApplicationState.CameraActive);
     } catch {
       this.statusEl.textContent = "Camera error. Try file input.";
       this.cameraErrorEl.style.display = "flex";
+      this.setState(ApplicationState.CameraError);
     }
   }
 
@@ -123,23 +135,30 @@ class AppController {
         return;
       }
       list.innerHTML = entries
-        .map(
-          (e) => `<div class="history-entry">
+        .map((e) => {
+          const date = sanitizeText(new Date(e.timestamp).toLocaleDateString());
+          const model = sanitizeText(e.modelKey);
+          const species = sanitizeText(e.top1Species);
+          const edibility = sanitizeText(e.top1Edibility);
+          const prob = (e.top1Probability * 100).toFixed(1);
+          const id = sanitizeText(e.id);
+          const edClass = getEdibilityClass(e.top1Edibility);
+          return `<div class="history-entry">
           <div class="history-meta">
-            <span class="history-date">${new Date(e.timestamp).toLocaleDateString()}</span>
-            <span class="history-model">${e.modelKey}</span>
-            <span class="history-edibility ${getEdibilityClass(e.top1Edibility)}">${e.top1Edibility}</span>
+            <span class="history-date">${date}</span>
+            <span class="history-model">${model}</span>
+            <span class="history-edibility ${edClass}">${edibility}</span>
           </div>
-          <div class="history-name">${e.top1Species}</div>
-          <div class="history-prob">${(e.top1Probability * 100).toFixed(1)}% confidence</div>
-          <button class="history-delete" data-id="${e.id}" aria-label="Delete this entry">&times;</button>
-        </div>`,
-        )
+          <div class="history-name">${species}</div>
+          <div class="history-prob">${prob}% confidence</div>
+          <button class="history-delete" data-id="${id}" aria-label="Delete this entry">&times;</button>
+        </div>`;
+        })
         .join("");
 
       list.querySelectorAll(".history-delete").forEach((btn) => {
         btn.addEventListener("click", async () => {
-          const id = (btn as HTMLElement).dataset.id;
+          const id = (btn as HTMLElement).dataset["id"];
           if (!id) return;
           const { deleteEntry } = await import("@/services/history");
           await deleteEntry(id);
@@ -193,6 +212,15 @@ class AppController {
     const el = document.querySelector(selector);
     if (!el) throw new Error(`Required element not found: ${selector}`);
     return el as HTMLElement;
+  }
+
+  private setState(newState: ApplicationState): void {
+    this.#appState = newState;
+    logger.debug(`State: ${newState}`);
+  }
+
+  getState(): ApplicationState {
+    return this.#appState;
   }
 }
 

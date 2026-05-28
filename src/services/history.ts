@@ -18,7 +18,7 @@ export interface HistoryEntry {
   top1Probability: number;
   top1Edibility: Edibility;
   predictions: { label: string; probability: number }[];
-  thumbnail?: string; // base64 data URL (small)
+  thumbnail: string; // base64 data URL (small)
   notes: string;
 }
 
@@ -55,7 +55,7 @@ export async function saveIdentification(
       label: p.label,
       probability: p.probability,
     })),
-    thumbnail,
+    thumbnail: thumbnail ?? "",
     notes: report.top1Knowledge.notes,
   };
 

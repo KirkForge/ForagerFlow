@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { defineConfig } from "vite";
+import { readFileSync } from "node:fs";
 
 export default defineConfig({
   root: "src",
@@ -8,6 +9,11 @@ export default defineConfig({
     alias: {
       "@": resolve(__dirname, "src"),
     },
+  },
+  define: {
+    __APP_VERSION__: JSON.stringify(
+      JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version,
+    ),
   },
   build: {
     outDir: "../dist",

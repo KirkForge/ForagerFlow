@@ -6,6 +6,12 @@
   --accent: #22c55e;
   --danger: #ef4444;
   --warn: #f59e0b;
+  --border: #22262e;
+  --surface-1: #1a1f26;
+  --text-muted: #9ca3af;
+  --space-1: 8px;
+  --space-2: 12px;
+  --radius-sm: 4px;
 }
 
 * {

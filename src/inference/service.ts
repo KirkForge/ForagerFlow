@@ -9,26 +9,34 @@ import {
   InferenceWorkerMessageType,
   WorkerCommandType,
 } from "@/core/types";
-import { AppError, InferenceError, ModelLoadError } from "@/core/errors";
+import { InferenceError, LabelMismatchError, ModelLoadError } from "@/core/errors";
 import { logger } from "@/core/logger";
 import { modelRegistry } from "@/data/model-registry";
+import { TypedEmitter } from "@/core/emitter";
 
 interface InferenceWorker extends Worker {
   onmessage: ((e: MessageEvent<WorkerMessage>) => void) | null;
   onerror: ((e: ErrorEvent) => void) | null;
 }
 
+interface InferenceEvents {
+  [key: string]: unknown;
+  status: string;
+  result: { logits: Float32Array; modelKey: ModelKey };
+  error: InferenceError | LabelMismatchError;
+}
+
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
+
 export type { WorkerMessage, WorkerCommand };
 
-export class InferenceService {
+export class InferenceService extends TypedEmitter<InferenceEvents> {
   private worker: InferenceWorker | null = null;
   private ready = false;
   private currentModelKey: ModelKey = ModelKey.BVRA;
-  private onStatusChange: ((text: string) => void) | null = null;
-  private onResult:
-    | ((logits: Float32Array, modelKey: ModelKey) => void)
-    | null = null;
-  private onError: ((error: AppError) => void) | null = null;
+  private retryCount = 0;
+  private inferQueue: Array<{ pixels: ArrayBuffer; width: number; height: number }> = [];
 
   initialize(): void {
     try {
@@ -47,28 +55,30 @@ export class InferenceService {
           case InferenceWorkerMessageType.Status: {
             if (e.data.text === "Ready" && e.data.modelKey === this.currentModelKey) {
               this.ready = true;
+              this.retryCount = 0;
+              this.flushInferQueue();
             }
-            this.onStatusChange?.(e.data.text);
+            this.emit("status", e.data.text);
             break;
           }
           case InferenceWorkerMessageType.Result: {
             if (e.data.logits.length !== this.getActiveModel().expectedLabelCount) {
-              this.onError?.(
-                new AppError(
-                  `Label/logit mismatch: ${String(this.getActiveModel().labels.length)} labels vs ${String(e.data.logits.length)} logits`,
-                  "LABEL_MISMATCH",
-                  false,
+              this.emit(
+                "error",
+                new LabelMismatchError(
+                  this.getActiveModel().labels.length,
+                  e.data.logits.length,
                 ),
               );
               return;
             }
-            this.onResult?.(new Float32Array(e.data.logits), e.data.modelKey);
-            this.onStatusChange?.("Done");
+            this.emit("result", { logits: new Float32Array(e.data.logits), modelKey: e.data.modelKey });
+            this.emit("status", "Done");
             break;
           }
           case InferenceWorkerMessageType.Error: {
             logger.error("Worker error:", e.data.message);
-            this.onError?.(new InferenceError(e.data.message));
+            this.handleWorkerError(new InferenceError(e.data.message));
             break;
           }
         }
@@ -76,15 +86,40 @@ export class InferenceService {
 
       this.worker.onerror = (e: ErrorEvent): void => {
         logger.error("Worker runtime error:", e.message);
-        this.onError?.(
-          new InferenceError(e.message || "Worker runtime error"),
-        );
+        this.handleWorkerError(new InferenceError(e.message || "Worker runtime error"));
       };
     } catch (err) {
       throw new ModelLoadError(
         err instanceof Error ? err.message : "Failed to initialize worker",
         this.currentModelKey,
       );
+    }
+  }
+
+  private handleWorkerError(error: InferenceError): void {
+    if (error.recoverable && this.retryCount < MAX_RETRIES) {
+      this.retryCount++;
+      logger.warn(
+        `Retrying model load (attempt ${String(this.retryCount)}/${String(MAX_RETRIES)})`,
+      );
+      this.emit(
+        "status",
+        `Retrying (${String(this.retryCount)}/${String(MAX_RETRIES)})...`,
+      );
+      setTimeout(() => {
+        this.switchModel(this.currentModelKey);
+      }, RETRY_DELAY_MS * this.retryCount);
+    } else {
+      this.emit("error", error);
+    }
+  }
+
+  private flushInferQueue(): void {
+    while (this.inferQueue.length > 0) {
+      const item = this.inferQueue.shift();
+      if (item) {
+        this.infer(item.pixels, item.width, item.height);
+      }
     }
   }
 
@@ -102,12 +137,13 @@ export class InferenceService {
       std: model.std,
     };
     this.worker?.postMessage(cmd);
-    this.onStatusChange?.(`Loading ${model.name}...`);
+    this.emit("status", `Loading ${model.name}...`);
   }
 
   infer(pixels: ArrayBuffer, width: number, height: number): void {
     if (!this.ready) {
-      this.onStatusChange?.("Model still loading...");
+      this.inferQueue.push({ pixels, width, height });
+      this.emit("status", "Model still loading — request queued");
       return;
     }
     const cmd: WorkerCommand = {
@@ -118,32 +154,7 @@ export class InferenceService {
       height,
     };
     this.worker?.postMessage(cmd, [pixels]);
-    this.onStatusChange?.("Processing...");
-  }
-
-  on(
-    event: "status",
-    handler: (text: string) => void,
-  ): void;
-  on(
-    event: "result",
-    handler: (logits: Float32Array, modelKey: ModelKey) => void,
-  ): void;
-  on(
-    event: "error",
-    handler: (error: AppError) => void,
-  ): void;
-  on(
-    event: string,
-    handler: (...args: never[]) => void,
-  ): void {
-    if (event === "status") {
-      this.onStatusChange = handler as (text: string) => void;
-    } else if (event === "result") {
-      this.onResult = handler as (logits: Float32Array, modelKey: ModelKey) => void;
-    } else if (event === "error") {
-      this.onError = handler as (error: AppError) => void;
-    }
+    this.emit("status", "Processing...");
   }
 
   isReady(): boolean {
@@ -166,6 +177,8 @@ export class InferenceService {
     this.worker?.terminate();
     this.worker = null;
     this.ready = false;
+    this.inferQueue = [];
+    this.removeAllListeners();
   }
 }
 

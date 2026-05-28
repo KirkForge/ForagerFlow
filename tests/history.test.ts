@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 
 // We test the history module's pure logic by mocking IndexedDB.
 // The IndexedDB API isn't available in jsdom, so we test the function signatures
