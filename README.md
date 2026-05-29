@@ -1,5 +1,8 @@
 # Foragerflow
 
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support%20my%20hardware-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/KirkForge)
+
+
 Offline-first PWA for mushroom identification using ONNX models running entirely in the browser.
 
 ## Setup
