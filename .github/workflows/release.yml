@@ -1,0 +1,151 @@
+name: Release
+
+# Build a release bundle with the real ONNX weights baked in. Triggered
+# when you cut a GitHub release (so the artifact attaches to that release)
+# or manually from the Actions tab (for a dry-run build).
+#
+# This workflow is heavy (PyTorch + timm + transformers download, ~1 GB
+# of python deps, 90+330 MB of ONNX weights produced). It does NOT run
+# on every push — only on release. The every-push CI in ci.yml stays
+# small and fast.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write  # needed to upload release assets
+
+jobs:
+  export-onnx:
+    name: Export ONNX weights
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-release-${{ hashFiles('export_bvra_onnx.py', 'export_dima806_onnx.py') }}
+          restore-keys: ${{ runner.os }}-pip-release-
+
+      - name: Install PyTorch (CPU)
+        run: |
+          python -m pip install --upgrade pip
+          # CPU-only torch keeps the image small; the export is graph
+          # tracing, not training, so GPU is unnecessary.
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.4.1
+          python -m pip install timm==1.0.7 transformers==4.45.2 onnx==1.17.0 onnxruntime==1.19.2
+
+      - name: Export BVRA ONNX
+        run: python export_bvra_onnx.py
+        env:
+          # Keep the HF cache inside the workspace so we can upload it
+          # to the build job. Default would be ~/.cache/huggingface.
+          HF_HOME: ${{ github.workspace }}/.hf-cache
+
+      - name: Export dima806 ONNX
+        run: python export_dima806_onnx.py
+        env:
+          HF_HOME: ${{ github.workspace }}/.hf-cache
+
+      - name: Smoke-test ONNX output shapes
+        run: |
+          python - <<'PY'
+          import onnxruntime as ort
+          import numpy as np
+          for path, expected in [
+              ("pwa/model/fungitastic.onnx", 215),
+              ("pwa/model/dima806.onnx", 100),
+          ]:
+              sess = ort.InferenceSession(path, providers=["CPUExecutionProvider"])
+              out = sess.run(None, {"pixel_values": np.zeros((1, 3, 224, 224), dtype=np.float32)})
+              shape = out[0].shape
+              assert shape == (1, expected), f"{path}: expected (1, {expected}), got {shape}"
+              assert np.isfinite(out[0]).all(), f"{path}: non-finite logits"
+              print(f"  PASS  {path}  shape={shape}")
+          PY
+
+      - name: Upload exported ONNX
+        uses: actions/upload-artifact@v4
+        with:
+          name: onnx-weights
+          path: |
+            pwa/model/*.onnx
+            pwa/model/*.onnx.data
+          retention-days: 7
+
+  build:
+    name: Build PWA bundle
+    needs: export-onnx
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Drop the in-repo ONNX stubs
+        run: |
+          # The repo ships shape-valid smoke-test stubs in pwa/model/.
+          # The export-onnx job produced the real weights. Remove the
+          # stubs and replace with the artifact's real weights.
+          rm -f pwa/model/*.onnx pwa/model/*.onnx.data
+
+      - name: Download exported ONNX
+        uses: actions/download-artifact@v4
+        with:
+          name: onnx-weights
+          path: pwa/model/
+
+      - name: Verify labels
+        run: node scripts/verify-labels.cjs
+
+      - name: Build
+        run: pnpm build
+
+      - name: Bundle the dist for upload
+        run: |
+          mkdir -p release-bundle
+          cp -r dist/. release-bundle/
+          # Print what we're shipping so it's obvious in the logs
+          du -sh release-bundle/* 2>/dev/null | head -20
+          echo "---"
+          find release-bundle -name "*.onnx*" -exec ls -la {} \;
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pwa-dist
+          path: release-bundle
+          retention-days: 14
+
+      - name: Attach dist to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-bundle/index.html
+            release-bundle/assets/*
+            release-bundle/js/*
+            release-bundle/css/*
+            release-bundle/model/*
+            release-bundle/manifest.json
+            release-bundle/sw.js
+          fail_on_unmatched_files: false

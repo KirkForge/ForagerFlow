@@ -43,6 +43,18 @@ llm/
 models--*/
 snapshots/
 
+# --- ONNX weight exports (NEVER commit) ---
+# The pwa/model/*.onnx files in the repo were shape-only stubs that
+# referenced missing .onnx.data sidecar files; they would crash at
+# inference time. Real weights are produced by export_bvra_onnx.py /
+# export_dima806_onnx.py (which download PyTorch checkpoints from HF
+# and torch.onnx.export locally), then committed to a release bundle
+# via .github/workflows/release.yml. Devs running pnpm dev locally
+# should run the export scripts to populate pwa/model/ before serving.
+pwa/model/*.onnx
+pwa/model/*.onnx.data
+pwa/model/*.onnx.external-data
+
 # --- Secrets & credentials ---
 *.pem
 *.key
