@@ -44,11 +44,21 @@ function extractModelLabels(appJs, modelKey) {
   }
 
   const block = appJs.slice(labelsStart + 1, labelsEnd);
-  return block
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l.startsWith('"'))
-    .map((l) => l.replace(/,$/, "").replace(/^"/, "").replace(/"$/, ""));
+  // pwa/js/app.js writes labels with 4 entries per line, e.g.
+  //   "Agaricus altipes","Agaricus arvensis","Agaricus augustus","Agaricus bernardii",
+  // Split each line on ',' first, then unquote each part.
+  const items = [];
+  for (const rawLine of block.split("\n")) {
+    const line = rawLine.replace(/,$/, "").trim();
+    if (!line) continue;
+    for (const part of line.split(",")) {
+      const t = part.trim();
+      if (t.startsWith('"') && t.endsWith('"') && t.length >= 2) {
+        items.push(t.slice(1, -1));
+      }
+    }
+  }
+  return items;
 }
 
 function extractKnowledgeKeys(filePath) {
@@ -63,47 +73,74 @@ function extractKnowledgeKeys(filePath) {
 }
 
 const appJs = fs.readFileSync(path.join(JS, "app.js"), "utf8");
-const bvra = extractModelLabels(appJs, "bvra");
-const dima = extractModelLabels(appJs, "dima806");
 const knowledge = extractKnowledgeKeys(path.join(JS, "knowledge.js"));
+
+// Source of truth for BVRA: the class list shipped with the ONNX model
+// (pwa/model/fungitastic-classes.json). Some upstream FungiTastic classes
+// appear more than once in this file — that's part of the model's training
+// output, not a bug. We must match the model class file *exactly* to keep
+// logit index → label alignment intact.
+const bvraExpectedPath = path.join(PWA, "model", "fungitastic-classes.json");
+const bvraExpected = JSON.parse(fs.readFileSync(bvraExpectedPath, "utf8"));
+const dimaExpected = JSON.parse(fs.readFileSync(
+  path.join(ROOT, "src", "data", "labels-dima806.json"),
+  "utf8",
+));
+
+const appBvra = extractModelLabels(appJs, "bvra");
+const appDima = extractModelLabels(appJs, "dima806");
 
 let exitCode = 0;
 
-function check(name, labels, expectedCount, knowledgeSet) {
+function check(name, appLabels, sourceLabels, knowledgeSet) {
   console.log(`\n--- ${name} ---`);
-  if (labels.length !== expectedCount) {
-    console.error(`FAIL: Expected ${expectedCount} labels, got ${labels.length}`);
+  if (appLabels.length !== sourceLabels.length) {
+    console.error(
+      `FAIL: app.js has ${appLabels.length} labels but source has ${sourceLabels.length}`,
+    );
     exitCode = 1;
   } else {
-    console.log(`PASS: Label count = ${labels.length}`);
+    console.log(`PASS: Label count = ${appLabels.length}`);
   }
 
-  const seen = new Set();
-  const dups = [];
-  for (const l of labels) {
-    if (seen.has(l)) dups.push(l);
-    seen.add(l);
-  }
-  if (dups.length > 0) {
-    console.error(`FAIL: Duplicate labels: ${dups.join(", ")}`);
+  // Exact match, order-sensitive (model logit i → label[i])
+  const firstDiff = appLabels.findIndex((l, i) => l !== sourceLabels[i]);
+  if (firstDiff !== -1) {
+    const show = (arr) =>
+      arr
+        .slice(Math.max(0, firstDiff - 2), firstDiff + 5)
+        .map((x, j) => `    [${firstDiff - 2 + j}] ${x}`)
+        .join("\n");
+    console.error(
+      `FAIL: app.js labels diverge from source at index ${firstDiff}.\n` +
+        `  app.js:\n${show(appLabels)}\n` +
+        `  source:\n${show(sourceLabels)}`,
+    );
     exitCode = 1;
   } else {
-    console.log("PASS: No duplicate labels");
+    console.log("PASS: app.js labels match source exactly");
   }
 
+  // Knowledge coverage — every distinct label should have a knowledge entry.
+  // Duplicates share the same knowledge key, so report on the unique set.
+  const uniqueLabels = new Set(sourceLabels);
   const missing = [];
-  for (const l of labels) {
+  for (const l of uniqueLabels) {
     if (!knowledgeSet.has(l)) missing.push(l);
   }
   if (missing.length > 0) {
-    console.error(`FAIL: Missing knowledge entries (${missing.length}): ${missing.slice(0, 5).join(", ")}${missing.length > 5 ? "..." : ""}`);
+    console.error(
+      `FAIL: Missing knowledge entries (${missing.length}): ${missing.slice(0, 5).join(", ")}${missing.length > 5 ? "..." : ""}`,
+    );
     exitCode = 1;
   } else {
-    console.log("PASS: All labels have knowledge entries");
+    console.log(
+      `PASS: All ${uniqueLabels.size} unique labels have knowledge entries`,
+    );
   }
 }
 
-check("BVRA", bvra, 215, knowledge);
-check("dima806", dima, 100, knowledge);
+check("BVRA", appBvra, bvraExpected, knowledge);
+check("dima806", appDima, dimaExpected, knowledge);
 
 process.exit(exitCode);
