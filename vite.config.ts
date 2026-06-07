@@ -23,16 +23,23 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, "src/index.html"),
+        sw: resolve(__dirname, "src/sw.ts"),
       },
       output: {
-        entryFileNames: "assets/[name]-[hash].js",
+        entryFileNames: (chunk) =>
+          // Service worker is loaded by the browser at the root path
+          // (/sw.js), so keep its filename stable (no hash).
+          chunk.name === "sw" ? "sw.js" : "assets/[name]-[hash].js",
         chunkFileNames: "assets/[name]-[hash].js",
         assetFileNames: "assets/[name]-[hash].[ext]",
       },
     },
   },
   worker: {
-    format: "es",
+    // Classic (IIFE) worker so it can use importScripts to load the
+    // vendored UMD ort.min.js. Module workers cannot use importScripts
+    // and ort.min.js is not an ES module.
+    format: "iife",
     rollupOptions: {
       output: {
         entryFileNames: "assets/inference-worker-[hash].js",

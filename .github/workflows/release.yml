@@ -120,6 +120,16 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Copy ONNX models into dist/
+        run: |
+          # The exported ONNX files live in pwa/model/ but the build emits
+          # to dist/. The runtime loads them from /model/... (absolute path
+          # in src/data/model-registry.ts), so they must be at dist/model/.
+          mkdir -p dist/model
+          cp pwa/model/*.onnx pwa/model/*.onnx.data dist/model/ 2>/dev/null || true
+          echo "Models copied to dist/model/:"
+          ls -la dist/model/
+
       - name: Bundle the dist for upload
         run: |
           mkdir -p release-bundle
@@ -140,12 +150,18 @@ jobs:
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
+          # The TypeScript app builds to dist/ with a Vite-emitted
+          # structure: index.html, sw.js, manifest.webmanifest,
+          # assets/main-*.{js,css}, assets/inference-worker-*.js,
+          # assets/delete-entry-*.js, js/ort.min.js, js/ort-wasm-*,
+          # model/*.onnx. There is no css/ subdir (Vite emits the
+          # CSS as an asset/* file) and no manifest.json (the file
+          # is manifest.webmanifest).
           files: |
             release-bundle/index.html
             release-bundle/assets/*
             release-bundle/js/*
-            release-bundle/css/*
             release-bundle/model/*
-            release-bundle/manifest.json
+            release-bundle/manifest.webmanifest
             release-bundle/sw.js
           fail_on_unmatched_files: false

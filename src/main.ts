@@ -5,8 +5,13 @@ import { processFileInput } from "@/services/image-input";
 import { registerServiceWorker, updateOnlineStatus } from "@/services/connectivity";
 import { generatePredictionReport } from "@/inference/results";
 import { modelRegistry } from "@/data/model-registry";
-import { ResultsRenderer } from "@/ui/results";
-import { saveIdentification, getHistory, clearHistory } from "@/services/history";
+import { ResultsRenderer, SafetyUI } from "@/ui";
+import {
+  saveIdentification,
+  getHistory,
+  clearHistory,
+  type HistoryEntry,
+} from "@/services/history";
 import { initWebVitals } from "@/services/web-vitals";
 import { logger } from "@/core/logger";
 import { sanitizeText } from "@/core/sanitize";
@@ -20,11 +25,14 @@ function getEdibilityClass(ed: string): string {
 class AppController {
   private camera = new CameraService(224);
   private renderer: ResultsRenderer;
+  private safety!: SafetyUI;
   private statusEl: HTMLElement;
   private badgeEl: HTMLElement;
   private videoEl: HTMLVideoElement;
   private captureBtn: HTMLButtonElement;
   private cameraErrorEl: HTMLElement;
+  private fileFallbackBtn: HTMLButtonElement | null = null;
+  private fileInputEl: HTMLInputElement | null = null;
   #appState: ApplicationState = ApplicationState.Loading;
 
   constructor() {
@@ -33,6 +41,10 @@ class AppController {
     this.videoEl = this.require("#video") as unknown as HTMLVideoElement;
     this.captureBtn = this.require("#capture-btn") as unknown as HTMLButtonElement;
     this.cameraErrorEl = this.require("#camera-error");
+    this.fileFallbackBtn = document.querySelector<HTMLButtonElement>(
+      "#file-fallback-btn",
+    );
+    this.fileInputEl = document.querySelector<HTMLInputElement>("#file-input");
     this.renderer = new ResultsRenderer(this.require("#app"));
   }
 
@@ -44,6 +56,17 @@ class AppController {
     updateOnlineStatus(this.badgeEl);
 
     inferenceService.initialize();
+
+    // SafetyUI is constructed first because the storage-confirm modal
+    // listens for inferenceService.on("storageConfirm", ...). The
+    // init() promise blocks until the user has acknowledged the
+    // first-run modal (or has already done so in a previous session).
+    this.safety = new SafetyUI({
+      inferenceService,
+      onAcknowledged: () => {
+        logger.debug("Safety acknowledgement recorded");
+      },
+    });
 
     inferenceService.on("status", (text: string) => {
       this.statusEl.textContent = text;
@@ -57,17 +80,25 @@ class AppController {
       const report = generatePredictionReport(logits, model);
       this.setState(ApplicationState.Done);
       this.renderer.render(report, model);
+      this.setCaptureBusy(false);
       saveIdentification(report, modelKey).catch((_e: unknown) => { /* best-effort save */ });
       void this.renderHistory();
     });
 
     inferenceService.on("error", (error) => {
       this.statusEl.textContent = `Error: ${error.message}`;
+      this.setCaptureBusy(false);
       this.setState(ApplicationState.CameraError);
     });
 
+    // Block app initialization on the first-run safety modal so we
+    // don't show the camera (and the model-select) before the user
+    // has been told this is not a safety oracle.
+    await this.safety.init();
+
     await this.startCamera();
     void this.renderHistory();
+    void this.renderLastResult();
     inferenceService.switchModel(ModelKey.BVRA);
   }
 
@@ -85,9 +116,23 @@ class AppController {
   }
 
   private handleCapture(): void {
+    if (this.captureBtn.dataset["busy"] === "true") return; // debounce
     const result = this.camera.capture();
     if (!result) return;
+    this.setCaptureBusy(true);
+    this.statusEl.textContent = "Identifying…";
     inferenceService.infer(result.buffer, result.width, result.height);
+  }
+
+  /**
+   * Toggles the visible busy state on the capture button. The
+   * button is disabled while busy so a wet thumb cannot double-fire.
+   * The CSS [data-busy="true"] rule renders a spinner overlay.
+   */
+  private setCaptureBusy(busy: boolean): void {
+    this.captureBtn.dataset["busy"] = busy ? "true" : "false";
+    this.captureBtn.disabled = busy;
+    this.captureBtn.setAttribute("aria-busy", busy ? "true" : "false");
   }
 
   private async handleFileSelect(
@@ -99,8 +144,9 @@ class AppController {
 
     try {
       const { buffer, width, height } = await processFileInput(file);
+      this.setCaptureBusy(true);
+      this.statusEl.textContent = "Identifying…";
       inferenceService.infer(buffer, width, height);
-      this.statusEl.textContent = "Processing...";
     } catch (err) {
       logger.error("File processing failed:", err);
       this.statusEl.textContent = "Failed to process image.";
@@ -113,6 +159,8 @@ class AppController {
 
   private handleModelSwitch(e: Event): void {
     const select = e.target as HTMLSelectElement;
+    // SafetyUI has already gated the dropdown for capability and
+    // first-use confirmation. If the value made it through, switch.
     const key =
       select.value === "dima806"
         ? ModelKey.Dima806
@@ -125,6 +173,40 @@ class AppController {
     updateOnlineStatus(this.badgeEl);
   }
 
+  /**
+   * Renders the most recent history entry as a "last seen" callout
+   * above the camera viewfinder so a returning user can verify a
+   * species they identified earlier without scrolling. Skips if
+   * there is no history. Rendered into the #status area because
+   * that is the only always-visible slot before the camera; the
+   * results panel sits below the camera and would require scroll
+   * to reach on a phone.
+   */
+  private async renderLastResult(): Promise<void> {
+    const entries = await getHistory(1);
+    const last = entries[0];
+    if (!last) return;
+    const date = sanitizeText(new Date(last.timestamp).toLocaleString());
+    const species = sanitizeText(last.top1Species);
+    const edibility = sanitizeText(last.top1Edibility);
+    const prob = (last.top1Probability * 100).toFixed(1);
+    const edClass = getEdibilityClass(last.top1Edibility);
+    const slot = document.getElementById("last-result");
+    if (!slot) return;
+    slot.innerHTML = `
+      <div class="last-result-inner">
+        <div class="last-result-label">Last identification</div>
+        <div class="last-result-species">${species}</div>
+        <div class="last-result-meta">
+          <span class="history-edibility ${edClass}">${edibility}</span>
+          <span class="last-result-prob">${prob}%</span>
+          <span class="last-result-date">${date}</span>
+        </div>
+      </div>
+    `;
+    slot.style.display = "block";
+  }
+
   private async renderHistory(): Promise<void> {
     const list = document.getElementById("history-list");
     if (!list) return;
@@ -135,7 +217,7 @@ class AppController {
         return;
       }
       list.innerHTML = entries
-        .map((e) => {
+        .map((e: HistoryEntry) => {
           const date = sanitizeText(new Date(e.timestamp).toLocaleDateString());
           const model = sanitizeText(e.modelKey);
           const species = sanitizeText(e.top1Species);
@@ -161,9 +243,12 @@ class AppController {
           void (async () => {
             const id = (btn as HTMLElement).dataset["id"];
             if (!id) return;
-            const { deleteEntry } = await import("@/services/history");
+            const { deleteEntry } = await import(
+              /* @vite-ignore */ "@/services/history/delete-entry"
+            );
             await deleteEntry(id);
             void this.renderHistory();
+            void this.renderLastResult();
           })();
         });
       });
@@ -173,8 +258,11 @@ class AppController {
   }
 
   private async handleClearHistory(): Promise<void> {
+    const confirmed = await this.safety.confirmClearHistory();
+    if (!confirmed) return;
     await clearHistory();
     void this.renderHistory();
+    void this.renderLastResult();
   }
 
   private bindEvents(): void {
@@ -182,9 +270,16 @@ class AppController {
       this.handleCapture();
     });
 
-    const fileInput = document.getElementById("file-input");
-    fileInput?.addEventListener("change", (e) => {
+    this.fileInputEl?.addEventListener("change", (e) => {
       void this.handleFileSelect(e);
+    });
+
+    // The file-fallback button programmatically clicks the hidden
+    // file input. This is more phone-friendly than a <label> that
+    // requires the input to be visible next to it (which doesn't
+    // happen on landscape phones).
+    this.fileFallbackBtn?.addEventListener("click", () => {
+      this.fileInputEl?.click();
     });
 
     const clearBtn = document.getElementById("history-clear");

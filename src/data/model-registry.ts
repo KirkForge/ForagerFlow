@@ -11,7 +11,9 @@ export const modelRegistry: Record<ModelKey, ModelRegistryEntry> = {
     key: ModelKey.BVRA,
     name: "Specialist (215 classes)",
     size: "90 MB",
-    path: "./model/fungitastic.onnx",
+    // Absolute path so the worker (loaded from /assets/inference-worker-*.js)
+    // resolves the model against the site root, not the worker's location.
+    path: "/model/fungitastic.onnx",
     labels: labelsBvra,
     mean: [0.485, 0.456, 0.406],
     std: [0.229, 0.224, 0.225],
@@ -22,7 +24,7 @@ export const modelRegistry: Record<ModelKey, ModelRegistryEntry> = {
     key: ModelKey.Dima806,
     name: "General (100 classes)",
     size: "330 MB",
-    path: "./model/dima806.onnx",
+    path: "/model/dima806.onnx",
     labels: labelsDima806,
     mean: [0.5, 0.5, 0.5],
     std: [0.5, 0.5, 0.5],

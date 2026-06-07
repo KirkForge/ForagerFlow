@@ -38,13 +38,24 @@ jobs:
         run: pnpm lint
 
       - name: Unit tests
-        run: pnpm test -- --coverage
+        run: pnpm test
 
       - name: Verify labels
         run: node scripts/verify-labels.cjs
 
       - name: Build
         run: pnpm build
+
+      - name: Verify built dist
+        # Catches the regressions that have hit the bundle in past
+        # builds: ort free var in the module worker, sw.ts not in
+        # Vite inputs, CSP missing wasm-unsafe-eval, etc. The
+        # script is a static-analysis smoke test — it parses the
+        # built JS and asserts invariants. It does NOT need a real
+        # browser or a real ONNX file (a WARN is emitted if the
+        # models are missing, which is expected on every-push CI
+        # because the heavy export happens in release.yml).
+        run: pnpm verify:dist
 
       - name: Security audit
         run: pnpm audit --audit-level=high || true

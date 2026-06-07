@@ -24,10 +24,29 @@ interface InferenceEvents {
   status: string;
   result: { logits: Float32Array; modelKey: ModelKey };
   error: InferenceError | LabelMismatchError;
+  /**
+   * Emitted from switchModel() before a large (≥100 MB) model is
+   * loaded when navigator.storage.estimate() reports less than
+   * `MIN_FREE_BYTES` of free space. The UI listens for this and
+   * shows a confirm modal; the user accepting resumes the switch by
+   * calling switchModel() a second time with a bypass flag.
+   *
+   * The payload reports the requested model, the estimated free
+   * bytes, and a token. The handler must call
+   * `resumeStorageConfirm(token)` with the same token to actually
+   * load the model.
+   */
+  storageConfirm: { modelKey: ModelKey; freeBytes: number; token: string };
 }
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
+// We don't know the model size precisely without the .onnx loaded,
+// so we always run the storage check on first switch. 500 MB is
+// the dima806 ONNX (330 MB) plus the BVRA ONNX (90 MB) plus a
+// small margin. If you only intend to ship one model, lower this.
+const MIN_FREE_BYTES = 500 * 1024 * 1024;
+const STORAGE_ESTIMATE_TIMEOUT_MS = 1500;
 
 export type { WorkerMessage, WorkerCommand };
 
@@ -37,12 +56,18 @@ export class InferenceService extends TypedEmitter<InferenceEvents> {
   private currentModelKey: ModelKey = ModelKey.BVRA;
   private retryCount = 0;
   private inferQueue: { pixels: ArrayBuffer; width: number; height: number }[] = [];
+  private pendingStorageToken: string | null = null;
+  private pendingModelKey: ModelKey | null = null;
 
   initialize(): void {
     try {
+      // Classic worker (not module) so it can importScripts("/js/ort.min.js").
+      // The vendored ort.min.js is a UMD bundle that attaches `ort` to the
+      // worker global; module workers cannot use importScripts and ort.min.js
+      // is not an ES module.
       this.worker = new Worker(
         new URL("@/inference/worker.ts", import.meta.url),
-        { type: "module" },
+        { type: "classic" },
       );
 
       this.worker.onmessage = (
@@ -123,8 +148,19 @@ export class InferenceService extends TypedEmitter<InferenceEvents> {
     }
   }
 
-  switchModel(key: ModelKey): void {
+  switchModel(key: ModelKey, opts: { skipStorageCheck?: boolean } = {}): void {
     const model = modelRegistry[key];
+
+    // Only enforce the storage check on the "first big load" — once
+    // the user has confirmed once, repeated switches between the two
+    // models should not re-prompt. The ONNX file is cached by the
+    // service worker after first download; subsequent loads come from
+    // the cache. We still prompt for the very first load of each
+    // large model.
+    if (!opts.skipStorageCheck && this.shouldCheckStorageFor(key)) {
+      void this.checkStorageAndMaybeEmit(key);
+      return;
+    }
 
     this.currentModelKey = key;
     this.ready = false;
@@ -138,6 +174,81 @@ export class InferenceService extends TypedEmitter<InferenceEvents> {
     };
     this.worker?.postMessage(cmd);
     this.emit("status", `Loading ${model.name}...`);
+  }
+
+  /**
+   * Called by the UI after the user accepts the storage-confirm
+   * modal. Continues the pending switchModel() call.
+   */
+  resumeStorageConfirm(token: string): void {
+    if (this.pendingStorageToken !== token || this.pendingModelKey === null) {
+      logger.warn("resumeStorageConfirm: token mismatch or expired");
+      return;
+    }
+    const key = this.pendingModelKey;
+    this.pendingStorageToken = null;
+    this.pendingModelKey = null;
+    this.emit("status", "Continuing model load...");
+    this.switchModel(key, { skipStorageCheck: true });
+  }
+
+  private storageCheckedFor = new Set<ModelKey>();
+
+  private shouldCheckStorageFor(key: ModelKey): boolean {
+    // Don't re-prompt for the same model in the same session.
+    return !this.storageCheckedFor.has(key);
+  }
+
+  private async checkStorageAndMaybeEmit(key: ModelKey): Promise<void> {
+    // If StorageManager isn't available (older browsers, or a
+    // restrictive private mode), fall through to the normal load.
+    if (typeof navigator === "undefined" || typeof navigator.storage.estimate !== "function") {
+      logger.debug("StorageManager not available; skipping storage check");
+      this.storageCheckedFor.add(key);
+      this.switchModel(key, { skipStorageCheck: true });
+      return;
+    }
+
+    let freeBytes = Infinity;
+    try {
+      const estimatePromise = navigator.storage.estimate();
+      const result = await Promise.race([
+        estimatePromise,
+        new Promise<never>((_, reject) => {
+          setTimeout(
+            () => {
+              reject(new Error("storage estimate timeout"));
+            },
+            STORAGE_ESTIMATE_TIMEOUT_MS,
+          );
+        }),
+      ]);
+      if (typeof result.quota === "number" && typeof result.usage === "number") {
+        freeBytes = Math.max(0, result.quota - result.usage);
+      }
+    } catch (err) {
+      logger.warn("Storage estimate failed; skipping storage check:", err);
+      this.storageCheckedFor.add(key);
+      this.switchModel(key, { skipStorageCheck: true });
+      return;
+    }
+
+    this.storageCheckedFor.add(key);
+
+    if (freeBytes < MIN_FREE_BYTES) {
+      const token = crypto.randomUUID();
+      this.pendingStorageToken = token;
+      this.pendingModelKey = key;
+      const freeMB = Math.round(freeBytes / 1024 / 1024);
+      this.emit("storageConfirm", { modelKey: key, freeBytes, token });
+      this.emit(
+        "status",
+        `Low storage (${String(freeMB)} MB free). Awaiting confirmation.`,
+      );
+      return;
+    }
+
+    this.switchModel(key, { skipStorageCheck: true });
   }
 
   infer(pixels: ArrayBuffer, width: number, height: number): void {

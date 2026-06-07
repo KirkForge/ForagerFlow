@@ -3,6 +3,99 @@
 All notable changes to ForagerFlow are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com).
 
+## [Unreleased]
+
+### Added
+- **First-run safety modal.** Full-screen `<dialog>` with a `showModal()`
+  top layer. The "Continue" button is disabled until the
+  acknowledgement checkbox is checked. Acceptance is persisted in
+  `localStorage["ff:safety-ack-v1"]`; bump the version constant in
+  `src/ui/safety.ts` to re-prompt after a copy change.
+- **Sticky safety footer.** Always-visible 32 px band at the bottom of
+  the viewport. Lives at the end of the `#app` flex column so it
+  cannot be scrolled past and the camera shrinks to make room. Text:
+  *"Never eat a wild mushroom based on this app."* with a
+  "Find a mycologist" deep link.
+- **Phone-first capture button busy state.** `data-busy="true"` on
+  `#capture-btn` renders a spinner overlay, disables the button, and
+  sets `aria-busy="true"` so a wet thumb cannot double-fire and
+  submit two inferences.
+- **Camera-permission fallback button.** Replaces the broken
+  `<label for=...>` that needed the file input to be visible next to
+  it (off-screen on landscape phones). Now a full-width "Choose a
+  photo" button programmatically clicks the hidden input.
+- **Last-identification callout.** On app start, the most recent
+  history entry is rendered as a compact band above the camera
+  viewfinder, so a returning field user can verify a species they
+  identified earlier without scrolling. Hidden if there is no
+  history.
+- **Clear-history confirm modal.** Replaces the immediate
+  `clearHistory()` call that previously allowed a one-fat-finger
+  data loss.
+- **dima806 capability gate.** The 330 MB dima806 option is hidden
+  on devices that report `navigator.deviceMemory < 4`,
+  `hardwareConcurrency < 4`, or `connection.effectiveType` in
+  `{slow-2g, 2g, 3g}`. On capable devices, the first time the user
+  picks it, a confirm modal explains the size and the offline cache
+  implication; acceptance is persisted in
+  `localStorage["ff:dima-confirm-v1"]` so we never ask again.
+- **Pre-model-load storage confirm.** `inferenceService.switchModel()`
+  calls `navigator.storage.estimate()` and emits a new
+  `storageConfirm` event when there is less than 500 MB of free
+  space. The UI listens and shows a confirm modal; the user accepting
+  resumes the load via `inferenceService.resumeStorageConfirm(token)`.
+- **Verify-this-species link.** Each top-1 prediction in
+  `src/ui/results.ts` now appends an anchor that opens a Google
+  search for `"<species> mushroom identification"` in a new tab.
+  The URL is built with the `URL` constructor and `searchParams`
+  so the host cannot be tampered with by an attacker controlling
+  the species name.
+- **`pnpm verify:dist` and `pnpm verify:inference` scripts.** Wire
+  the existing `scripts/test-dist.py` and `scripts/test-inference.py`
+  into `package.json` so CI can gate on them. `verify:dist` is
+  included in the every-push `pnpm ci` aggregator.
+
+### Changed
+- **`src/services/history.ts` split into a barrel + dynamic sub-module.**
+  `src/services/history/index.ts` re-exports `saveIdentification`,
+  `getHistory`, `clearHistory` for static import. `deleteEntry` lives
+  in `src/services/history/delete-entry.ts` and is dynamically
+  imported by `src/main.ts` only when a history row's delete button
+  is tapped. Vite now produces a separate `assets/delete-entry-*.js`
+  chunk and the "mixed import" build warning is gone.
+- **`scripts/verify-labels.cjs` repointed at `src/data/`.** Previously
+  parsed labels out of the now-deleted `pwa/js/app.js`. Now compares
+  `src/data/labels-bvra.json` against the canonical
+  `pwa/model/fungitastic-classes.json` order-sensitively, and checks
+  `src/data/knowledge-{bvra,dima806}.json` for coverage. The
+  `pwa/model/` directory remains the export target and the source
+  of truth for the BVRA class list.
+- **README rewrite.** Drops the "pwa/ is what the app actually serves"
+  line, points Setup at `dist/`, drops the wrong test-count claim,
+  adds a "Phone-first safety behaviour" section that documents the
+  modal, sticky footer, capture busy state, capability gate, storage
+  confirm, and verify-this-species link.
+- **`InferenceService` event map extended** with
+  `storageConfirm: { modelKey, freeBytes, token }`. The map is still
+  type-safe — adding the event required only the interface entry.
+
+### Removed
+- **Legacy `pwa/` app directory.** `pwa/index.html`, `pwa/sw.js`,
+  `pwa/css/style.css`, `pwa/manifest.json`, and `pwa/js/{app,knowledge,worker,ort.*}.{js,wasm,mjs}`
+  are gone. `pwa/model/` is retained as the export target and
+  canonical BVRA class list. The TypeScript app under `src/` is the
+  single maintained implementation; `dist/` is the deployable.
+
+### Fixed
+- **Vite "mixed dynamic+static import" build warning** for
+  `src/services/history.ts` — see Changed.
+- **README inconsistency** that claimed `pwa/` was served and that
+  there were 56 tests.
+- **In-app safety message could be missed** by a returning user who
+  jumps straight to the camera. Now there is no path to the camera
+  without acknowledging the first-run modal, and the sticky footer
+  is always visible.
+
 ## [2.1.0] — 2025-05-28
 
 ### Added

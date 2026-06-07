@@ -102,9 +102,24 @@ export class ResultsRenderer {
         const p = document.createElement("p");
         p.textContent = k.notes;
 
+        // Verify-this-species link: a one-tap escape hatch from the
+        // sandboxed CSP-isolated app to a real search engine. The
+        // species name is sanitized via encodeURIComponent and the
+        // URL is built with the URL constructor so an attacker
+        // cannot inject a different host into the link target.
+        const verify = document.createElement("a");
+        verify.className = "verify-link";
+        verify.textContent = "Verify this species online →";
+        verify.target = "_blank";
+        verify.rel = "noopener noreferrer";
+        const verifyUrl = new URL("https://www.google.com/search");
+        verifyUrl.searchParams.set("q", `${item.label} mushroom identification`);
+        verify.href = verifyUrl.toString();
+
         this.knowledgeEl.innerHTML = "";
         this.knowledgeEl.appendChild(h3);
         this.knowledgeEl.appendChild(p);
+        this.knowledgeEl.appendChild(verify);
         this.knowledgeEl.style.display = "block";
 
         if (report.requiresWarning && report.warningMessage) {

@@ -23,14 +23,29 @@ src/
   data/         — Model registry, labels, knowledge JSON
   inference/    — Worker, service, softmax, results
   services/     — Camera, connectivity, history, image-input, web-vitals
-  ui/           — Results renderer
+                  (history/ is a sub-folder: index.ts is the static
+                   barrel, delete-entry.ts is the dynamic-import sub-module)
+  ui/           — Results renderer, SafetyUI (first-run modal, sticky
+                  footer, capture-busy state, model-picker gate, storage
+                  confirm, clear-history confirm)
   css/          — Stylesheet
   main.ts       — App controller (entry point)
   sw.ts         — Service worker
-  index.html     — SPA shell
+  index.html     — SPA shell (modals, sticky footer, last-result slot
+                  all live here, not in JS-rendered DOM)
 tests/          — Unit tests (Vitest + jsdom)
-scripts/        — CI helpers, label verification, model download
-pwa/            — Legacy standalone PWA (not built from src/)
+scripts/        — CI helpers, label verification, built-dist smoke test,
+                  real-ONNX inference smoke test
+pwa/            — Export target and ONNX drop directory. Contains only
+                  pwa/model/ (the BVRA canonical class list and the
+                  exported *.onnx / *.onnx.data files). There is no
+                  pwa/js/, pwa/css/, pwa/index.html, or pwa/sw.js —
+                  those were the legacy hand-rolled vanilla-JS app
+                  and have been removed.
+public/         — Static assets copied verbatim into dist/ by Vite.
+                  Contains the vendored ort.min.js + ort-wasm-* files
+                  and manifest.webmanifest.
+dist/           — Build output. The deployable.
 ```
 
 ## Code Style
@@ -49,11 +64,18 @@ pwa/            — Legacy standalone PWA (not built from src/)
 3. Results flow back: Worker → InferenceService → AppController → ResultsRenderer
 4. Auto-retry on recoverable errors (max 3 retries with exponential backoff)
 5. Inference requests are queued when model is still loading
+6. `inferenceService.switchModel(key)` checks `navigator.storage.estimate()`
+   before any large model load and emits a `storageConfirm` event the UI
+   listens for to gate the download on a confirm modal
 
 ### State Management
 - `ApplicationState` enum tracks app lifecycle: Loading → CameraActive → Processing → Done
 - `TypedEmitter` provides type-safe event binding
 - `config` module provides runtime feature flags and settings
+- `SafetyUI` (in `src/ui/safety.ts`) owns every `<dialog>` and the sticky
+  footer. `AppController` constructs it once on init and blocks on
+  `safetyUI.init()` to ensure the first-run modal is acknowledged
+  before the camera opens.
 
 ### Error Handling
 - All custom errors extend `AppError` with `code` and `recoverable` flags
@@ -62,13 +84,18 @@ pwa/            — Legacy standalone PWA (not built from src/)
 - `sanitizeText()` is used for all user-visible strings in innerHTML
 
 ### Persistence
-- Identification history stored in IndexedDB via `services/history.ts`
+- Identification history stored in IndexedDB via
+  `services/history/index.ts`. Per-row deletion lives in
+  `services/history/delete-entry.ts` and is dynamically imported by
+  the click handler so Vite can code-split it.
 - Service Worker caches app shell (versioned) and models (lazy)
 
 ## Testing
 
 - Run: `pnpm test`
-- Coverage: `pnpm test:coverage` (threshold: 70% branches/functions/lines/statements)
+- Coverage: `pnpm test:coverage` is broken on vitest 4.x — see
+  `foragerflow-dist-build` memory note. Stick to `pnpm test` and
+  trust the count in the test runner output.
 - Test files live in `tests/` and use `@/` path aliases matching `src/`
 - Mock browser APIs (IndexedDB, camera, canvas) in unit tests
 - Never skip tests. If a test is flaky, mark it with `.skip()` and file an issue.
@@ -79,6 +106,8 @@ pwa/            — Legacy standalone PWA (not built from src/)
 - [ ] `pnpm lint` passes
 - [ ] `pnpm test` passes
 - [ ] `pnpm build` succeeds
+- [ ] `pnpm verify:labels` passes (label/logit alignment)
+- [ ] `pnpm verify:dist` passes (built-asset smoke test)
 - [ ] No secrets or large files committed
 - [ ] Commit messages follow `type(scope): message` format
 

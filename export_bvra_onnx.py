@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import onnx
 import torch
 import timm
 
@@ -18,12 +19,17 @@ model = timm.create_model(
 )
 model.eval()
 
-dummy_input = torch.randn(1, 3, 224, 224)
-
+# Export to an in-memory buffer first so torch.onnx.export doesn't write a
+# .data sidecar. Then save with onnx.save(save_as_external_data=False) to
+# produce a single monolithic .onnx. onnxruntime-web 1.25.1 cannot load
+# external-data sidecars from inside a Web Worker (the sidecar URL
+# resolution is broken — empty path, "Module.MountedFiles is not
+# available"), so the in-browser build needs a single file.
+buf_path = ROOT / "pwa/model/fungitastic.tmp.onnx"
 torch.onnx.export(
     model,
-    dummy_input,
-    ROOT / "pwa/model/fungitastic.onnx",
+    torch.randn(1, 3, 224, 224),
+    buf_path,
     export_params=True,
     opset_version=14,
     do_constant_folding=True,
@@ -35,4 +41,15 @@ torch.onnx.export(
     },
 )
 
-print("ONNX export complete: pwa/model/fungitastic.onnx")
+# Reload with external data and re-save monolithically. This pulls the
+# sidecar contents into the .onnx file itself.
+loaded = onnx.load(str(buf_path), load_external_data=True)
+buf_path.unlink()
+# Also drop any sidecar that was written.
+sidecar = ROOT / "pwa/model/fungitastic.tmp.onnx.data"
+if sidecar.exists():
+    sidecar.unlink()
+
+final_path = ROOT / "pwa/model/fungitastic.onnx"
+onnx.save(loaded, str(final_path), save_as_external_data=False)
+print(f"ONNX export complete (monolithic): {final_path}  ({final_path.stat().st_size} bytes)")
