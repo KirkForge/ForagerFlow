@@ -29,10 +29,12 @@ The HuggingFace repos (`BVRA/resnext50_32x4d.in1k_ft_fungitastic-mini_224` and `
    ```
    After this, `pwa/model/fungitastic.onnx` (~90 MB) and `pwa/model/dima806.onnx` (~330 MB) exist locally. **They are gitignored** — never commit them.
 
-3. Install JS deps and run the dev server. The static `pwa/` directory is what the app actually serves.
+3. Install JS deps. The TypeScript app under `src/` is the only maintained implementation. `pnpm build` produces the static `dist/` directory, which is what should be hosted.
    ```bash
    pnpm install
-   pnpm dev
+   pnpm dev          # vite dev server on http://localhost:5173
+   pnpm build        # → dist/
+   pnpm preview      # serve the built dist/ locally
    ```
 
 4. Open `http://localhost:5173` in a browser.
@@ -46,13 +48,65 @@ git tag v2.1.0
 git push origin v2.1.0
 ```
 
-Then on GitHub, draft a release for that tag and publish it. The `release.yml` workflow will run, export the real ONNX, and attach the full `pwa/` bundle (JS + CSS + manifest + service worker + the two ONNX weights) to the release as a downloadable asset. Upload the contents of that asset to your static host (GitHub Pages, Netlify, Cloudflare Pages, etc.).
+Then on GitHub, draft a release for that tag and publish it. The `release.yml` workflow will run, export the real ONNX, and attach the full `dist/` bundle (JS + CSS + manifest + service worker + the two ONNX weights) to the release as a downloadable asset. Upload the contents of that asset to your static host (GitHub Pages, Netlify, Cloudflare Pages, etc.). The `pwa/model/` directory is the export target and the source of truth for the BVRA class list; the deployable bundle is `dist/`.
 
 To do a dry-run build without publishing a release, use the Actions tab → "Release" → "Run workflow".
 
 ## Safety
 
-This app runs client-side inference with no remote API. All predictions are local. **Always verify identifications with a certified mycologist before consuming any wild mushroom.**
+**This app runs client-side inference with no remote API.** All predictions are local.
+
+The app will:
+
+- Show a full-screen first-run acknowledgement that must be checked before
+  the camera opens. You are agreeing that you understand the app is not a
+  substitute for expert identification.
+- Display a sticky footer at the bottom of the screen at all times:
+  *"Never eat a wild mushroom based on this app."*
+- Surface a "Verify this species online" link under each top-1 prediction
+  that opens a Google search for the species name in a new tab. Use it.
+- Show per-prediction warnings on low confidence, poisonous lookalikes in
+  the top 3, poisonous top-1, and unknown edibility.
+
+The app will **not**:
+
+- Tell you a mushroom is safe to eat. It identifies species; it does not
+  certify edibility. Even a 99.9% match on a deadly species is a 0.1%
+  chance of misidentification.
+- Phone home, log your images, or contact any safety service.
+
+**Always verify identifications with a certified mycologist or your local poison control center before consuming any wild mushroom.**
+
+### Phone-first safety behaviour
+
+Because this app is designed to be used in the field on a phone:
+
+- The first-run safety modal is `showModal()` with a `<dialog>` top layer.
+  It cannot be dismissed by tapping outside it. The "Continue" button
+  stays disabled until the acknowledgement checkbox is checked.
+- The sticky footer is always visible at the bottom of the viewport, in
+  the same 32–36 px band the OS uses for navigation chrome. It cannot
+  be scrolled past.
+- The capture button has a busy state (`data-busy="true"`) with a
+  spinner overlay and is disabled while inference is running, so a
+  wet thumb cannot double-fire and submit two inferences.
+- On app start, the most recent identification is shown as a callout
+  above the camera viewfinder, so a returning user can verify a species
+  they identified earlier without scrolling.
+- The "Clear history" button opens a confirm dialog before destroying
+  IndexedDB data. A one-tap data loss is not possible.
+- The 330 MB dima806 model is hidden from the dropdown on devices that
+  report `navigator.deviceMemory < 4`, `hardwareConcurrency < 4`, or
+  `connection.effectiveType` in `{slow-2g, 2g, 3g}`. On capable
+  devices, the first time the user picks it, a confirm modal explains
+  the size and the offline cache implication.
+- Before any large model download, the app calls
+  `navigator.storage.estimate()` and shows a confirm modal if there is
+  less than 500 MB of free storage. Users on 32 GB phones get a
+  chance to cancel before the OS starts evicting their camera roll.
+- Camera-permission denial no longer relies on a `<label for=...>`
+  that needs the input to be visible next to it. The fallback is a
+  full-width "Choose a photo" button that taps a hidden file input.
 
 ## Models
 
@@ -62,11 +116,26 @@ This app runs client-side inference with no remote API. All predictions are loca
 ## Build checks
 
 ```bash
-pnpm typecheck        # tsc --noEmit
-pnpm lint             # eslint
-pnpm test             # vitest run (56 tests, no ONNX needed)
-pnpm build            # vite build → dist/
-node scripts/verify-labels.cjs
+pnpm typecheck              # tsc --noEmit
+pnpm lint                   # eslint
+pnpm test                   # vitest run (see package.json "test")
+pnpm build                  # vite build → dist/
+node scripts/verify-labels.cjs   # label/logit alignment + knowledge coverage
+pnpm verify:dist            # python3 scripts/test-dist.py — built-asset smoke checks
+pnpm verify:inference       # python3 scripts/test-inference.py — real-ONNX sanity (requires export)
+pnpm verify                 # the whole battery: typecheck + lint + test + build + verify:dist + verify:labels
 ```
 
-The `verify-labels` script asserts that the labels embedded in `pwa/js/app.js` match the canonical lists (`pwa/model/fungitastic-classes.json` for BVRA, `src/data/labels-dima806.json` for dima806) exactly, order-sensitive — so logit index `i` always maps to the same species. It also checks that every label has a knowledge entry in `pwa/js/knowledge.js`.
+`verify:dist` asserts that `sw.js` exists, `ort.min.js` is present at
+`/js/ort.min.js`, the worker uses `importScripts` and the `wasm`
+execution provider, the CSP includes `wasm-unsafe-eval`, and the
+built HTML points at the worker correctly. Catches the regressions
+that have hit the bundle in past builds (ort free var, sw.ts missing
+from vite inputs, CSP missing `wasm-unsafe-eval`).
+
+`verify-labels` asserts that the BVRA labels in
+`src/data/labels-bvra.json` match the canonical class list shipped
+with the ONNX model (`pwa/model/fungitastic-classes.json`) exactly,
+order-sensitive, and that every unique label has an entry in
+`src/data/knowledge-bvra.json`. The dima806 side asserts the label
+array has 100 unique entries and that each has a knowledge entry.

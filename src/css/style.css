@@ -427,3 +427,215 @@ video {
   opacity: 1;
   color: var(--warn);
 }
+
+/* ─── Phone-first safety ────────────────────────────── */
+
+/* Sticky footer. Sits at the end of the #app flex column, which is
+   100dvh tall. The camera-wrap above is `flex: 1 1 auto` so it
+   shrinks to make room. The footer is always present, always
+   visible, always at the bottom — it cannot be scrolled past. */
+#safety-footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  min-height: 36px;
+  background: var(--warn);
+  color: #1a1a1a;
+  font-size: 12px;
+  text-align: center;
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+}
+#safety-footer strong {
+  font-weight: 700;
+}
+#safety-footer a {
+  color: #1a1a1a;
+  text-decoration: underline;
+  font-weight: 600;
+}
+#safety-footer a:focus-visible {
+  outline: 2px solid #1a1a1a;
+  outline-offset: 2px;
+}
+
+/* Capture-button busy state. The button itself is the round white
+   ring overlaid on the camera preview. When `data-busy="true"` we
+   fill the ring with a dimmer overlay and add a spinning ring so
+   the user gets immediate visual confirmation that their tap
+   registered. */
+#capture-btn[data-busy="true"] {
+  background: rgba(255, 255, 255, 0.45);
+  cursor: progress;
+  pointer-events: none;
+}
+#capture-btn[data-busy="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border: 3px solid rgba(255, 255, 255, 0.7);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: capture-spin 0.8s linear infinite;
+}
+@keyframes capture-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* First-run safety modal. Native <dialog> with showModal() gives
+   us a real top layer and an automatic backdrop. The form is the
+   only way to dismiss it; the submit button is disabled until the
+   user checks the acknowledgement. */
+#safety-modal,
+#model-confirm-modal,
+#storage-confirm-modal,
+#clear-confirm-modal {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  background: var(--panel);
+  color: var(--text);
+  max-width: 90vw;
+  width: 420px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+#safety-modal::backdrop,
+#model-confirm-modal::backdrop,
+#storage-confirm-modal::backdrop,
+#clear-confirm-modal::backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+#safety-modal h2,
+#model-confirm-modal h2,
+#storage-confirm-modal h2,
+#clear-confirm-modal h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+#safety-modal p,
+#model-confirm-modal p,
+#storage-confirm-modal p,
+#clear-confirm-modal p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+#safety-modal ul {
+  margin: 0 0 10px;
+  padding-left: 20px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+#safety-modal-ack-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
+  margin: 12px 0;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+#safety-modal-ack-label input[type="checkbox"] {
+  margin-top: 2px;
+  flex: 0 0 auto;
+}
+.safety-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+.safety-modal-actions button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+.safety-modal-actions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.safety-modal-actions button[type="submit"]:disabled,
+.safety-modal-actions button[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+#safety-modal-continue:not(:disabled),
+#model-confirm-accept,
+#storage-confirm-accept {
+  background: var(--accent);
+  color: #0a0a0a;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+#clear-confirm-accept {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+  font-weight: 600;
+}
+
+/* Verify-this-species link under the top-1 prediction. */
+.verify-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--accent);
+  text-decoration: underline;
+}
+.verify-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Last-identification callout. Shown above the camera on app start
+   when history is non-empty. Compact band so it doesn't push the
+   camera off-screen on small phones. */
+#last-result {
+  flex: 0 0 auto;
+  padding: 8px 16px;
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.last-result-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.last-result-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+.last-result-species {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.last-result-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.last-result-prob,
+.last-result-date {
+  color: var(--text-muted);
+}

@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#0f1115" />
   <meta
     http-equiv="Content-Security-Policy"
-    content="default-src 'self'; script-src 'self' 'unsafe-inline' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; font-src 'self'"
+    content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; font-src 'self'"
   />
   <title>Foragerflow</title>
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -27,9 +27,23 @@
       <label for="model-select">Model:</label>
       <select id="model-select" aria-label="Select inference model">
         <option value="bvra">Specialist (215 classes, ~90 MB)</option>
-        <option value="dima806">General (100 classes, ~330 MB)</option>
+        <option value="dima806" data-capability-gated="true">General (100 classes, ~330 MB)</option>
       </select>
     </div>
+
+    <!--
+      Last-identification callout. Renders the most recent history
+      entry above the camera viewfinder on app start, so a returning
+      field user can verify a species they identified earlier
+      without scrolling past the camera. Hidden until renderLastResult()
+      populates it.
+    -->
+    <div
+      id="last-result"
+      role="region"
+      aria-label="Last identification"
+      style="display:none;"
+    ></div>
 
     <div id="camera-wrap" role="region" aria-label="Camera viewfinder">
       <video
@@ -41,6 +55,7 @@
       ></video>
       <button
         id="capture-btn"
+        type="button"
         aria-label="Capture and identify mushroom"
       ></button>
       <div
@@ -50,11 +65,32 @@
         style="display:none;"
       >
         <p>Camera unavailable.</p>
-        <button id="camera-retry" aria-label="Retry camera access">
+        <button
+          id="camera-retry"
+          type="button"
+          aria-label="Retry camera access"
+        >
           Retry camera
         </button>
-        <label for="file-input" aria-label="Choose a photo">or choose a photo</label>
-        <input type="file" id="file-input" accept="image/*" aria-label="Select an image file" />
+        <!--
+          File-input fallback. The input itself is visually hidden
+          (see #file-input rule); a full-width button taps it.
+          This is more phone-friendly than a <label> that needs the
+          input to be visible next to it.
+        -->
+        <button
+          id="file-fallback-btn"
+          type="button"
+          aria-label="Choose a photo from your device"
+        >
+          Choose a photo
+        </button>
+        <input
+          type="file"
+          id="file-input"
+          accept="image/*"
+          aria-label="Select an image file"
+        />
       </div>
     </div>
 
@@ -93,6 +129,142 @@
       <div id="history-list" aria-label="Past identifications"></div>
     </div>
   </div>
+
+  <!--
+    Sticky safety footer. Lives at the bottom of #app (which is
+    100dvh). The camera viewfinder shrinks to make room. Cannot be
+    scrolled past because it is always present in the DOM at the
+    end of the flex column.
+  -->
+  <div
+    id="safety-footer"
+    role="contentinfo"
+    aria-label="Safety notice"
+  >
+    <strong>Never eat a wild mushroom based on this app.</strong>
+    <a
+      id="find-mycologist-link"
+      href="https://www.google.com/search?q=certified+mycologist+near+me"
+      target="_blank"
+      rel="noopener noreferrer"
+    >Find a mycologist</a>
+  </div>
+
+  <!--
+    First-run safety acknowledgement modal. Cannot be dismissed
+    without the user checking the "I understand" box and tapping
+    Continue. Storage key: ff:safety-ack-v1.
+  -->
+  <dialog
+    id="safety-modal"
+    aria-labelledby="safety-modal-title"
+    aria-describedby="safety-modal-body"
+  >
+    <form method="dialog" id="safety-form">
+      <h2 id="safety-modal-title">Before you identify a mushroom</h2>
+      <div id="safety-modal-body">
+        <p>
+          ForagerFlow runs AI inference on your phone. It can be wrong —
+          including about whether a mushroom is safe to eat. Misidentification
+          can cause severe illness or death.
+        </p>
+        <p>
+          <strong>Do not eat any wild mushroom based solely on this app.</strong>
+          Always verify with a certified mycologist or your local poison
+          control center.
+        </p>
+        <ul>
+          <li>Top-1 confidence is not a safety guarantee.</li>
+          <li>"Edible" in the result panel is a model output, not a recommendation.</li>
+          <li>This app is offline; it cannot call any safety service.</li>
+        </ul>
+      </div>
+      <label id="safety-modal-ack-label">
+        <input type="checkbox" id="safety-modal-ack" required />
+        I understand this app is not a substitute for expert identification.
+      </label>
+      <div class="safety-modal-actions">
+        <button
+          type="submit"
+          id="safety-modal-continue"
+          disabled
+        >Continue</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!--
+    Model-size confirm modal. Shown the first time the user picks
+    dima806 (a ~330 MB download). Storage key: ff:dima-confirm-v1.
+  -->
+  <dialog
+    id="model-confirm-modal"
+    aria-labelledby="model-confirm-title"
+  >
+    <form method="dialog" id="model-confirm-form">
+      <h2 id="model-confirm-title">Download a 330&nbsp;MB model?</h2>
+      <p id="model-confirm-body">
+        The General (dima806) model will be downloaded on first use and
+        cached for offline use. This may take a moment on a slow connection
+        and will use approximately 330 MB of your device's storage.
+      </p>
+      <div class="safety-modal-actions">
+        <button type="button" id="model-confirm-cancel" value="cancel">
+          Cancel
+        </button>
+        <button type="button" id="model-confirm-accept" value="accept">
+          Download
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <!--
+    Pre-model-load storage confirm. Shown when
+    navigator.storage.estimate() reports less than 500 MB free.
+  -->
+  <dialog
+    id="storage-confirm-modal"
+    aria-labelledby="storage-confirm-title"
+  >
+    <form method="dialog" id="storage-confirm-form">
+      <h2 id="storage-confirm-title">Low device storage</h2>
+      <p id="storage-confirm-body">
+        Your device reports less than 500 MB of free storage. The selected
+        model needs ~330 MB. Continue anyway?
+      </p>
+      <div class="safety-modal-actions">
+        <button type="button" id="storage-confirm-cancel" value="cancel">
+          Cancel
+        </button>
+        <button type="button" id="storage-confirm-accept" value="accept">
+          Continue anyway
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <!--
+    History-clear confirm modal. Replaces the immediate `clearHistory()`
+    call that previously allowed a one-fat-finger data loss.
+  -->
+  <dialog
+    id="clear-confirm-modal"
+    aria-labelledby="clear-confirm-title"
+  >
+    <form method="dialog" id="clear-confirm-form">
+      <h2 id="clear-confirm-title">Clear all history?</h2>
+      <p>This will permanently remove every saved identification on this device. This cannot be undone.</p>
+      <div class="safety-modal-actions">
+        <button type="button" id="clear-confirm-cancel" value="cancel">
+          Cancel
+        </button>
+        <button type="button" id="clear-confirm-accept" value="accept">
+          Clear all
+        </button>
+      </div>
+    </form>
+  </dialog>
 
   <script type="module" src="/main.ts"></script>
 </body>

@@ -1,4 +1,19 @@
-/// <reference lib="webworker" />
+// Classic (dedicated) worker: use importScripts to load the UMD ort.min.js
+// which attaches `ort` to the worker global. Module workers cannot use
+// importScripts, and ort.min.js (vendored UMD) is not an ES module.
+
+declare const self: DedicatedWorkerGlobalScope;
+declare const ort: OrtStatic;
+
+importScripts("/js/ort.min.js");
+
+// The worker is loaded from /assets/inference-worker-*.js, so when ort
+// internally dynamic-imports `ort-wasm-simd-threaded.jsep.mjs` (and the
+// .wasm sidecar), it resolves relative to the worker's location, producing
+// the wrong URL /assets/ort-wasm-simd-threaded.jsep.mjs. Force the base
+// path to /js/ where we actually serve the artifacts.
+(ort as unknown as { env: { wasm: { wasmPaths: string } } }).env.wasm.wasmPaths =
+  "/js/";
 
 import type { WorkerCommand } from "../core/types";
 import { WorkerCommandType, InferenceWorkerMessageType } from "../core/types";
@@ -15,7 +30,7 @@ interface OrtSession {
 interface OrtStatic {
   InferenceSession: {
     create(
-      path: string,
+      buffer: Uint8Array | string,
       options: {
         executionProviders: string[];
         graphOptimizationLevel: string;
@@ -28,8 +43,6 @@ interface OrtStatic {
     dims: number[],
   ) => OrtTensor;
 }
-
-declare const ort: OrtStatic;
 
 let session: OrtSession | null = null;
 let currentMean: [number, number, number] = [0.485, 0.456, 0.406];
@@ -76,7 +89,17 @@ async function loadModel(
     text: "Loading model...",
   });
   try {
-    session = await ort.InferenceSession.create(modelPath, {
+    // Fetch the ONNX as ArrayBuffer and pass to ort. This sidesteps ort's
+    // internal external-data sidecar resolution, which is broken when the
+    // model is loaded from inside a worker (ort computes the .data URL
+    // relative to the worker's location, not the model URL, and the empty
+    // path then errors with "Module.MountedFiles is not available").
+    const resp = await fetch(modelPath);
+    if (!resp.ok) {
+      throw new Error(`Failed to fetch model: HTTP ${String(resp.status)}`);
+    }
+    const buf = new Uint8Array(await resp.arrayBuffer());
+    session = await ort.InferenceSession.create(buf, {
       executionProviders: ["wasm"],
       graphOptimizationLevel: "all",
     });
@@ -100,12 +123,11 @@ async function loadModel(
     const cmd = e.data as { mean?: [number, number, number]; std?: [number, number, number]; modelPath: string; modelKey: string };
     if (cmd.mean) currentMean = cmd.mean;
     if (cmd.std) currentStd = cmd.std;
+    // loadModel() posts Status/Error itself. Don't double-post "Ready" here —
+    // if we do, the main thread flips to ready=true even on load failure,
+    // and the next infer call hits a stale "No model loaded" error instead
+    // of the real failure message.
     await loadModel(cmd.modelPath, cmd.modelKey);
-    self.postMessage({
-      type: InferenceWorkerMessageType.Status,
-      text: "Ready",
-      modelKey: cmd.modelKey,
-    });
     return;
   }
 
