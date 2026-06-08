@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com).
 
 ## [Unreleased]
 
+### Fixed
+- **`pnpm verify:inference` was wired to a script that required an image
+  input** but the package.json was passing model + label paths. Rewrote
+  `scripts/test-inference.py` with two explicit modes: `smoke` (zero-input
+  shape + finiteness check, matches the gate `release.yml` runs in-workflow)
+  and `top5` (the previous e2e image-based top-5 helper, kept as a dev tool).
+  `package.json` now invokes `python3 scripts/test-inference.py smoke ...`.
+  Running the smoke test against the locally-exported ONNX weights passes
+  for both `fungitastic.onnx` (215 classes) and `dima806.onnx` (100).
+
 ### Added
 - **First-run safety modal.** Full-screen `<dialog>` with a `showModal()`
   top layer. The "Continue" button is disabled until the

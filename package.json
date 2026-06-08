@@ -16,7 +16,7 @@
     "test:coverage": "vitest run --coverage",
     "verify:labels": "node scripts/verify-labels.cjs",
     "verify:dist": "python3 scripts/test-dist.py",
-    "verify:inference": "python3 scripts/test-inference.py pwa/model/fungitastic.onnx pwa/model/fungitastic-classes.json pwa/model/dima806.onnx src/data/labels-dima806.json",
+    "verify:inference": "python3 scripts/test-inference.py smoke pwa/model/fungitastic.onnx pwa/model/fungitastic-classes.json pwa/model/dima806.onnx src/data/labels-dima806.json",
     "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm verify:dist && pnpm verify:labels"
   },
   "devDependencies": {
