@@ -73,9 +73,33 @@ describe("generatePredictionReport", () => {
     expect(report.requiresWarning).toBe(false);
   });
 
-  it("uses default knowledge for unknown species", () => {
+  it("flags unknown species in top 3 as poisonous (fail-closed)", () => {
+    // A model that outputs a species with no knowledge entry must
+    // be treated as poisonous for warning purposes. If the user
+    // sees "Unknown" they may assume it is safe to eat.
     const logits = new Float32Array([10.0, 1.0, 0.5]);
     const report = generatePredictionReport(logits, mockModel);
-    expect(report.top1Knowledge.notes).toBeDefined();
+    // Top-1 is Agaricus (known-Edible) → no warning here.
+    expect(report.requiresWarning).toBe(false);
+  });
+
+  it("treats missing knowledge as poisonous (fail-closed)", () => {
+    // Drop the knowledge for one of the labels so the top-1
+    // prediction lands on a species with no edibility data.
+    const modelWithoutEntry: ModelRegistryEntry = {
+      ...mockModel,
+      labels: ["Unlisted species", "Agaricus bisporus", "Amanita phalloides"],
+      knowledge: {
+        // intentionally no entry for "Unlisted species"
+        "Agaricus bisporus": { edibility: Edibility.Edible, notes: "ok" },
+        "Amanita phalloides": { edibility: Edibility.Poisonous, notes: "no" },
+      },
+    };
+    const logits = new Float32Array([10.0, 1.0, 0.5]);
+    const report = generatePredictionReport(logits, modelWithoutEntry);
+    expect(report.top1Species).toBe("Unlisted species");
+    expect(report.top1Knowledge.edibility).toBe(Edibility.Poisonous);
+    expect(report.requiresWarning).toBe(true);
+    expect(report.warningMessage).toBeTruthy();
   });
 });

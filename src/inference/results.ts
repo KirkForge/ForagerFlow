@@ -37,11 +37,21 @@ export function generatePredictionReport(
   if (!top1) throw new Error("No predictions generated");
 
   const top1Knowledge =
-    model.knowledge[top1.label] ?? defaultKnowledge();
+    model.knowledge[top1.label] ?? missingKnowledgeFallback(top1.label);
 
+  // Fail-closed: any top-3 prediction whose edibility is
+  // Poisonous OR Unknown is treated as a "lookalike risk" so the
+  // warning pipeline surfaces a "Cannot rule out a toxic
+  // lookalike" message whenever the model isn't sure of its top
+  // picks. An "Unknown" edibility is not a clean bill of health;
+  // it is "we don't know if this will kill you", and that is
+  // exactly the situation we want to warn about.
   const hasPoisonous = top3.some((p) => {
-    const k = model.knowledge[p.label] ?? defaultKnowledge();
-    return k.edibility === Edibility.Poisonous;
+    const k = model.knowledge[p.label] ?? missingKnowledgeFallback(p.label);
+    return (
+      k.edibility === Edibility.Poisonous ||
+      k.edibility === Edibility.Unknown
+    );
   });
 
   const { requiresWarning, warningMessage } = computeWarning(
@@ -61,10 +71,14 @@ export function generatePredictionReport(
   };
 }
 
-function defaultKnowledge(): SpeciesKnowledge {
+function missingKnowledgeFallback(species: string): SpeciesKnowledge {
+  // Fail-closed: an unknown species gets the same warning treatment
+  // as a confirmed poisonous one. Returning "Unknown" would let a
+  // dangerous mushroom slip through the warning pipeline because
+  // the user might not read the fine print. Better to over-warn.
   return {
-    edibility: Edibility.Unknown,
-    notes: "No data available.",
+    edibility: Edibility.Poisonous,
+    notes: `No edibility data on file for "${species}". Treating as potentially poisonous; do not consume and verify with a certified mycologist.`,
   };
 }
 
