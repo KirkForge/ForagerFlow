@@ -41,11 +41,15 @@ interface InferenceEvents {
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
-// We don't know the model size precisely without the .onnx loaded,
-// so we always run the storage check on first switch. 500 MB is
-// the dima806 ONNX (330 MB) plus the BVRA ONNX (90 MB) plus a
-// small margin. If you only intend to ship one model, lower this.
-const MIN_FREE_BYTES = 500 * 1024 * 1024;
+// Per-model free-storage threshold for the pre-load check. The
+// ONNX file plus the cached wasm sidecars need roughly the model
+// size in MB plus a small margin (we round up to give the OS
+// room to write). The dima806 model is ~330 MB, BVRA is ~90 MB.
+// A single global threshold would over-prompt BVRA-only users.
+const MIN_FREE_BYTES_PER_MODEL: Record<ModelKey, number> = {
+  [ModelKey.BVRA]: 150 * 1024 * 1024,
+  [ModelKey.Dima806]: 500 * 1024 * 1024,
+};
 const STORAGE_ESTIMATE_TIMEOUT_MS = 1500;
 
 export type { WorkerMessage, WorkerCommand };
@@ -235,7 +239,8 @@ export class InferenceService extends TypedEmitter<InferenceEvents> {
 
     this.storageCheckedFor.add(key);
 
-    if (freeBytes < MIN_FREE_BYTES) {
+    const minFree = MIN_FREE_BYTES_PER_MODEL[key];
+    if (freeBytes < minFree) {
       const token = crypto.randomUUID();
       this.pendingStorageToken = token;
       this.pendingModelKey = key;

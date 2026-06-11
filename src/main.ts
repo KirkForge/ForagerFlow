@@ -303,6 +303,17 @@ class AppController {
     window.addEventListener("offline", () => {
       this.handleOfflineChange();
     });
+
+    // Release the camera when the page is hidden or unloaded.
+    // Without this, the camera indicator (and the underlying
+    // MediaStreamTracks) stay alive after the user has navigated
+    // away or backgrounded the tab on mobile — draining battery
+    // and leaving the user with no clear signal that the camera
+    // is still on.
+    window.addEventListener("pagehide", () => {
+      this.camera.stop();
+      inferenceService.terminate();
+    });
   }
 
   private require(selector: string): HTMLElement {
