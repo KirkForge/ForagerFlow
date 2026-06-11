@@ -137,15 +137,31 @@ export class SafetyUI {
         cleanup();
         resolve(false);
       };
+      // The native <dialog> element fires a "cancel" event when the
+      // user dismisses it via ESC or by clicking the backdrop. The
+      // accept/cancel button click handlers don't fire in that case,
+      // so without this listener the Promise would never resolve and
+      // the listeners above would leak.
+      const onDialogCancel = (e: Event) => {
+        e.preventDefault();
+        onCancel();
+      };
       const cleanup = () => {
         this.els.clearConfirmAccept.removeEventListener("click", onAccept);
         this.els.clearConfirmCancel.removeEventListener("click", onCancel);
+        this.els.clearConfirmModal.removeEventListener(
+          "cancel",
+          onDialogCancel,
+        );
         this.els.clearConfirmModal.close();
       };
       this.els.clearConfirmAccept.addEventListener("click", onAccept, {
         once: true,
       });
       this.els.clearConfirmCancel.addEventListener("click", onCancel, {
+        once: true,
+      });
+      this.els.clearConfirmModal.addEventListener("cancel", onDialogCancel, {
         once: true,
       });
       this.els.clearConfirmModal.showModal();
@@ -218,15 +234,29 @@ export class SafetyUI {
         cleanup();
         resolve(false);
       };
+      // <dialog> cancel event: ESC or backdrop click dismisses the
+      // modal without firing the cancel button. Without this handler
+      // the Promise hangs forever and the listeners above leak.
+      const onDialogCancel = (e: Event) => {
+        e.preventDefault();
+        onCancel();
+      };
       const cleanup = () => {
         this.els.modelConfirmAccept.removeEventListener("click", onAccept);
         this.els.modelConfirmCancel.removeEventListener("click", onCancel);
+        this.els.modelConfirmModal.removeEventListener(
+          "cancel",
+          onDialogCancel,
+        );
         this.els.modelConfirmModal.close();
       };
       this.els.modelConfirmAccept.addEventListener("click", onAccept, {
         once: true,
       });
       this.els.modelConfirmCancel.addEventListener("click", onCancel, {
+        once: true,
+      });
+      this.els.modelConfirmModal.addEventListener("cancel", onDialogCancel, {
         once: true,
       });
       this.els.modelConfirmModal.showModal();
@@ -291,18 +321,32 @@ export class SafetyUI {
     this.opts.inferenceService.on("storageConfirm", (payload) => {
       const freeMB = Math.round(payload.freeBytes / 1024 / 1024);
       this.els.storageConfirmBody.textContent = `Your device reports ${String(freeMB)} MB of free storage. The selected model needs ~330 MB. Continue anyway?`;
-      this.els.storageConfirmModal.showModal();
       const onAccept = () => {
         cleanup();
         this.opts.inferenceService.resumeStorageConfirm(payload.token);
       };
       const onCancel = () => {
         cleanup();
-        this.els.storageConfirmModal.close();
+        // Do NOT resume the load — the inference service keeps the
+        // pending token alive and will retry on the next model
+        // switch. Closing without resuming is the documented cancel
+        // behavior.
+      };
+      // <dialog> cancel event: ESC/backdrop dismisses without
+      // clicking the cancel button. Without this handler the
+      // listeners above leak and the modal stays in the
+      // half-cancelled state.
+      const onDialogCancel = (e: Event) => {
+        e.preventDefault();
+        onCancel();
       };
       const cleanup = () => {
         this.els.storageConfirmAccept.removeEventListener("click", onAccept);
         this.els.storageConfirmCancel.removeEventListener("click", onCancel);
+        this.els.storageConfirmModal.removeEventListener(
+          "cancel",
+          onDialogCancel,
+        );
         this.els.storageConfirmModal.close();
       };
       this.els.storageConfirmAccept.addEventListener("click", onAccept, {
@@ -311,6 +355,10 @@ export class SafetyUI {
       this.els.storageConfirmCancel.addEventListener("click", onCancel, {
         once: true,
       });
+      this.els.storageConfirmModal.addEventListener("cancel", onDialogCancel, {
+        once: true,
+      });
+      this.els.storageConfirmModal.showModal();
     });
   }
 
