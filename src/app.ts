@@ -20,30 +20,6 @@ import { initWebVitals } from "@/services/web-vitals";
 import { logger } from "@/core/logger";
 import { sanitizeText } from "@/core/sanitize";
 import { config } from "@/core/config";
-import {
-  setTelemetryEnabled,
-  addTelemetryHandler,
-  createBeaconTelemetryHandler,
-  createConsoleTelemetryHandler,
-  createLocalStorageTelemetryHandler,
-} from "@/core/telemetry";
-
-export function initTelemetry(): void {
-  setTelemetryEnabled(config.features.telemetry);
-  if (!config.features.telemetry) return;
-
-  addTelemetryHandler(
-    createLocalStorageTelemetryHandler(config.telemetryBufferSize),
-  );
-
-  if (config.telemetryEndpoint) {
-    addTelemetryHandler(createBeaconTelemetryHandler(config.telemetryEndpoint));
-  }
-
-  if (import.meta.env.DEV) {
-    addTelemetryHandler(createConsoleTelemetryHandler());
-  }
-}
 
 export function getEdibilityClass(ed: string): string {
   if (ed === "Poisonous") return "edibility-poisonous";
@@ -91,7 +67,6 @@ export class AppController {
   }
 
   async init(): Promise<void> {
-    initTelemetry();
     registerServiceWorker();
     initWebVitals();
     this.bindEvents();

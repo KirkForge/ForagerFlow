@@ -7,12 +7,7 @@ export {
 } from "./errors";
 export { logger } from "./logger";
 export { escapeHtml, sanitizeText } from "./sanitize";
-export {
-  addTelemetryHandler,
-  removeTelemetryHandler,
-  recordTelemetry,
-  setTelemetryEnabled,
-} from "./telemetry";
+export { recordTelemetry, setTelemetryEnabled } from "./telemetry";
 export type { TelemetryEvent } from "./telemetry";
 export { config } from "./config";
 export {

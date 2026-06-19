@@ -1,7 +1,7 @@
 import type { PredictionReport } from "@/inference/results";
 import type { ModelKey, Edibility } from "@/core/types";
 import { logger } from "@/core/logger";
-import { openDB, withTransaction, setMeta } from "./db";
+import { openDB, withTransaction, setMeta, STORE_NAME } from "./db";
 
 export interface HistoryEntry {
   id: string;
@@ -11,7 +11,7 @@ export interface HistoryEntry {
   top1Probability: number;
   top1Edibility: Edibility;
   predictions: { label: string; probability: number }[];
-  thumbnail: string; // base64 data URL (small)
+  thumbnail: string;
   notes: string;
 }
 
@@ -87,21 +87,18 @@ export async function getHistory(limit = 50): Promise<HistoryEntry[]> {
     const db = await openDB();
     const results: HistoryEntry[] = [];
     return await new Promise<HistoryEntry[]>((resolve, reject) => {
-      const tx = db.transaction("identifications", "readonly");
-      const store = tx.objectStore("identifications");
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
       const index = store.index("timestamp");
       const request = index.openCursor(null, "prev");
 
       tx.oncomplete = () => {
-        db.close();
         resolve(results);
       };
       tx.onerror = () => {
-        db.close();
         reject(new Error(tx.error?.message ?? "IDB transaction failed"));
       };
       tx.onabort = () => {
-        db.close();
         reject(new Error("IDB transaction aborted"));
       };
 
@@ -124,7 +121,7 @@ export async function getHistory(limit = 50): Promise<HistoryEntry[]> {
 
 export async function clearHistory(): Promise<void> {
   const db = await openDB();
-  await withTransaction(db, "readwrite", (store) => store.clear());
+  await withTransaction<undefined>(db, "readwrite", (store) => store.clear());
 }
 
 async function recordBackupTimestamp(iso: string): Promise<void> {
@@ -164,12 +161,27 @@ export async function importHistory(json: string): Promise<number> {
   }
 
   const db = await openDB();
+  const tx = db.transaction(STORE_NAME, "readwrite");
+  const store = tx.objectStore(STORE_NAME);
   let imported = 0;
   for (const raw of entries) {
     const entry = raw as HistoryEntry;
-    await withTransaction(db, "readwrite", (store) => store.put(entry));
+    store.put(entry);
     imported++;
   }
+
+  await new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => {
+      resolve();
+    };
+    tx.onerror = () => {
+      reject(new Error(tx.error?.message ?? "IDB import failed"));
+    };
+    tx.onabort = () => {
+      reject(new Error("IDB import aborted"));
+    };
+  });
+
   await recordBackupTimestamp(new Date().toISOString());
   return imported;
 }

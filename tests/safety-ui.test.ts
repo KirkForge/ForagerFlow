@@ -8,24 +8,15 @@ class MockInferenceService {
   private storageHandler: ((payload: {
     modelKey: ModelKey;
     freeBytes: number;
-    token: string;
   }) => void) | null = null;
 
   onStorageConfirm(
-    handler: (payload: {
-      modelKey: ModelKey;
-      freeBytes: number;
-      token: string;
-    }) => void,
+    handler: (payload: { modelKey: ModelKey; freeBytes: number }) => void,
   ): void {
     this.storageHandler = handler;
   }
 
-  emitStorageConfirm(payload: {
-    modelKey: ModelKey;
-    freeBytes: number;
-    token: string;
-  }): void {
+  emitStorageConfirm(payload: { modelKey: ModelKey; freeBytes: number }): void {
     this.storageHandler?.(payload);
   }
 }
@@ -194,7 +185,6 @@ describe("SafetyUI", () => {
     inferenceService.emitStorageConfirm({
       modelKey: ModelKey.Dima806,
       freeBytes: 100 * 1024 * 1024,
-      token: "token-123",
     });
 
     expect(modal.showModal).toHaveBeenCalled();
@@ -204,8 +194,6 @@ describe("SafetyUI", () => {
     ) as HTMLButtonElement;
     acceptBtn.click();
 
-    expect(inferenceService.resumeStorageConfirm).toHaveBeenCalledWith(
-      "token-123",
-    );
+    expect(inferenceService.resumeStorageConfirm).toHaveBeenCalled();
   });
 });

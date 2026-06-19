@@ -235,17 +235,17 @@ describe("InferenceService", () => {
       writable: true,
     });
 
-    let token = "";
-    service.onStorageConfirm((c) => {
-      token = c.token;
+    let confirmed = false;
+    service.onStorageConfirm(() => {
+      confirmed = true;
     });
 
     service.initialize();
     service.switchModel(ModelKey.Dima806);
     await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(token).toBeTruthy();
+    expect(confirmed).toBe(true);
 
-    service.resumeStorageConfirm(token);
+    service.resumeStorageConfirm();
     expect(workerMock.postMessage).toHaveBeenLastCalledWith(
       expect.objectContaining({
         type: WorkerCommandType.Switch,
@@ -254,9 +254,9 @@ describe("InferenceService", () => {
     );
   });
 
-  it("ignores resumeStorageConfirm with a mismatched token", () => {
+  it("ignores resumeStorageConfirm when no confirmation is pending", () => {
     service.initialize();
-    service.resumeStorageConfirm("invalid-token");
+    service.resumeStorageConfirm();
     expect(workerMock.postMessage).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: WorkerCommandType.Switch }),
     );

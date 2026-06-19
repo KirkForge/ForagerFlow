@@ -6,24 +6,31 @@ import {
   STORE_NAME,
   getMeta,
   setMeta,
+  closeDB,
 } from "@/services/history/db";
+
+const originalIndexedDBOpen = indexedDB.open;
+
+async function deleteHistoryDB(): Promise<void> {
+  await closeDB().catch(() => {
+    /* ignore closed/rejected connections */
+  });
+  await new Promise<void>((resolve, reject) => {
+    const req = indexedDB.deleteDatabase("foragerflow-history");
+    req.onsuccess = () => { resolve(); };
+    req.onerror = () => { reject(new Error(String(req.error))); };
+  });
+}
 
 describe("history db", () => {
   beforeEach(async () => {
     // Ensure a fresh database for each test.
-    await new Promise<void>((resolve, reject) => {
-      const req = indexedDB.deleteDatabase("foragerflow-history");
-      req.onsuccess = () => { resolve(); };
-      req.onerror = () => { reject(new Error(String(req.error))); };
-    });
+    await deleteHistoryDB();
   });
 
   afterEach(async () => {
-    await new Promise<void>((resolve, reject) => {
-      const req = indexedDB.deleteDatabase("foragerflow-history");
-      req.onsuccess = () => { resolve(); };
-      req.onerror = () => { reject(new Error(String(req.error))); };
-    });
+    indexedDB.open = originalIndexedDBOpen;
+    await deleteHistoryDB();
   });
 
   it("opens the database at version 2 and creates the meta store", async () => {

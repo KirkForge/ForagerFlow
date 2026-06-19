@@ -1,6 +1,6 @@
 import type { CaptureResult } from "@/services/camera";
 import { config } from "@/core/config";
-import { createThumbnailDataUrl } from "./image-utils";
+import { createThumbnailDataUrl, drawCenterCrop } from "./image-utils";
 
 export function processFileInput(
   file: File,
@@ -9,9 +9,6 @@ export function processFileInput(
   return new Promise((resolve, reject) => {
     const img = new Image();
     const objectUrl = URL.createObjectURL(file);
-    // Revoke the blob URL once the image has been decoded (or failed
-    // to decode). Without this, every photo the user picks from the
-    // file input leaks a blob URL for the lifetime of the document.
     const cleanup = (): void => {
       URL.revokeObjectURL(objectUrl);
     };
@@ -27,10 +24,7 @@ export function processFileInput(
         return;
       }
 
-      const sz = Math.min(img.naturalWidth, img.naturalHeight);
-      const sx = (img.naturalWidth - sz) / 2;
-      const sy = (img.naturalHeight - sz) / 2;
-      ctx.drawImage(img, sx, sy, sz, sz, 0, 0, size, size);
+      drawCenterCrop(ctx, img, img.naturalWidth, img.naturalHeight, size);
 
       const imageData = ctx.getImageData(0, 0, size, size);
       const thumbnail = createThumbnailDataUrl(img);
