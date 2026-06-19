@@ -1,25 +1,10 @@
-// ui/safety.ts
-//
-// All the safety-critical modal logic lives here. main.ts instantiates
-// SafetyUI once and the SafetyUI owns every <dialog> in index.html.
-//
-// Why a separate module:
-//   - The first-run modal, model-picker confirm, and storage confirm
-//     are independent of the camera/inference flow and would crowd
-//     AppController.
-//   - localStorage keys are versioned (`v1` suffix) so a future
-//     change to the safety copy forces a re-acknowledgement.
-//   - All the DOM IDs that index.html exposes for the safety UI are
-//     referenced from exactly one place.
-
 import { logger } from "@/core/logger";
 import type { InferenceService } from "@/inference/service";
 import { ModelKey } from "@/core/types";
+import { modelRegistry } from "@/data/model-registry";
 
 const SAFETY_ACK_KEY = "ff:safety-ack-v1";
 const DIMA_CONFIRM_KEY = "ff:dima-confirm-v1";
-// Increment this if the safety copy changes materially; the user will
-// be re-prompted on next load.
 const SAFETY_ACK_VERSION = "1";
 
 interface SafetyUIOptions {
@@ -29,7 +14,6 @@ interface SafetyUIOptions {
 
 export class SafetyUI {
   private readonly opts: SafetyUIOptions;
-  // Cached element references — index.html is the source of truth.
   private readonly els: {
     safetyModal: HTMLDialogElement;
     safetyForm: HTMLFormElement;
@@ -73,60 +57,45 @@ export class SafetyUI {
     };
   }
 
-  /**
-   * Wire all safety-UI event handlers. Call once on app init.
-   * Returns a Promise that resolves when the user has acknowledged
-   * the first-run safety modal (or has already done so in a previous
-   * session).
-   */
   async init(): Promise<void> {
     this.bindSafetyModal();
     this.bindModelConfirm();
-    this.bindStorageConfirm();
-    this.bindClearConfirm();
-    this.bindModelCapabilityGate();
     this.bindStorageConfirmFromService();
 
     if (this.hasAcknowledged()) {
-      // Apply capability gating immediately so the dropdown is in
-      // the right state before the user sees it.
       this.applyCapabilityGate();
       return;
     }
 
-    // First run. Show the modal, wait for acknowledgement.
     this.els.safetyModal.showModal();
+    this.els.safetyAck.focus();
     await new Promise<void>((resolve) => {
-      this.els.safetyForm.addEventListener(
-        "submit",
-        (e) => {
-          if (!this.els.safetyAck.checked) {
-            e.preventDefault();
-            return;
-          }
-          try {
-            localStorage.setItem(
-              SAFETY_ACK_KEY,
-              SAFETY_ACK_VERSION,
-            );
-          } catch (err) {
-            logger.warn("Could not persist safety acknowledgement:", err);
-          }
-          this.els.safetyModal.close();
-          this.applyCapabilityGate();
-          resolve();
-        },
-        { once: true },
-      );
+      const onSubmit = (e: SubmitEvent) => {
+        if (!this.els.safetyAck.checked) {
+          e.preventDefault();
+          return;
+        }
+        try {
+          localStorage.setItem(SAFETY_ACK_KEY, SAFETY_ACK_VERSION);
+        } catch (err) {
+          logger.warn("Could not persist safety acknowledgement:", err);
+        }
+        this.els.safetyModal.removeEventListener("cancel", onCancel);
+        this.els.safetyModal.close();
+        this.applyCapabilityGate();
+        resolve();
+      };
+      const onCancel = (e: Event) => {
+        // The modal is mandatory: ESC or backdrop click must not dismiss it.
+        e.preventDefault();
+      };
+      this.els.safetyForm.addEventListener("submit", onSubmit, { once: true });
+      this.els.safetyModal.addEventListener("cancel", onCancel);
     });
 
     this.opts.onAcknowledged();
   }
 
-  /**
-   * Public: open the clear-history confirm. Returns a Promise that
-   * resolves to `true` if the user confirmed, `false` if cancelled.
-   */
   confirmClearHistory(): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
       const onAccept = () => {
@@ -137,11 +106,6 @@ export class SafetyUI {
         cleanup();
         resolve(false);
       };
-      // The native <dialog> element fires a "cancel" event when the
-      // user dismisses it via ESC or by clicking the backdrop. The
-      // accept/cancel button click handlers don't fire in that case,
-      // so without this listener the Promise would never resolve and
-      // the listeners above would leak.
       const onDialogCancel = (e: Event) => {
         e.preventDefault();
         onCancel();
@@ -165,6 +129,7 @@ export class SafetyUI {
         once: true,
       });
       this.els.clearConfirmModal.showModal();
+      this.els.clearConfirmCancel.focus();
     });
   }
 
@@ -172,7 +137,6 @@ export class SafetyUI {
     try {
       return localStorage.getItem(SAFETY_ACK_KEY) === SAFETY_ACK_VERSION;
     } catch {
-      // localStorage can throw in private mode; treat as un-acked.
       return false;
     }
   }
@@ -202,19 +166,13 @@ export class SafetyUI {
   private bindModelConfirm(): void {
     this.els.modelSelect.addEventListener("change", (e) => {
       const select = e.target as HTMLSelectElement;
-      // <select>.value is a plain string; ModelKey is an enum. Compare
-      // via the string literal the enum value resolves to so the lint
-      // rule about mixed-enum comparisons is satisfied.
       if (select.value === "dima806" && !this.hasConfirmedDima806()) {
-        // Reset to bvra; we'll only commit the change after the
-        // user accepts the modal.
-        select.value = "bvra";
+        select.value = ModelKey.BVRA;
         e.preventDefault();
         e.stopPropagation();
         void this.openModelConfirm();
         return;
       }
-      // First time after they accept, persist so we never ask again.
       if (select.value === "dima806") {
         this.markDima806Confirmed();
       }
@@ -234,9 +192,6 @@ export class SafetyUI {
         cleanup();
         resolve(false);
       };
-      // <dialog> cancel event: ESC or backdrop click dismisses the
-      // modal without firing the cancel button. Without this handler
-      // the Promise hangs forever and the listeners above leak.
       const onDialogCancel = (e: Event) => {
         e.preventDefault();
         onCancel();
@@ -260,40 +215,22 @@ export class SafetyUI {
         once: true,
       });
       this.els.modelConfirmModal.showModal();
+      this.els.modelConfirmAccept.focus();
     });
   }
 
-  private bindStorageConfirm(): void {
-    // No-op binding placeholder. Storage confirm is driven by the
-    // inference service's `storageConfirm` event below.
-  }
-
-  private bindClearConfirm(): void {
-    // The accept/cancel buttons are wired per-confirm in
-    // confirmClearHistory(). Nothing to bind here at init.
-  }
-
   private bindModelCapabilityGate(): void {
-    // Hide dima806 entirely on devices that report
-    //   navigator.deviceMemory < 4 || navigator.hardwareConcurrency < 4
-    //   || connection.effectiveType in {2g,3g,slow-2g}
-    // The first two are real failure modes (insufficient RAM / CPU
-    // for a 330 MB model). The third is a UX hint: don't show the
-    // user a download that will take 10 minutes on EDGE.
     const opt = this.els.modelSelect.querySelector<HTMLOptionElement>(
-      'option[value="dima806"]',
+      `option[value="${ModelKey.Dima806}"]`,
     );
     if (!opt) return;
 
-    // navigator.deviceMemory is non-standard (Chrome only); cast to
-    // unknown then narrow to avoid the DOM lib complaining.
     const nav = navigator as unknown as {
       deviceMemory?: number;
       hardwareConcurrency?: number;
       connection?: { effectiveType?: string };
     };
-    const lowMem =
-      typeof nav.deviceMemory === "number" && nav.deviceMemory < 4;
+    const lowMem = typeof nav.deviceMemory === "number" && nav.deviceMemory < 4;
     const lowCores =
       typeof nav.hardwareConcurrency === "number" &&
       nav.hardwareConcurrency < 4;
@@ -306,9 +243,8 @@ export class SafetyUI {
     if (lowMem || lowCores || slowNet) {
       opt.hidden = true;
       opt.disabled = true;
-      // If the current value is the hidden one, fall back to bvra.
       if (this.els.modelSelect.value === "dima806") {
-        this.els.modelSelect.value = "bvra";
+        this.els.modelSelect.value = ModelKey.BVRA;
       }
     }
   }
@@ -318,24 +254,17 @@ export class SafetyUI {
   }
 
   private bindStorageConfirmFromService(): void {
-    this.opts.inferenceService.on("storageConfirm", (payload) => {
+    this.opts.inferenceService.onStorageConfirm((payload) => {
       const freeMB = Math.round(payload.freeBytes / 1024 / 1024);
-      this.els.storageConfirmBody.textContent = `Your device reports ${String(freeMB)} MB of free storage. The selected model needs ~330 MB. Continue anyway?`;
+      const modelSize = modelRegistry[payload.modelKey].size;
+      this.els.storageConfirmBody.textContent = `Your device reports ${String(freeMB)} MB of free storage. The selected model needs ${modelSize}. Continue anyway?`;
       const onAccept = () => {
         cleanup();
         this.opts.inferenceService.resumeStorageConfirm(payload.token);
       };
       const onCancel = () => {
         cleanup();
-        // Do NOT resume the load — the inference service keeps the
-        // pending token alive and will retry on the next model
-        // switch. Closing without resuming is the documented cancel
-        // behavior.
       };
-      // <dialog> cancel event: ESC/backdrop dismisses without
-      // clicking the cancel button. Without this handler the
-      // listeners above leak and the modal stays in the
-      // half-cancelled state.
       const onDialogCancel = (e: Event) => {
         e.preventDefault();
         onCancel();
@@ -359,6 +288,7 @@ export class SafetyUI {
         once: true,
       });
       this.els.storageConfirmModal.showModal();
+      this.els.storageConfirmCancel.focus();
     });
   }
 

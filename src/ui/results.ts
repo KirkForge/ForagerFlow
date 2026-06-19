@@ -7,7 +7,6 @@ export class ResultsRenderer {
   private predictionsEl: HTMLElement;
   private knowledgeEl: HTMLElement;
   private warningEl: HTMLElement;
-  private lowConfidenceEl: HTMLElement;
   private modelSelect: HTMLSelectElement;
 
   constructor(root: HTMLElement) {
@@ -15,31 +14,22 @@ export class ResultsRenderer {
     this.predictionsEl = this.require("#predictions");
     this.knowledgeEl = this.require("#knowledge");
     this.warningEl = this.require("#warning");
-    this.lowConfidenceEl = this.require("#low-confidence");
     this.modelSelect = this.require("#model-select") as HTMLSelectElement;
     this.bindModelSelector();
   }
 
   clear(): void {
-    this.predictionsEl.innerHTML = "";
+    this.predictionsEl.replaceChildren();
+    this.knowledgeEl.replaceChildren();
     this.knowledgeEl.style.display = "none";
     this.warningEl.style.display = "none";
-    this.lowConfidenceEl.style.display = "none";
   }
 
   render(report: PredictionReport, model: ModelRegistryEntry): void {
     this.clear();
 
-    if (report.top1Probability < 0.5) {
-      this.lowConfidenceEl.textContent =
-        "Low confidence — do not act on this prediction.";
-      this.lowConfidenceEl.style.display = "block";
-    } else if (
-      report.hasPoisonousInTop3 &&
-      report.top1Probability < 0.85
-    ) {
-      this.warningEl.textContent =
-        "Cannot rule out a toxic lookalike. Do not consume. Always verify with a certified expert.";
+    if (report.requiresWarning && report.warningMessage) {
+      this.warningEl.textContent = report.warningMessage;
       this.warningEl.style.display = "block";
     }
 
@@ -52,11 +42,7 @@ export class ResultsRenderer {
       const isPoison = k.edibility === Edibility.Poisonous;
       const isUnknown = k.edibility === Edibility.Unknown;
       const edClass = isPoison ? "poisonous" : isUnknown ? "unknown" : "edible";
-      const edText = isPoison
-        ? "POISONOUS"
-        : isUnknown
-          ? "Unknown"
-          : "Edible";
+      const edText = isPoison ? "POISONOUS" : isUnknown ? "Unknown" : "Edible";
 
       const div = document.createElement("div");
       div.className = "prediction";
@@ -110,10 +96,17 @@ export class ResultsRenderer {
         const verify = document.createElement("a");
         verify.className = "verify-link";
         verify.textContent = "Verify this species online →";
+        verify.setAttribute(
+          "aria-label",
+          `Verify ${item.label} online (opens in new tab)`,
+        );
         verify.target = "_blank";
         verify.rel = "noopener noreferrer";
         const verifyUrl = new URL("https://www.google.com/search");
-        verifyUrl.searchParams.set("q", `${item.label} mushroom identification`);
+        verifyUrl.searchParams.set(
+          "q",
+          `${item.label} mushroom identification`,
+        );
         verify.href = verifyUrl.toString();
 
         this.knowledgeEl.innerHTML = "";
@@ -121,11 +114,6 @@ export class ResultsRenderer {
         this.knowledgeEl.appendChild(p);
         this.knowledgeEl.appendChild(verify);
         this.knowledgeEl.style.display = "block";
-
-        if (report.requiresWarning && report.warningMessage) {
-          this.warningEl.textContent = report.warningMessage;
-          this.warningEl.style.display = "block";
-        }
       }
     });
   }

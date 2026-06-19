@@ -1,15 +1,23 @@
-export { AppError, ModelLoadError, InferenceError, CameraError, LabelMismatchError } from "./errors";
-export { TypedEmitter } from "./emitter";
+export {
+  AppError,
+  ModelLoadError,
+  InferenceError,
+  CameraError,
+  LabelMismatchError,
+} from "./errors";
 export { logger } from "./logger";
 export { escapeHtml, sanitizeText } from "./sanitize";
-export { addTelemetryHandler, removeTelemetryHandler, recordTelemetry, measureAsync, measureSync } from "./telemetry";
+export {
+  addTelemetryHandler,
+  removeTelemetryHandler,
+  recordTelemetry,
+  setTelemetryEnabled,
+} from "./telemetry";
 export type { TelemetryEvent } from "./telemetry";
 export { config } from "./config";
-export type { AppConfig } from "./config";
 export {
   Edibility,
   ModelKey,
-  ApplicationState,
   InferenceWorkerMessageType,
   WorkerCommandType,
 } from "./types";

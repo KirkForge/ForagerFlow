@@ -12,19 +12,23 @@ importScripts("/js/ort.min.js");
 // .wasm sidecar), it resolves relative to the worker's location, producing
 // the wrong URL /assets/ort-wasm-simd-threaded.jsep.mjs. Force the base
 // path to /js/ where we actually serve the artifacts.
-(ort as unknown as { env: { wasm: { wasmPaths: string } } }).env.wasm.wasmPaths =
-  "/js/";
+(
+  ort as unknown as { env: { wasm: { wasmPaths: string } } }
+).env.wasm.wasmPaths = "/js/";
 
-import type { WorkerCommand } from "../core/types";
-import { WorkerCommandType, InferenceWorkerMessageType } from "../core/types";
+import type { InferCommand, WorkerCommand } from "../core/types";
+import { InferenceWorkerMessageType } from "../core/types";
 
 interface OrtTensor {
   data: Float32Array;
+  dispose?: () => void;
   buffer: ArrayBuffer;
 }
 
 interface OrtSession {
   run(feeds: Record<string, OrtTensor>): Promise<Record<string, OrtTensor>>;
+  release?: () => Promise<void>;
+  dispose?: () => Promise<void>;
 }
 
 interface OrtStatic {
@@ -37,16 +41,17 @@ interface OrtStatic {
       },
     ): Promise<OrtSession>;
   };
-  Tensor: new (
-    type: string,
-    data: Float32Array,
-    dims: number[],
-  ) => OrtTensor;
+  Tensor: new (type: string, data: Float32Array, dims: number[]) => OrtTensor;
 }
 
-let session: OrtSession | null = null;
-let currentMean: [number, number, number] = [0.485, 0.456, 0.406];
-let currentStd: [number, number, number] = [0.229, 0.224, 0.225];
+interface SessionState {
+  session: OrtSession;
+  modelKey: string;
+  mean: [number, number, number];
+  std: [number, number, number];
+}
+
+let state: SessionState | null = null;
 
 function preprocess(
   pixels: ArrayBuffer,
@@ -56,25 +61,20 @@ function preprocess(
   std: readonly [number, number, number],
 ): OrtTensor {
   const total = width * height;
-  const red = new Float32Array(total);
-  const green = new Float32Array(total);
-  const blue = new Float32Array(total);
   const data = new Uint8ClampedArray(pixels);
+
+  // Single [3, H, W] NCHW buffer to reduce transient allocations.
+  const tensorData = new Float32Array(total * 3);
 
   for (let i = 0; i < total; i++) {
     const offset = i * 4;
     const r = data[offset] ?? 0;
     const g = data[offset + 1] ?? 0;
     const b = data[offset + 2] ?? 0;
-    red[i] = (r / 255 - mean[0]) / std[0];
-    green[i] = (g / 255 - mean[1]) / std[1];
-    blue[i] = (b / 255 - mean[2]) / std[2];
+    tensorData[i] = (r / 255 - mean[0]) / std[0];
+    tensorData[i + total] = (g / 255 - mean[1]) / std[1];
+    tensorData[i + total * 2] = (b / 255 - mean[2]) / std[2];
   }
-
-  const tensorData = new Float32Array(total * 3);
-  tensorData.set(red, 0);
-  tensorData.set(green, total);
-  tensorData.set(blue, total * 2);
 
   return new ort.Tensor("float32", tensorData, [1, 3, height, width]);
 }
@@ -82,27 +82,36 @@ function preprocess(
 async function loadModel(
   modelPath: string,
   modelKey: string,
+  mean: [number, number, number],
+  std: [number, number, number],
 ): Promise<void> {
-  session = null;
   self.postMessage({
     type: InferenceWorkerMessageType.Status,
     text: "Loading model...",
   });
   try {
-    // Fetch the ONNX as ArrayBuffer and pass to ort. This sidesteps ort's
-    // internal external-data sidecar resolution, which is broken when the
-    // model is loaded from inside a worker (ort computes the .data URL
-    // relative to the worker's location, not the model URL, and the empty
-    // path then errors with "Module.MountedFiles is not available").
     const resp = await fetch(modelPath);
     if (!resp.ok) {
       throw new Error(`Failed to fetch model: HTTP ${String(resp.status)}`);
     }
     const buf = new Uint8Array(await resp.arrayBuffer());
-    session = await ort.InferenceSession.create(buf, {
+    const newSession = await ort.InferenceSession.create(buf, {
       executionProviders: ["wasm"],
       graphOptimizationLevel: "all",
     });
+
+    // Dispose the previous session so its native memory is released promptly
+    // instead of waiting for GC.
+    if (state?.session) {
+      try {
+        await (state.session.dispose?.() ?? state.session.release?.());
+      } catch (e) {
+        // Best-effort disposal; some ort builds don't expose dispose/release.
+        console.warn("[FORAGERFLOW] Failed to dispose old session:", e);
+      }
+    }
+
+    state = { session: newSession, modelKey, mean, std };
     self.postMessage({
       type: InferenceWorkerMessageType.Status,
       text: "Ready",
@@ -116,26 +125,32 @@ async function loadModel(
   }
 }
 
-  self.onmessage = async (e: MessageEvent<WorkerCommand>) => {
+interface UnknownWorkerCommand {
+  type: string;
+}
+
+async function handleWorkerMessage(
+  e: MessageEvent<WorkerCommand | UnknownWorkerCommand>,
+): Promise<void> {
   const { type } = e.data;
 
-  if (type === WorkerCommandType.Switch) {
-    const cmd = e.data as { mean?: [number, number, number]; std?: [number, number, number]; modelPath: string; modelKey: string };
-    if (cmd.mean) currentMean = cmd.mean;
-    if (cmd.std) currentStd = cmd.std;
-    // loadModel() posts Status/Error itself. Don't double-post "Ready" here —
-    // if we do, the main thread flips to ready=true even on load failure,
-    // and the next infer call hits a stale "No model loaded" error instead
-    // of the real failure message.
-    await loadModel(cmd.modelPath, cmd.modelKey);
+  if (type === "switch") {
+    const cmd = e.data as {
+      mean?: [number, number, number];
+      std?: [number, number, number];
+      modelPath: string;
+      modelKey: string;
+    };
+    const mean = cmd.mean ?? [0.485, 0.456, 0.406];
+    const std = cmd.std ?? [0.229, 0.224, 0.225];
+    await loadModel(cmd.modelPath, cmd.modelKey, mean, std);
     return;
   }
 
-  {
-    // type === WorkerCommandType.Infer
-    const { pixels, width, height } = e.data;
+  if (type === "infer") {
+    const { pixels, width, height, modelKey } = e.data as InferCommand;
     try {
-      if (!session) {
+      if (state?.modelKey !== modelKey) {
         self.postMessage({
           type: InferenceWorkerMessageType.Error,
           message: "No model loaded",
@@ -146,14 +161,24 @@ async function loadModel(
         type: InferenceWorkerMessageType.Status,
         text: "Running inference...",
       });
-      const input = preprocess(pixels, width, height, currentMean, currentStd);
-      const outputs = await session.run({ pixel_values: input });
+      const input = preprocess(pixels, width, height, state.mean, state.std);
+      const outputs = await state.session.run({ pixel_values: input });
       const logitsData = outputs["logits"];
       const logits = logitsData?.data ?? new Float32Array();
+
+      // Dispose output tensors if the runtime supports it.
+      for (const tensor of Object.values(outputs)) {
+        try {
+          tensor.dispose?.();
+        } catch {
+          // ignore
+        }
+      }
+
       self.postMessage({
         type: InferenceWorkerMessageType.Result,
         logits: Array.from(logits),
-        modelKey: e.data.modelKey,
+        modelKey,
       });
     } catch (err) {
       console.error("[FORAGERFLOW] Inference worker error:", err);
@@ -162,5 +187,18 @@ async function loadModel(
         message: err instanceof Error ? err.message : "Unknown inference error",
       });
     }
+    return;
   }
-};
+
+  self.postMessage({
+    type: InferenceWorkerMessageType.Error,
+    message: `Unknown worker command: ${type}`,
+  });
+}
+
+self.addEventListener(
+  "message",
+  (e: MessageEvent<WorkerCommand | UnknownWorkerCommand>) => {
+    void handleWorkerMessage(e);
+  },
+);

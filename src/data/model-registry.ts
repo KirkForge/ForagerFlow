@@ -17,7 +17,7 @@ export const modelRegistry: Record<ModelKey, ModelRegistryEntry> = {
     labels: labelsBvra,
     mean: [0.485, 0.456, 0.406],
     std: [0.229, 0.224, 0.225],
-    expectedLabelCount: 215,
+    expectedLabelCount: labelsBvra.length,
     knowledge: knowledgeBvra as Record<string, SpeciesKnowledge>,
   },
   [ModelKey.Dima806]: {
@@ -28,7 +28,7 @@ export const modelRegistry: Record<ModelKey, ModelRegistryEntry> = {
     labels: labelsDima806,
     mean: [0.5, 0.5, 0.5],
     std: [0.5, 0.5, 0.5],
-    expectedLabelCount: 100,
+    expectedLabelCount: labelsDima806.length,
     knowledge: knowledgeDima806 as Record<string, SpeciesKnowledge>,
   },
 };

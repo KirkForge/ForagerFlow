@@ -12,7 +12,8 @@ export default defineConfig({
   },
   define: {
     __APP_VERSION__: JSON.stringify(
-      JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version,
+      JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8"))
+        .version,
     ),
   },
   build: {

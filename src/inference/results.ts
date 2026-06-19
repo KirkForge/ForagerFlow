@@ -1,7 +1,4 @@
-import type {
-  SpeciesKnowledge,
-  Prediction,
-} from "@/core/types";
+import type { SpeciesKnowledge, Prediction } from "@/core/types";
 import { Edibility } from "@/core/types";
 import { softmax } from "@/inference/softmax";
 import type { ModelRegistryEntry } from "@/core/types";
@@ -49,8 +46,7 @@ export function generatePredictionReport(
   const hasPoisonous = top3.some((p) => {
     const k = model.knowledge[p.label] ?? missingKnowledgeFallback(p.label);
     return (
-      k.edibility === Edibility.Poisonous ||
-      k.edibility === Edibility.Unknown
+      k.edibility === Edibility.Poisonous || k.edibility === Edibility.Unknown
     );
   });
 

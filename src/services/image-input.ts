@@ -1,8 +1,10 @@
 import type { CaptureResult } from "@/services/camera";
+import { config } from "@/core/config";
+import { createThumbnailDataUrl } from "./image-utils";
 
 export function processFileInput(
   file: File,
-  size = 224,
+  size = config.captureSize,
 ): Promise<CaptureResult> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -31,11 +33,13 @@ export function processFileInput(
       ctx.drawImage(img, sx, sy, sz, sz, 0, 0, size, size);
 
       const imageData = ctx.getImageData(0, 0, size, size);
+      const thumbnail = createThumbnailDataUrl(img);
       cleanup();
       resolve({
         buffer: imageData.data.buffer,
         width: size,
         height: size,
+        thumbnail,
       });
     };
     img.onerror = () => {

@@ -10,7 +10,10 @@ export class AppError extends Error {
 }
 
 export class ModelLoadError extends AppError {
-  constructor(message: string, public readonly modelKey: string) {
+  constructor(
+    message: string,
+    public readonly modelKey: string,
+  ) {
     super(message, "MODEL_LOAD_FAILED", true);
     this.name = "ModelLoadError";
   }

@@ -4,6 +4,8 @@
  * Feature flags allow gradual rollout of new capabilities.
  */
 
+import { ModelKey } from "@/core/types";
+
 function envBool(key: string, fallback: boolean): boolean {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const val: string | undefined = import.meta.env[key];
@@ -23,6 +25,14 @@ function envNumber(key: string, fallback: number): number {
   return Number.isFinite(num) ? num : fallback;
 }
 
+function envMinFreeBytes(): Record<ModelKey, number> {
+  return {
+    [ModelKey.BVRA]: envNumber("VITE_BVRA_MIN_FREE_MB", 150) * 1024 * 1024,
+    [ModelKey.Dima806]:
+      envNumber("VITE_DIMA806_MIN_FREE_MB", 500) * 1024 * 1024,
+  };
+}
+
 export const config = {
   /** Maximum inference retries before giving up */
   maxInferenceRetries: envNumber("VITE_MAX_INFERENCE_RETRIES", 3),
@@ -36,8 +46,20 @@ export const config = {
   /** Maximum history entries to keep in IndexedDB */
   historyLimit: envNumber("VITE_HISTORY_LIMIT", 200),
 
-  /** App version from package.json, overridden by env */
-  appVersion: envString("VITE_APP_VERSION", "2.1.0"),
+  /** App version injected by Vite from package.json */
+  appVersion: envString("VITE_APP_VERSION", __APP_VERSION__),
+
+  /** Per-model free-storage threshold (bytes) for pre-load check. */
+  minFreeBytesPerModel: envMinFreeBytes(),
+
+  /** Timeout for navigator.storage.estimate() (ms) */
+  storageEstimateTimeoutMs: envNumber("VITE_STORAGE_ESTIMATE_TIMEOUT_MS", 1500),
+
+  /** Optional endpoint for beacon telemetry (e.g. /api/telemetry) */
+  telemetryEndpoint: envString("VITE_TELEMETRY_ENDPOINT", ""),
+
+  /** Maximum telemetry events to keep in the localStorage buffer */
+  telemetryBufferSize: envNumber("VITE_TELEMETRY_BUFFER_SIZE", 250),
 
   /** Feature flags */
   features: {
@@ -54,6 +76,3 @@ export const config = {
     modelSwitch: envBool("VITE_FEATURE_MODEL_SWITCH", true),
   },
 } as const;
-
-/** Type-safe config key lookup */
-export type AppConfig = typeof config;

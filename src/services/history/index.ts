@@ -1,20 +1,7 @@
-// services/history/index.ts
-// IndexedDB-backed identification history for Foragerflow.
-// Stores past predictions for offline review.
-//
-// The barrel re-exports the read and write APIs so main.ts can import them
-// statically. `deleteEntry` lives in a separate module (delete-entry.ts) so
-// the per-row delete handler can import it dynamically — Vite will then put
-// the delete code in its own chunk and main.ts does not pay for it on first
-// paint.
-
 import type { PredictionReport } from "@/inference/results";
 import type { ModelKey, Edibility } from "@/core/types";
 import { logger } from "@/core/logger";
-
-const DB_NAME = "foragerflow-history";
-const DB_VERSION = 1;
-const STORE_NAME = "identifications";
+import { openDB, withTransaction, setMeta } from "./db";
 
 export interface HistoryEntry {
   id: string;
@@ -28,29 +15,18 @@ export interface HistoryEntry {
   notes: string;
 }
 
-function openDB(): Promise<IDBDatabase> {
-  return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: "id" });
-        store.createIndex("timestamp", "timestamp", { unique: false });
-        store.createIndex("modelKey", "modelKey", { unique: false });
-        store.createIndex("edibility", "top1Edibility", { unique: false });
-      }
-    };
-    request.onsuccess = () => { resolve(request.result); };
-    request.onerror = () => { reject(new Error(request.error?.message ?? "IndexedDB open failed")); };
-  });
+export interface HistoryBackup {
+  version: number;
+  exportedAt: string;
+  entries: HistoryEntry[];
 }
 
-export async function saveIdentification(
+function makeEntry(
   report: PredictionReport,
   modelKey: ModelKey,
   thumbnail?: string,
-): Promise<string> {
-  const entry: HistoryEntry = {
+): HistoryEntry {
+  return {
     id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
     modelKey,
@@ -64,53 +40,80 @@ export async function saveIdentification(
     thumbnail: thumbnail ?? "",
     notes: report.top1Knowledge.notes,
   };
+}
+
+function isQuotaExceeded(err: unknown): boolean {
+  return (
+    err instanceof DOMException &&
+    (err.name === "QuotaExceededError" || err.name === "QuotaExceeded")
+  );
+}
+
+export async function saveIdentification(
+  report: PredictionReport,
+  modelKey: ModelKey,
+  thumbnail?: string,
+): Promise<string> {
+  const entry = makeEntry(report, modelKey, thumbnail);
 
   try {
     const db = await openDB();
-    return await new Promise<string>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, "readwrite");
-      const store = tx.objectStore(STORE_NAME);
-      const request = store.add(entry);
-      request.onsuccess = () => {
-        db.close();
-        resolve(entry.id);
-      };
-      request.onerror = () => {
-        db.close();
-        reject(new Error(request.error?.message ?? "IDB error"));
-      };
-    });
+    return await withTransaction<string>(db, "readwrite", (store) =>
+      store.add(entry),
+    );
   } catch (err) {
+    if (isQuotaExceeded(err) && thumbnail) {
+      logger.warn(
+        "Quota exceeded saving identification with thumbnail; retrying without thumbnail",
+      );
+      try {
+        const db = await openDB();
+        const entryNoThumb = { ...entry, thumbnail: "" };
+        return await withTransaction<string>(db, "readwrite", (store) =>
+          store.add(entryNoThumb),
+        );
+      } catch (retryErr) {
+        logger.error("Failed to save identification (retry):", retryErr);
+        throw retryErr;
+      }
+    }
     logger.error("Failed to save identification:", err);
     throw err;
   }
 }
 
-export async function getHistory(
-  limit = 50,
-): Promise<HistoryEntry[]> {
+export async function getHistory(limit = 50): Promise<HistoryEntry[]> {
   try {
     const db = await openDB();
+    const results: HistoryEntry[] = [];
     return await new Promise<HistoryEntry[]>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, "readonly");
-      const store = tx.objectStore(STORE_NAME);
+      const tx = db.transaction("identifications", "readonly");
+      const store = tx.objectStore("identifications");
       const index = store.index("timestamp");
       const request = index.openCursor(null, "prev");
-      const results: HistoryEntry[] = [];
+
+      tx.oncomplete = () => {
+        db.close();
+        resolve(results);
+      };
+      tx.onerror = () => {
+        db.close();
+        reject(new Error(tx.error?.message ?? "IDB transaction failed"));
+      };
+      tx.onabort = () => {
+        db.close();
+        reject(new Error("IDB transaction aborted"));
+      };
 
       request.onsuccess = () => {
         const cursor = request.result;
         if (cursor && results.length < limit) {
           results.push(cursor.value as HistoryEntry);
           cursor.continue();
-        } else {
-          db.close();
-          resolve(results);
         }
       };
       request.onerror = () => {
-        db.close();
-        reject(new Error(request.error?.message ?? "IDB error"));
+        reject(new Error(request.error?.message ?? "IDB request failed"));
       };
     });
   } catch (err) {
@@ -120,23 +123,53 @@ export async function getHistory(
 }
 
 export async function clearHistory(): Promise<void> {
+  const db = await openDB();
+  await withTransaction(db, "readwrite", (store) => store.clear());
+}
+
+async function recordBackupTimestamp(iso: string): Promise<void> {
   try {
-    const db = await openDB();
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, "readwrite");
-      const store = tx.objectStore(STORE_NAME);
-      const request = store.clear();
-      request.onsuccess = () => {
-        db.close();
-        resolve();
-      };
-      request.onerror = () => {
-        db.close();
-        reject(new Error(request.error?.message ?? "IDB error"));
-      };
-    });
+    await setMeta("lastBackupAt", iso);
   } catch (err) {
-    logger.error("Failed to clear history:", err);
-    throw err;
+    logger.warn("Failed to record backup timestamp:", err);
   }
+}
+
+export async function exportHistory(): Promise<string> {
+  const entries = await getHistory(10_000);
+  const backup: HistoryBackup = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    entries,
+  };
+  await recordBackupTimestamp(backup.exportedAt);
+  return JSON.stringify(backup);
+}
+
+export async function importHistory(json: string): Promise<number> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    throw new Error("Backup file is not valid JSON");
+  }
+
+  if (!parsed || typeof parsed !== "object" || !("entries" in parsed)) {
+    throw new Error("Backup file has no entries");
+  }
+
+  const entries = (parsed as { entries?: unknown }).entries;
+  if (!Array.isArray(entries)) {
+    throw new Error("Backup entries are not an array");
+  }
+
+  const db = await openDB();
+  let imported = 0;
+  for (const raw of entries) {
+    const entry = raw as HistoryEntry;
+    await withTransaction(db, "readwrite", (store) => store.put(entry));
+    imported++;
+  }
+  await recordBackupTimestamp(new Date().toISOString());
+  return imported;
 }

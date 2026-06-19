@@ -24,7 +24,12 @@ body {
   padding: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
   height: 100%;
   overflow: hidden;
 }
@@ -371,6 +376,14 @@ video {
   font-size: 12px;
   position: relative;
 }
+.history-thumbnail {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  background: var(--surface-1);
+}
 .history-meta {
   display: flex;
   flex-direction: column;
@@ -481,7 +494,9 @@ video {
   animation: capture-spin 0.8s linear infinite;
 }
 @keyframes capture-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* First-run safety modal. Native <dialog> with showModal() gives

@@ -1,99 +1,133 @@
-import type {
-  ModelConfig,
-  SpeciesKnowledge,
-  WorkerMessage,
-  WorkerCommand,
-} from "@/core/types";
+import type { ModelConfig, WorkerMessage, WorkerCommand } from "@/core/types";
 import {
   ModelKey,
   InferenceWorkerMessageType,
   WorkerCommandType,
 } from "@/core/types";
-import { InferenceError, LabelMismatchError, ModelLoadError } from "@/core/errors";
+import {
+  InferenceError,
+  LabelMismatchError,
+  ModelLoadError,
+} from "@/core/errors";
 import { logger } from "@/core/logger";
 import { modelRegistry } from "@/data/model-registry";
-import { TypedEmitter } from "@/core/emitter";
+import { config } from "@/core/config";
 
 interface InferenceWorker extends Worker {
   onmessage: ((e: MessageEvent<WorkerMessage>) => void) | null;
   onerror: ((e: ErrorEvent) => void) | null;
 }
 
-interface InferenceEvents {
-  [key: string]: unknown;
-  status: string;
-  result: { logits: Float32Array; modelKey: ModelKey };
-  error: InferenceError | LabelMismatchError;
-  /**
-   * Emitted from switchModel() before a large (≥100 MB) model is
-   * loaded when navigator.storage.estimate() reports less than
-   * `MIN_FREE_BYTES` of free space. The UI listens for this and
-   * shows a confirm modal; the user accepting resumes the switch by
-   * calling switchModel() a second time with a bypass flag.
-   *
-   * The payload reports the requested model, the estimated free
-   * bytes, and a token. The handler must call
-   * `resumeStorageConfirm(token)` with the same token to actually
-   * load the model.
-   */
-  storageConfirm: { modelKey: ModelKey; freeBytes: number; token: string };
-}
-
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 1000;
-// Per-model free-storage threshold for the pre-load check. The
-// ONNX file plus the cached wasm sidecars need roughly the model
-// size in MB plus a small margin (we round up to give the OS
-// room to write). The dima806 model is ~330 MB, BVRA is ~90 MB.
-// A single global threshold would over-prompt BVRA-only users.
-const MIN_FREE_BYTES_PER_MODEL: Record<ModelKey, number> = {
-  [ModelKey.BVRA]: 150 * 1024 * 1024,
-  [ModelKey.Dima806]: 500 * 1024 * 1024,
-};
-const STORAGE_ESTIMATE_TIMEOUT_MS = 1500;
-
 export type { WorkerMessage, WorkerCommand };
 
-export class InferenceService extends TypedEmitter<InferenceEvents> {
+export type StatusHandler = (text: string) => void;
+export type ResultHandler = (result: {
+  logits: Float32Array;
+  modelKey: ModelKey;
+}) => void;
+export type ErrorHandler = (
+  error: InferenceError | LabelMismatchError,
+) => void;
+export type StorageConfirmHandler = (payload: {
+  modelKey: ModelKey;
+  freeBytes: number;
+  token: string;
+}) => void;
+
+function generateToken(): string {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
+    return crypto.randomUUID();
+  }
+  const arr = new Uint8Array(16);
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.getRandomValues === "function"
+  ) {
+    crypto.getRandomValues(arr);
+  } else {
+    for (let i = 0; i < arr.length; i++) {
+      arr[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  let hex = "";
+  for (const b of arr) {
+    hex += b.toString(16).padStart(2, "0");
+  }
+  return `${Date.now().toString(36)}-${hex}`;
+}
+
+export class InferenceService {
   private worker: InferenceWorker | null = null;
   private ready = false;
   private currentModelKey: ModelKey = ModelKey.BVRA;
   private retryCount = 0;
-  private inferQueue: { pixels: ArrayBuffer; width: number; height: number }[] = [];
+  private retryTimeout: ReturnType<typeof setTimeout> | null = null;
+  private inferQueue: {
+    pixels: ArrayBuffer;
+    width: number;
+    height: number;
+    modelKey: ModelKey;
+  }[] = [];
   private pendingStorageToken: string | null = null;
   private pendingModelKey: ModelKey | null = null;
+  private terminated = false;
+
+  private onStatusHandler: StatusHandler | null = null;
+  private onResultHandler: ResultHandler | null = null;
+  private onErrorHandler: ErrorHandler | null = null;
+  private onStorageConfirmHandler: StorageConfirmHandler | null = null;
+
+  onStatus(handler: StatusHandler): void {
+    this.onStatusHandler = handler;
+  }
+
+  onResult(handler: ResultHandler): void {
+    this.onResultHandler = handler;
+  }
+
+  onError(handler: ErrorHandler): void {
+    this.onErrorHandler = handler;
+  }
+
+  onStorageConfirm(handler: StorageConfirmHandler): void {
+    this.onStorageConfirmHandler = handler;
+  }
 
   initialize(): void {
+    this.terminated = false;
+    this.retryCount = 0;
     try {
-      // Classic worker (not module) so it can importScripts("/js/ort.min.js").
-      // The vendored ort.min.js is a UMD bundle that attaches `ort` to the
-      // worker global; module workers cannot use importScripts and ort.min.js
-      // is not an ES module.
       this.worker = new Worker(
         new URL("@/inference/worker.ts", import.meta.url),
         { type: "classic" },
       );
 
-      this.worker.onmessage = (
-        e: MessageEvent<WorkerMessage>,
-      ): void => {
+      this.worker.onmessage = (e: MessageEvent<WorkerMessage>): void => {
+        if (this.terminated) return;
         const { type } = e.data;
         logger.debug("Worker message:", type);
 
         switch (type) {
           case InferenceWorkerMessageType.Status: {
-            if (e.data.text === "Ready" && e.data.modelKey === this.currentModelKey) {
+            if (
+              e.data.text === "Ready" &&
+              e.data.modelKey === this.currentModelKey
+            ) {
               this.ready = true;
               this.retryCount = 0;
               this.flushInferQueue();
             }
-            this.emit("status", e.data.text);
+            this.onStatusHandler?.(e.data.text);
             break;
           }
           case InferenceWorkerMessageType.Result: {
-            if (e.data.logits.length !== this.getActiveModel().expectedLabelCount) {
-              this.emit(
-                "error",
+            if (
+              e.data.logits.length !== this.getActiveModel().expectedLabelCount
+            ) {
+              this.onErrorHandler?.(
                 new LabelMismatchError(
                   this.getActiveModel().labels.length,
                   e.data.logits.length,
@@ -101,8 +135,11 @@ export class InferenceService extends TypedEmitter<InferenceEvents> {
               );
               return;
             }
-            this.emit("result", { logits: new Float32Array(e.data.logits), modelKey: e.data.modelKey });
-            this.emit("status", "Done");
+            this.onResultHandler?.({
+              logits: new Float32Array(e.data.logits),
+              modelKey: e.data.modelKey,
+            });
+            this.onStatusHandler?.("Done");
             break;
           }
           case InferenceWorkerMessageType.Error: {
@@ -114,8 +151,11 @@ export class InferenceService extends TypedEmitter<InferenceEvents> {
       };
 
       this.worker.onerror = (e: ErrorEvent): void => {
+        if (this.terminated) return;
         logger.error("Worker runtime error:", e.message);
-        this.handleWorkerError(new InferenceError(e.message || "Worker runtime error"));
+        this.handleWorkerError(
+          new InferenceError(e.message || "Worker runtime error"),
+        );
       };
     } catch (err) {
       throw new ModelLoadError(
@@ -126,20 +166,23 @@ export class InferenceService extends TypedEmitter<InferenceEvents> {
   }
 
   private handleWorkerError(error: InferenceError): void {
-    if (error.recoverable && this.retryCount < MAX_RETRIES) {
+    if (error.recoverable && this.retryCount < config.maxInferenceRetries) {
       this.retryCount++;
       logger.warn(
-        `Retrying model load (attempt ${String(this.retryCount)}/${String(MAX_RETRIES)})`,
+        `Retrying model load (attempt ${String(this.retryCount)}/${String(config.maxInferenceRetries)})`,
       );
-      this.emit(
-        "status",
-        `Retrying (${String(this.retryCount)}/${String(MAX_RETRIES)})...`,
+      this.onStatusHandler?.(
+        `Retrying (${String(this.retryCount)}/${String(config.maxInferenceRetries)})...`,
       );
-      setTimeout(() => {
+      if (this.retryTimeout) {
+        clearTimeout(this.retryTimeout);
+      }
+      this.retryTimeout = setTimeout(() => {
+        this.retryTimeout = null;
         this.switchModel(this.currentModelKey);
-      }, RETRY_DELAY_MS * this.retryCount);
+      }, config.retryDelayMs * this.retryCount);
     } else {
-      this.emit("error", error);
+      this.onErrorHandler?.(error);
     }
   }
 
@@ -147,6 +190,13 @@ export class InferenceService extends TypedEmitter<InferenceEvents> {
     while (this.inferQueue.length > 0) {
       const item = this.inferQueue.shift();
       if (item) {
+        if (item.modelKey !== this.currentModelKey) {
+          logger.debug(
+            "Dropping queued inference for stale model",
+            item.modelKey,
+          );
+          continue;
+        }
         this.infer(item.pixels, item.width, item.height);
       }
     }
@@ -155,17 +205,12 @@ export class InferenceService extends TypedEmitter<InferenceEvents> {
   switchModel(key: ModelKey, opts: { skipStorageCheck?: boolean } = {}): void {
     const model = modelRegistry[key];
 
-    // Only enforce the storage check on the "first big load" — once
-    // the user has confirmed once, repeated switches between the two
-    // models should not re-prompt. The ONNX file is cached by the
-    // service worker after first download; subsequent loads come from
-    // the cache. We still prompt for the very first load of each
-    // large model.
     if (!opts.skipStorageCheck && this.shouldCheckStorageFor(key)) {
       void this.checkStorageAndMaybeEmit(key);
       return;
     }
 
+    this.retryCount = 0;
     this.currentModelKey = key;
     this.ready = false;
 
@@ -177,13 +222,9 @@ export class InferenceService extends TypedEmitter<InferenceEvents> {
       std: model.std,
     };
     this.worker?.postMessage(cmd);
-    this.emit("status", `Loading ${model.name}...`);
+    this.onStatusHandler?.(`Loading ${model.name}...`);
   }
 
-  /**
-   * Called by the UI after the user accepts the storage-confirm
-   * modal. Continues the pending switchModel() call.
-   */
   resumeStorageConfirm(token: string): void {
     if (this.pendingStorageToken !== token || this.pendingModelKey === null) {
       logger.warn("resumeStorageConfirm: token mismatch or expired");
@@ -192,21 +233,22 @@ export class InferenceService extends TypedEmitter<InferenceEvents> {
     const key = this.pendingModelKey;
     this.pendingStorageToken = null;
     this.pendingModelKey = null;
-    this.emit("status", "Continuing model load...");
+    this.onStatusHandler?.("Continuing model load...");
     this.switchModel(key, { skipStorageCheck: true });
   }
 
   private storageCheckedFor = new Set<ModelKey>();
 
   private shouldCheckStorageFor(key: ModelKey): boolean {
-    // Don't re-prompt for the same model in the same session.
     return !this.storageCheckedFor.has(key);
   }
 
   private async checkStorageAndMaybeEmit(key: ModelKey): Promise<void> {
-    // If StorageManager isn't available (older browsers, or a
-    // restrictive private mode), fall through to the normal load.
-    if (typeof navigator === "undefined" || typeof navigator.storage.estimate !== "function") {
+    const storage = (navigator as { storage?: StorageManager }).storage;
+    if (
+      typeof navigator === "undefined" ||
+      typeof storage?.estimate !== "function"
+    ) {
       logger.debug("StorageManager not available; skipping storage check");
       this.storageCheckedFor.add(key);
       this.switchModel(key, { skipStorageCheck: true });
@@ -219,15 +261,15 @@ export class InferenceService extends TypedEmitter<InferenceEvents> {
       const result = await Promise.race([
         estimatePromise,
         new Promise<never>((_, reject) => {
-          setTimeout(
-            () => {
-              reject(new Error("storage estimate timeout"));
-            },
-            STORAGE_ESTIMATE_TIMEOUT_MS,
-          );
+          setTimeout(() => {
+            reject(new Error("storage estimate timeout"));
+          }, config.storageEstimateTimeoutMs);
         }),
       ]);
-      if (typeof result.quota === "number" && typeof result.usage === "number") {
+      if (
+        typeof result.quota === "number" &&
+        typeof result.usage === "number"
+      ) {
         freeBytes = Math.max(0, result.quota - result.usage);
       }
     } catch (err) {
@@ -239,15 +281,14 @@ export class InferenceService extends TypedEmitter<InferenceEvents> {
 
     this.storageCheckedFor.add(key);
 
-    const minFree = MIN_FREE_BYTES_PER_MODEL[key];
+    const minFree = config.minFreeBytesPerModel[key];
     if (freeBytes < minFree) {
-      const token = crypto.randomUUID();
+      const token = generateToken();
       this.pendingStorageToken = token;
       this.pendingModelKey = key;
       const freeMB = Math.round(freeBytes / 1024 / 1024);
-      this.emit("storageConfirm", { modelKey: key, freeBytes, token });
-      this.emit(
-        "status",
+      this.onStorageConfirmHandler?.({ modelKey: key, freeBytes, token });
+      this.onStatusHandler?.(
         `Low storage (${String(freeMB)} MB free). Awaiting confirmation.`,
       );
       return;
@@ -258,8 +299,13 @@ export class InferenceService extends TypedEmitter<InferenceEvents> {
 
   infer(pixels: ArrayBuffer, width: number, height: number): void {
     if (!this.ready) {
-      this.inferQueue.push({ pixels, width, height });
-      this.emit("status", "Model still loading — request queued");
+      this.inferQueue.push({
+        pixels,
+        width,
+        height,
+        modelKey: this.currentModelKey,
+      });
+      this.onStatusHandler?.("Model still loading — request queued");
       return;
     }
     const cmd: WorkerCommand = {
@@ -270,7 +316,7 @@ export class InferenceService extends TypedEmitter<InferenceEvents> {
       height,
     };
     this.worker?.postMessage(cmd, [pixels]);
-    this.emit("status", "Processing...");
+    this.onStatusHandler?.("Processing...");
   }
 
   isReady(): boolean {
@@ -285,16 +331,22 @@ export class InferenceService extends TypedEmitter<InferenceEvents> {
     return this.currentModelKey;
   }
 
-  getActiveKnowledge(): Record<string, SpeciesKnowledge> {
-    return modelRegistry[this.currentModelKey].knowledge;
-  }
-
   terminate(): void {
+    this.terminated = true;
+    if (this.retryTimeout) {
+      clearTimeout(this.retryTimeout);
+      this.retryTimeout = null;
+    }
+    this.pendingStorageToken = null;
+    this.pendingModelKey = null;
+    this.inferQueue = [];
     this.worker?.terminate();
     this.worker = null;
     this.ready = false;
-    this.inferQueue = [];
-    this.removeAllListeners();
+    this.onStatusHandler = null;
+    this.onResultHandler = null;
+    this.onErrorHandler = null;
+    this.onStorageConfirmHandler = null;
   }
 }
 

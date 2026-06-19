@@ -1,0 +1,6 @@
+dist/
+node_modules/
+pwa/model/
+coverage/
+test-results/
+playwright-report/

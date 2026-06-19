@@ -1,19 +1,135 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import "fake-indexeddb/auto";
+import {
+  saveIdentification,
+  getHistory,
+  clearHistory,
+  exportHistory,
+  importHistory,
+  type HistoryEntry,
+  type HistoryBackup,
+} from "@/services/history";
+import { deleteEntry } from "@/services/history/delete-entry";
+import * as historyDb from "@/services/history/db";
+import type * as HistoryDb from "@/services/history/db";
+import { ModelKey, Edibility } from "@/core/types";
+import type { PredictionReport } from "@/inference/results";
 
-// We test the history module's pure logic by mocking IndexedDB.
-// The IndexedDB API isn't available in jsdom, so we test the function signatures
-// and error handling patterns.
+function makeReport(
+  overrides: Partial<PredictionReport> = {},
+): PredictionReport {
+  return {
+    top1Species: "Agaricus bisporus",
+    top1Probability: 0.95,
+    top1Knowledge: {
+      edibility: Edibility.Edible,
+      notes: "Button mushroom.",
+    },
+    predictions: [
+      { label: "Agaricus bisporus", probability: 0.95 },
+      { label: "Amanita phalloides", probability: 0.03 },
+    ],
+    ...overrides,
+  } as PredictionReport;
+}
 
-describe("history module", () => {
+describe("history with IndexedDB", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(async () => {
+    await clearHistory();
+    localStorage.clear();
+  });
+
+  it("saves and retrieves an identification", async () => {
+    const report = makeReport();
+    const id = await saveIdentification(report, ModelKey.BVRA);
+    expect(id).toBeTruthy();
+
+    const entries = await getHistory(10);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.id).toBe(id);
+    expect(entries[0]!.top1Species).toBe("Agaricus bisporus");
+    expect(entries[0]!.modelKey).toBe(ModelKey.BVRA);
+  });
+
+  it("stores thumbnail when provided", async () => {
+    const report = makeReport();
+    const thumbnail = "data:image/jpeg;base64,/9j/4AAQSkZJRg==";
+    await saveIdentification(report, ModelKey.BVRA, thumbnail);
+
+    const entries = await getHistory(10);
+    expect(entries[0]!.thumbnail).toBe(thumbnail);
+  });
+
+  it("returns empty array when history is empty", async () => {
+    const entries = await getHistory(10);
+    expect(entries).toEqual([]);
+  });
+
+  it("returns history sorted by timestamp descending", async () => {
+    await saveIdentification(
+      makeReport({ top1Species: "First" }),
+      ModelKey.BVRA,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await saveIdentification(
+      makeReport({ top1Species: "Second" }),
+      ModelKey.BVRA,
+    );
+
+    const entries = await getHistory(10);
+    expect(entries).toHaveLength(2);
+    expect(entries[0]!.top1Species).toBe("Second");
+    expect(entries[1]!.top1Species).toBe("First");
+  });
+
+  it("respects the limit parameter", async () => {
+    await saveIdentification(makeReport({ top1Species: "One" }), ModelKey.BVRA);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await saveIdentification(makeReport({ top1Species: "Two" }), ModelKey.BVRA);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await saveIdentification(
+      makeReport({ top1Species: "Three" }),
+      ModelKey.BVRA,
+    );
+
+    const entries = await getHistory(2);
+    expect(entries).toHaveLength(2);
+    expect(entries[0]!.top1Species).toBe("Three");
+    expect(entries[1]!.top1Species).toBe("Two");
+  });
+
+  it("deletes a single entry", async () => {
+    const id = await saveIdentification(makeReport(), ModelKey.BVRA);
+    await deleteEntry(id);
+    const entries = await getHistory(10);
+    expect(entries).toHaveLength(0);
+  });
+
+  it("clears all entries", async () => {
+    await saveIdentification(makeReport({ top1Species: "A" }), ModelKey.BVRA);
+    await saveIdentification(
+      makeReport({ top1Species: "B" }),
+      ModelKey.Dima806,
+    );
+    await clearHistory();
+    const entries = await getHistory(10);
+    expect(entries).toHaveLength(0);
+  });
+
   it("HistoryEntry type is well-formed", () => {
-    const entry = {
+    const entry: HistoryEntry = {
       id: "test-1",
       timestamp: new Date().toISOString(),
-      modelKey: "bvra",
+      modelKey: ModelKey.BVRA,
       top1Species: "Agaricus bisporus",
       top1Probability: 0.95,
-      top1Edibility: "Edible",
+      top1Edibility: Edibility.Edible,
       predictions: [{ label: "Agaricus bisporus", probability: 0.95 }],
+      thumbnail: "",
       notes: "Button mushroom.",
     };
 
@@ -24,54 +140,189 @@ describe("history module", () => {
     expect(entry.predictions.length).toBeGreaterThan(0);
   });
 
-  it("modelKey is one of the valid options", () => {
-    const valid = ["bvra", "dima806"];
-    expect(valid).toContain("bvra");
-    expect(valid).toContain("dima806");
-    expect(valid).not.toContain("invalid");
-  });
-
-  it("edibility values are valid", () => {
-    const valid = ["Edible", "Poisonous", "Unknown"];
-    valid.forEach((v) => {
-      expect(["Edible", "Poisonous", "Unknown"]).toContain(v);
+  it("retries save without thumbnail on QuotaExceededError", async () => {
+    let attempt = 0;
+    vi.doMock("@/services/history/db", async () => {
+      const actual = await vi.importActual<typeof HistoryDb>("@/services/history/db");
+      return {
+        ...actual,
+        openDB: async () => {
+          const db = await actual.openDB();
+          const originalTransaction = db.transaction.bind(db);
+          db.transaction = vi.fn((name: string, mode: IDBTransactionMode) => {
+            const tx = originalTransaction(name, mode);
+            const originalStore = tx.objectStore.bind(tx);
+            tx.objectStore = () => {
+              const store = originalStore(name);
+              const originalAdd = store.add.bind(store);
+              store.add = (value: unknown): IDBRequest<IDBValidKey> => {
+                attempt++;
+                const entry = value as { thumbnail?: string };
+                if (attempt === 1 && entry.thumbnail) {
+                  const err = new DOMException(
+                    "Quota exceeded",
+                    "QuotaExceededError",
+                  );
+                  const req = {
+                    set onsuccess(_: () => void) {},
+                    set onerror(handler: () => void) {
+                      handler();
+                    },
+                  };
+                  Object.defineProperty(req, "error", {
+                    value: err,
+                    configurable: true,
+                  });
+                  return req as unknown as IDBRequest<IDBValidKey>;
+                }
+                return originalAdd(value);
+              };
+              return store;
+            };
+            return tx;
+          }) as unknown as typeof db.transaction;
+          return db;
+        },
+      };
     });
+
+    const { saveIdentification } = await import("@/services/history");
+    const report = makeReport();
+    const id = await saveIdentification(report, ModelKey.BVRA, "thumb");
+    expect(id).toBeTruthy();
+
+    vi.doUnmock("@/services/history/db");
   });
 
-  it("handles empty history gracefully", () => {
-    const entries: unknown[] = [];
-    expect(entries.length).toBe(0);
-    expect(Array.isArray(entries)).toBe(true);
+  it("returns empty history when IndexedDB read fails", async () => {
+    vi.doMock("@/services/history/db", () => ({
+      openDB: vi.fn().mockRejectedValue(new Error("idb unavailable")),
+      withTransaction: vi.fn(),
+      STORE_NAME: "identifications",
+    }));
+
+    const { getHistory } = await import("@/services/history");
+    const entries = await getHistory(10);
+    expect(entries).toEqual([]);
+
+    vi.doUnmock("@/services/history/db");
   });
 
-  it("history entries are sorted by timestamp descending", () => {
-    const entries = [
-      { id: "1", timestamp: "2025-01-01T00:00:00Z" },
-      { id: "2", timestamp: "2025-06-01T00:00:00Z" },
-      { id: "3", timestamp: "2025-03-01T00:00:00Z" },
-    ];
-    entries.sort(
-      (a, b) =>
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+  it("throws when save fails for a non-quota reason", async () => {
+    const openDBSpy = vi
+      .spyOn(historyDb, "openDB")
+      .mockRejectedValue(new Error("save failed"));
+
+    await expect(
+      saveIdentification(makeReport(), ModelKey.BVRA),
+    ).rejects.toThrow("save failed");
+
+    openDBSpy.mockRestore();
+  });
+
+  it("throws when QuotaExceeded occurs without a thumbnail", async () => {
+    const withTransactionSpy = vi
+      .spyOn(historyDb, "withTransaction")
+      .mockRejectedValue(
+        new DOMException("Quota exceeded", "QuotaExceededError"),
+      );
+
+    await expect(
+      saveIdentification(makeReport(), ModelKey.BVRA),
+    ).rejects.toThrow("Quota exceeded");
+
+    withTransactionSpy.mockRestore();
+  });
+
+  it("throws when QuotaExceeded retry also fails", async () => {
+    const withTransactionSpy = vi
+      .spyOn(historyDb, "withTransaction")
+      .mockRejectedValue(
+        new DOMException("Quota exceeded", "QuotaExceededError"),
+      );
+
+    await expect(
+      saveIdentification(makeReport(), ModelKey.BVRA, "thumb"),
+    ).rejects.toThrow("Quota exceeded");
+
+    withTransactionSpy.mockRestore();
+  });
+
+  it("returns empty history when the read transaction fails", async () => {
+    const openDBSpy = vi.spyOn(historyDb, "openDB").mockResolvedValue({
+      transaction: vi.fn().mockReturnValue({
+        objectStore: vi.fn().mockReturnValue({
+          index: vi.fn().mockReturnValue({
+            openCursor: vi.fn().mockReturnValue({
+              set onsuccess(_: () => void) {},
+              set onerror(handler: () => void) {
+                handler();
+              },
+            }),
+          }),
+        }),
+        set onerror(handler: () => void) {
+          handler();
+        },
+        set onabort(_: () => void) {},
+        set oncomplete(_: () => void) {},
+      }),
+      close: vi.fn(),
+    } as unknown as IDBDatabase);
+
+    const entries = await getHistory(10);
+    expect(entries).toEqual([]);
+
+    openDBSpy.mockRestore();
+  });
+
+  it("exports all history entries as JSON", async () => {
+    await saveIdentification(
+      makeReport({ top1Species: "Export A" }),
+      ModelKey.BVRA,
     );
-    expect(entries[0]!.id).toBe("2");
-    expect(entries[2]!.id).toBe("1");
+
+    const json = await exportHistory();
+    const backup = JSON.parse(json) as HistoryBackup;
+
+    expect(backup.version).toBe(1);
+    expect(backup.entries).toHaveLength(1);
+    expect(backup.entries[0]!.top1Species).toBe("Export A");
+    expect(backup.exportedAt).toBeTruthy();
   });
 
-  it("clearHistory removes all entries", () => {
-    let entries = [{ id: "1" }, { id: "2" }, { id: "3" }];
-    entries = [];
-    expect(entries.length).toBe(0);
+  it("imports history entries from JSON", async () => {
+    const backup: HistoryBackup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries: [
+        {
+          id: "imp-1",
+          timestamp: new Date().toISOString(),
+          modelKey: ModelKey.BVRA,
+          top1Species: "Imported",
+          top1Probability: 0.8,
+          top1Edibility: Edibility.Unknown,
+          predictions: [],
+          thumbnail: "",
+          notes: "",
+        },
+      ],
+    };
+
+    const count = await importHistory(JSON.stringify(backup));
+    expect(count).toBe(1);
+
+    const entries = await getHistory(10);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.id).toBe("imp-1");
   });
 
-  it("deleteEntry removes single entry", () => {
-    const entries = [
-      { id: "1", label: "A" },
-      { id: "2", label: "B" },
-      { id: "3", label: "C" },
-    ];
-    const filtered = entries.filter((e) => e.id !== "2");
-    expect(filtered.length).toBe(2);
-    expect(filtered.find((e) => e.id === "2")).toBeUndefined();
+  it("throws when importing invalid JSON", async () => {
+    await expect(importHistory("not json")).rejects.toThrow("not valid JSON");
+  });
+
+  it("throws when importing a backup with no entries", async () => {
+    await expect(importHistory('{"version":1}')).rejects.toThrow("no entries");
   });
 });

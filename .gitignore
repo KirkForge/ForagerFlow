@@ -38,6 +38,7 @@ CACHEDIR.TAG
 
 # --- LLM planning / AI session notes ---
 llm/
+state.md
 
 # --- Model snapshots from HuggingFace (generated) ---
 models--*/
