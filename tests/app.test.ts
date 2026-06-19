@@ -2,10 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ModelKey, Edibility } from "@/core/types";
 import type { CaptureResult } from "@/services/camera";
 import type * as AppModule from "@/app";
+import { getEdibilityClass, createEl } from "@/ui/utils";
 
 interface MockInferenceService {
   onStatus: (handler: (text: string) => void) => void;
-  onResult: (handler: (result: { logits: Float32Array; modelKey: ModelKey }) => void) => void;
+  onResult: (
+    handler: (result: { logits: Float32Array; modelKey: ModelKey }) => void,
+  ) => void;
   onError: (handler: (error: Error) => void) => void;
   emitStatus: (text: string) => void;
   emitResult: (result: { logits: Float32Array; modelKey: ModelKey }) => void;
@@ -19,10 +22,9 @@ interface MockInferenceService {
 
 const mockInferenceService = vi.hoisted<MockInferenceService>(() => {
   let statusHandler: ((text: string) => void) | null = null;
-  let resultHandler: ((result: {
-    logits: Float32Array;
-    modelKey: ModelKey;
-  }) => void) | null = null;
+  let resultHandler:
+    | ((result: { logits: Float32Array; modelKey: ModelKey }) => void)
+    | null = null;
   let errorHandler: ((error: Error) => void) | null = null;
   return {
     onStatus: (handler) => {
@@ -150,7 +152,9 @@ describe("AppController", () => {
 
     expect(mockCamera.start).toHaveBeenCalled();
     expect(mockInferenceService.initialize).toHaveBeenCalled();
-    expect(mockInferenceService.switchModel).toHaveBeenCalledWith(ModelKey.BVRA);
+    expect(mockInferenceService.switchModel).toHaveBeenCalledWith(
+      ModelKey.BVRA,
+    );
   });
 
   it("renders result on inference result", async () => {
@@ -205,18 +209,10 @@ describe("AppController", () => {
 
     const input = document.querySelector("#file-input") as HTMLInputElement;
     const file = new File([], "test.jpg", { type: "image/jpeg" });
-    const fileList = {
-      0: file,
-      length: 1,
-      item: (i: number) => (i === 0 ? file : null),
-    } as unknown as FileList;
-    Object.defineProperty(input, "files", {
-      value: fileList,
-      configurable: true,
-    });
+    setFiles(input, file);
     input.dispatchEvent(new Event("change"));
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
     expect(processFileInput).toHaveBeenCalledWith(file);
     expect(mockInferenceService.infer).toHaveBeenCalled();
   });
@@ -252,7 +248,9 @@ describe("AppController", () => {
     select.dispatchEvent(new Event("change"));
 
     expect(mockRenderer.clear).toHaveBeenCalled();
-    expect(mockInferenceService.switchModel).toHaveBeenCalledWith(ModelKey.Dima806);
+    expect(mockInferenceService.switchModel).toHaveBeenCalledWith(
+      ModelKey.Dima806,
+    );
   });
 
   it("clears history when clear button is clicked", async () => {
@@ -263,19 +261,16 @@ describe("AppController", () => {
     const clearBtn = document.querySelector("#history-clear") as HTMLElement;
     clearBtn.click();
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
     expect(clearHistory).toHaveBeenCalled();
   });
 
-  it("exports helper functions", async () => {
-    const appModule = await import("@/app");
-    expect(appModule.getEdibilityClass("Poisonous")).toBe(
-      "edibility-poisonous",
-    );
-    expect(appModule.getEdibilityClass("Edible")).toBe("edibility-edible");
-    expect(appModule.getEdibilityClass("Unknown")).toBe("edibility-unknown");
+  it("exports helper functions", () => {
+    expect(getEdibilityClass("Poisonous")).toBe("edibility-poisonous");
+    expect(getEdibilityClass("Edible")).toBe("edibility-edible");
+    expect(getEdibilityClass("Unknown")).toBe("edibility-unknown");
 
-    const el = appModule.createEl("div", "cls", "txt");
+    const el = createEl("div", "cls", "txt");
     expect(el.tagName).toBe("DIV");
     expect(el.className).toBe("cls");
     expect(el.textContent).toBe("txt");
@@ -298,7 +293,7 @@ describe("AppController", () => {
 
     const controller = new appModule.AppController();
     await controller.init();
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
 
     const list = document.querySelector("#history-list") as HTMLElement;
     expect(list.children.length).toBeGreaterThan(0);
@@ -313,7 +308,7 @@ describe("AppController", () => {
 
     const controller = new appModule.AppController();
     await controller.init();
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
 
     const list = document.querySelector("#history-list") as HTMLElement;
     expect(list.textContent).toContain("No past identifications yet");
@@ -329,7 +324,7 @@ describe("AppController", () => {
     const clearBtn = document.querySelector("#history-clear") as HTMLElement;
     clearBtn.click();
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
     expect(clearHistory).not.toHaveBeenCalled();
   });
 
@@ -342,18 +337,10 @@ describe("AppController", () => {
 
     const input = document.querySelector("#file-input") as HTMLInputElement;
     const file = new File([], "test.jpg", { type: "image/jpeg" });
-    const fileList = {
-      0: file,
-      length: 1,
-      item: (i: number) => (i === 0 ? file : null),
-    } as unknown as FileList;
-    Object.defineProperty(input, "files", {
-      value: fileList,
-      configurable: true,
-    });
+    setFiles(input, file);
     input.dispatchEvent(new Event("change"));
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
     const status = document.querySelector("#status") as HTMLElement;
     expect(status.textContent).toBe("Failed to process image.");
   });
@@ -371,7 +358,9 @@ describe("AppController", () => {
     const controller = new appModule.AppController();
     await controller.init();
 
-    const captureBtn = document.querySelector("#capture-btn") as HTMLButtonElement;
+    const captureBtn = document.querySelector(
+      "#capture-btn",
+    ) as HTMLButtonElement;
     captureBtn.dataset["busy"] = "true";
     captureBtn.click();
 
@@ -408,14 +397,18 @@ describe("AppController", () => {
     select.value = "bvra";
     select.dispatchEvent(new Event("change"));
 
-    expect(mockInferenceService.switchModel).toHaveBeenCalledWith(ModelKey.BVRA);
+    expect(mockInferenceService.switchModel).toHaveBeenCalledWith(
+      ModelKey.BVRA,
+    );
   });
 
   it("stops camera and terminates inference on pagehide", async () => {
     const controller = new appModule.AppController();
     await controller.init();
 
-    window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: false }));
+    window.dispatchEvent(
+      new PageTransitionEvent("pagehide", { persisted: false }),
+    );
     expect(mockCamera.stop).toHaveBeenCalled();
     expect(mockInferenceService.terminate).toHaveBeenCalled();
   });
@@ -425,13 +418,17 @@ describe("AppController", () => {
     await controller.init();
 
     const initCalls = mockInferenceService.initialize.mock.calls.length;
-    window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    window.dispatchEvent(
+      new PageTransitionEvent("pageshow", { persisted: true }),
+    );
+    await flushPromises();
 
     expect(mockInferenceService.initialize.mock.calls.length).toBeGreaterThan(
       initCalls,
     );
-    expect(mockInferenceService.switchModel).toHaveBeenCalledWith(ModelKey.BVRA);
+    expect(mockInferenceService.switchModel).toHaveBeenCalledWith(
+      ModelKey.BVRA,
+    );
   });
 
   it("delegates history delete button clicks", async () => {
@@ -452,13 +449,13 @@ describe("AppController", () => {
 
     const controller = new appModule.AppController();
     await controller.init();
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
 
     const list = document.querySelector("#history-list") as HTMLElement;
     const delBtn = list.querySelector(".history-delete") as HTMLElement;
     delBtn.click();
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
     expect(deleteEntry).toHaveBeenCalledWith("h-del");
   });
 
@@ -475,7 +472,7 @@ describe("AppController", () => {
     const exportBtn = document.querySelector("#history-export") as HTMLElement;
     exportBtn.click();
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
     expect(exportHistory).toHaveBeenCalled();
     expect(createObjectURLSpy).toHaveBeenCalled();
     expect(revokeObjectURLSpy).toHaveBeenCalledWith("blob:mock");
@@ -496,7 +493,7 @@ describe("AppController", () => {
     const exportBtn = document.querySelector("#history-export") as HTMLElement;
     exportBtn.click();
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
     const status = document.querySelector("#status") as HTMLElement;
     expect(status.textContent).toBe("Failed to export history.");
   });
@@ -530,18 +527,10 @@ describe("AppController", () => {
     const input = document.querySelector(
       "#history-import-input",
     ) as HTMLInputElement;
-    const fileList = {
-      0: file,
-      length: 1,
-      item: (i: number) => (i === 0 ? file : null),
-    } as unknown as FileList;
-    Object.defineProperty(input, "files", {
-      value: fileList,
-      configurable: true,
-    });
+    setFiles(input, file);
     input.dispatchEvent(new Event("change"));
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
     expect(importHistory).toHaveBeenCalledWith(fileText);
     const status = document.querySelector("#status") as HTMLElement;
     expect(status.textContent).toBe("Imported 0 history entries.");
@@ -560,19 +549,26 @@ describe("AppController", () => {
     const input = document.querySelector(
       "#history-import-input",
     ) as HTMLInputElement;
-    const fileList = {
-      0: file,
-      length: 1,
-      item: (i: number) => (i === 0 ? file : null),
-    } as unknown as FileList;
-    Object.defineProperty(input, "files", {
-      value: fileList,
-      configurable: true,
-    });
+    setFiles(input, file);
     input.dispatchEvent(new Event("change"));
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
     const status = document.querySelector("#status") as HTMLElement;
     expect(status.textContent).toBe("Failed to import history.");
   });
 });
+
+function setFiles(input: HTMLInputElement, file: File): void {
+  Object.defineProperty(input, "files", {
+    value: {
+      0: file,
+      length: 1,
+      item: (i: number) => (i === 0 ? file : null),
+    } as unknown as FileList,
+    configurable: true,
+  });
+}
+
+function flushPromises(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}

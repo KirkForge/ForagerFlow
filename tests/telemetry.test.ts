@@ -31,9 +31,11 @@ describe("telemetry", () => {
     });
 
     const originalEndpoint = config.telemetryEndpoint;
-    (config as { telemetryEndpoint: string }).telemetryEndpoint = "/api/telemetry";
+    (config as { telemetryEndpoint: string }).telemetryEndpoint =
+      "/api/telemetry";
     recordTelemetry("beacon.test", { value: 1 });
-    (config as { telemetryEndpoint: string }).telemetryEndpoint = originalEndpoint;
+    (config as { telemetryEndpoint: string }).telemetryEndpoint =
+      originalEndpoint;
 
     expect(sendBeacon).toHaveBeenCalledOnce();
     const [url, blob] = sendBeacon.mock.calls[0] as [
@@ -46,7 +48,8 @@ describe("telemetry", () => {
 
   it("does not throw when sendBeacon is unavailable", () => {
     const originalEndpoint = config.telemetryEndpoint;
-    (config as { telemetryEndpoint: string }).telemetryEndpoint = "/api/telemetry";
+    (config as { telemetryEndpoint: string }).telemetryEndpoint =
+      "/api/telemetry";
     Object.defineProperty(globalThis.navigator, "sendBeacon", {
       value: undefined,
       configurable: true,
@@ -57,6 +60,7 @@ describe("telemetry", () => {
       recordTelemetry("no-beacon");
     }).not.toThrow();
 
-    (config as { telemetryEndpoint: string }).telemetryEndpoint = originalEndpoint;
+    (config as { telemetryEndpoint: string }).telemetryEndpoint =
+      originalEndpoint;
   });
 });

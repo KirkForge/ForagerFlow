@@ -16,13 +16,12 @@ The app may collect the following telemetry data only when telemetry is enabled 
 - Web Vitals metrics (page load timing)
 - Generic device capabilities (memory class, connection type) used to gate large model downloads
 
-If `VITE_TELEMETRY_ENDPOINT` is configured, telemetry events are sent to that endpoint via `navigator.sendBeacon`. Otherwise, events are buffered locally in the browser's `localStorage` for support/diagnostic export.
+If `VITE_TELEMETRY_ENDPOINT` is configured, telemetry events are sent to that endpoint via `navigator.sendBeacon`. Otherwise, events are logged locally for diagnostic use and are not transmitted.
 
 ## What data is stored locally
 
 - Identification history (species name, confidence, edibility, timestamp, and an optional thumbnail) is stored in the browser's IndexedDB.
 - Safety acknowledgement and model-download confirmations are stored in `localStorage`.
-- Buffered telemetry events are stored in `localStorage`.
 
 You can clear history at any time from the History panel. Clearing history removes all locally stored identification records.
 

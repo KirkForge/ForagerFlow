@@ -32,13 +32,6 @@
         </select>
       </div>
 
-      <!--
-      Last-identification callout. Renders the most recent history
-      entry above the camera viewfinder on app start, so a returning
-      field user can verify a species they identified earlier
-      without scrolling past the camera. Hidden until renderLastResult()
-      populates it.
-    -->
       <div
         id="last-result"
         role="region"
@@ -73,12 +66,6 @@
           >
             Retry camera
           </button>
-          <!--
-          File-input fallback. The input itself is visually hidden
-          (see #file-input rule); a full-width button taps it.
-          This is more phone-friendly than a <label> that needs the
-          input to be visible next to it.
-        -->
           <button
             id="file-fallback-btn"
             type="button"
@@ -153,12 +140,6 @@
       </div>
     </div>
 
-    <!--
-    Sticky safety footer. Lives at the bottom of #app (which is
-    100dvh). The camera viewfinder shrinks to make room. Cannot be
-    scrolled past because it is always present in the DOM at the
-    end of the flex column.
-  -->
     <div id="safety-footer" role="contentinfo" aria-label="Safety notice">
       <strong>Never eat a wild mushroom based on this app.</strong>
       <a
@@ -170,11 +151,6 @@
       >
     </div>
 
-    <!--
-    First-run safety acknowledgement modal. Cannot be dismissed
-    without the user checking the "I understand" box and tapping
-    Continue. Storage key: ff:safety-ack-v1.
-  -->
     <dialog
       id="safety-modal"
       aria-labelledby="safety-modal-title"
@@ -216,10 +192,6 @@
       </form>
     </dialog>
 
-    <!--
-    Model-size confirm modal. Shown the first time the user picks
-    dima806 (a ~330 MB download). Storage key: ff:dima-confirm-v1.
-  -->
     <dialog
       id="model-confirm-modal"
       aria-labelledby="model-confirm-title"
@@ -243,10 +215,6 @@
       </form>
     </dialog>
 
-    <!--
-    Pre-model-load storage confirm. Shown when
-    navigator.storage.estimate() reports less than 500 MB free.
-  -->
     <dialog
       id="storage-confirm-modal"
       aria-labelledby="storage-confirm-title"
@@ -269,10 +237,6 @@
       </form>
     </dialog>
 
-    <!--
-    History-clear confirm modal. Replaces the immediate `clearHistory()`
-    call that previously allowed a one-fat-finger data loss.
-  -->
     <dialog
       id="clear-confirm-modal"
       aria-labelledby="clear-confirm-title"

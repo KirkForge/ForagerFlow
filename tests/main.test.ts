@@ -22,7 +22,7 @@ describe("main bootstrap", () => {
 
   it("instantiates AppController and calls init", async () => {
     await import("@/main");
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
     expect(MockAppController).toHaveBeenCalledTimes(1);
     expect(init).toHaveBeenCalledTimes(1);
   });
@@ -30,9 +30,13 @@ describe("main bootstrap", () => {
   it("displays error message when init fails", async () => {
     init.mockRejectedValueOnce(new Error("boot failed"));
     await import("@/main");
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
 
     const status = document.getElementById("status");
     expect(status?.textContent).toBe("Failed to initialize. Please reload.");
   });
 });
+
+function flushPromises(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}

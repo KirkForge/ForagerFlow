@@ -48,7 +48,7 @@ describe("generatePredictionReport", () => {
   it("flags poisonous species in top 3", () => {
     const logits = new Float32Array([5.0, 2.0, 1.0]);
     const report = generatePredictionReport(logits, mockModel);
-    expect(report.hasPoisonousInTop3).toBe(true);
+    expect(report.hasRiskInTop3).toBe(true);
   });
 
   it("sets requiresWarning when top1 is poisonous with high confidence", () => {
@@ -73,14 +73,18 @@ describe("generatePredictionReport", () => {
     expect(report.requiresWarning).toBe(false);
   });
 
-  it("flags unknown species in top 3 as poisonous (fail-closed)", () => {
-    // A model that outputs a species with no knowledge entry must
-    // be treated as poisonous for warning purposes. If the user
-    // sees "Unknown" they may assume it is safe to eat.
-    const logits = new Float32Array([10.0, 1.0, 0.5]);
-    const report = generatePredictionReport(logits, mockModel);
-    // Top-1 is Agaricus (known-Edible) → no warning here.
-    expect(report.requiresWarning).toBe(false);
+  it("treats unknown species in top 3 as a risk when confidence is low", () => {
+    const modelWithUnknown: ModelRegistryEntry = {
+      ...mockModel,
+      knowledge: {
+        ...mockModel.knowledge,
+        "Russula emetica": { edibility: Edibility.Unknown, notes: "unknown" },
+      },
+    };
+    const logits = new Float32Array([2.0, 1.5, 1.0]);
+    const report = generatePredictionReport(logits, modelWithUnknown);
+    expect(report.hasRiskInTop3).toBe(true);
+    expect(report.requiresWarning).toBe(true);
   });
 
   it("treats missing knowledge as poisonous (fail-closed)", () => {

@@ -199,7 +199,7 @@ describe("InferenceService", () => {
     service.initialize();
     service.switchModel(ModelKey.Dima806);
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
     expect(estimate).toHaveBeenCalled();
     expect(workerMock.postMessage).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -223,7 +223,7 @@ describe("InferenceService", () => {
     service.initialize();
     service.switchModel(ModelKey.Dima806);
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
     expect(confirmations).toHaveLength(1);
   });
 
@@ -242,7 +242,7 @@ describe("InferenceService", () => {
 
     service.initialize();
     service.switchModel(ModelKey.Dima806);
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
     expect(confirmed).toBe(true);
 
     service.resumeStorageConfirm();
@@ -275,8 +275,9 @@ describe("InferenceService", () => {
       message: "recoverable",
     });
 
-    await new Promise((resolve) => setTimeout(resolve, config.retryDelayMs * 3));
-    (config as { maxInferenceRetries: number }).maxInferenceRetries = originalRetries;
+    await sleep(config.retryDelayMs * 3);
+    (config as { maxInferenceRetries: number }).maxInferenceRetries =
+      originalRetries;
     expect(statuses.some((s) => s.startsWith("Retrying"))).toBe(true);
   });
 
@@ -290,7 +291,8 @@ describe("InferenceService", () => {
     service.initialize();
     workerMock.onerror?.(new ErrorEvent("error", { message: "runtime crash" }));
 
-    (config as { maxInferenceRetries: number }).maxInferenceRetries = originalRetries;
+    (config as { maxInferenceRetries: number }).maxInferenceRetries =
+      originalRetries;
     expect(errors).toHaveLength(1);
   });
 
@@ -346,7 +348,7 @@ describe("InferenceService", () => {
 
     service.initialize();
     service.switchModel(ModelKey.Dima806);
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
     expect(estimate).toHaveBeenCalledTimes(1);
 
     service.switchModel(ModelKey.Dima806);
@@ -391,7 +393,15 @@ describe("InferenceService", () => {
     expect(service.isReady()).toBe(false);
     expect(workerMock.terminate).toHaveBeenCalled();
 
-    (config as { maxInferenceRetries: number }).maxInferenceRetries = originalRetries;
+    (config as { maxInferenceRetries: number }).maxInferenceRetries =
+      originalRetries;
   });
 });
 
+function flushPromises(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  __resetForTests,
-  initWebVitals,
-} from "@/services/web-vitals";
+import { __resetForTests, initWebVitals } from "@/services/web-vitals";
 import * as telemetry from "@/core/telemetry";
 import { logger } from "@/core/logger";
 
@@ -67,9 +64,7 @@ describe("initWebVitals", () => {
         mock: { calls: [string, Record<string, unknown>][] };
       }
     ).mock.calls;
-    return calls
-      .map(([, data]) => data)
-      .find((d) => d["name"] === name);
+    return calls.map(([, data]) => data).find((d) => d["name"] === name);
   }
 
   it("records LCP metric", () => {

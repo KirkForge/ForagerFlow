@@ -74,7 +74,7 @@ describe("history with IndexedDB", () => {
       makeReport({ top1Species: "First" }),
       ModelKey.BVRA,
     );
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await sleep(10);
     await saveIdentification(
       makeReport({ top1Species: "Second" }),
       ModelKey.BVRA,
@@ -88,9 +88,9 @@ describe("history with IndexedDB", () => {
 
   it("respects the limit parameter", async () => {
     await saveIdentification(makeReport({ top1Species: "One" }), ModelKey.BVRA);
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await sleep(10);
     await saveIdentification(makeReport({ top1Species: "Two" }), ModelKey.BVRA);
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await sleep(10);
     await saveIdentification(
       makeReport({ top1Species: "Three" }),
       ModelKey.BVRA,
@@ -121,6 +121,7 @@ describe("history with IndexedDB", () => {
   });
 
   it("HistoryEntry type is well-formed", () => {
+    // Type-level smoke test; runtime assertions guard the shape.
     const entry: HistoryEntry = {
       id: "test-1",
       timestamp: new Date().toISOString(),
@@ -143,7 +144,9 @@ describe("history with IndexedDB", () => {
   it("retries save without thumbnail on QuotaExceededError", async () => {
     let attempt = 0;
     vi.doMock("@/services/history/db", async () => {
-      const actual = await vi.importActual<typeof HistoryDb>("@/services/history/db");
+      const actual = await vi.importActual<typeof HistoryDb>(
+        "@/services/history/db",
+      );
       return {
         ...actual,
         openDB: async () => {
@@ -326,3 +329,7 @@ describe("history with IndexedDB", () => {
     await expect(importHistory('{"version":1}')).rejects.toThrow("no entries");
   });
 });
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

@@ -35,7 +35,7 @@ export class ResultsRenderer {
     }
 
     this.predictionsEl.innerHTML = report.predictions
-      .map((item, rank) => this.renderPrediction(item, rank, model))
+      .map((item) => this.renderPrediction(item, model))
       .join("");
 
     const top = report.predictions[0];
@@ -65,7 +65,6 @@ export class ResultsRenderer {
 
   private renderPrediction(
     item: { label: string; probability: number },
-    _rank: number,
     model: ModelRegistryEntry,
   ): string {
     const k = model.knowledge[item.label] ?? {
@@ -75,11 +74,7 @@ export class ResultsRenderer {
     const pct = (item.probability * 100).toFixed(1);
     const isPoison = k.edibility === Edibility.Poisonous;
     const isUnknown = k.edibility === Edibility.Unknown;
-    const edClass = isPoison
-      ? "poisonous"
-      : isUnknown
-        ? "unknown"
-        : "edible";
+    const edClass = isPoison ? "poisonous" : isUnknown ? "unknown" : "edible";
     const edText = isPoison ? "POISONOUS" : isUnknown ? "Unknown" : "Edible";
 
     return `

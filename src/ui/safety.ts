@@ -217,7 +217,7 @@ export class SafetyUI {
     });
   }
 
-private bindStorageConfirmFromService(): void {
+  private bindStorageConfirmFromService(): void {
     this.opts.inferenceService.onStorageConfirm((payload) => {
       const freeMB = Math.round(payload.freeBytes / 1024 / 1024);
       const modelSize = modelRegistry[payload.modelKey].size;

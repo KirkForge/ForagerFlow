@@ -137,7 +137,7 @@ describe("CameraService", () => {
       value: {
         getUserMedia: vi.fn().mockImplementation(async () => {
           callCount++;
-          await new Promise((resolve) => setTimeout(resolve, 10));
+          await sleep(10);
           return stream;
         }),
       },
@@ -155,3 +155,7 @@ describe("CameraService", () => {
     expect(callCount).toBe(1);
   });
 });
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

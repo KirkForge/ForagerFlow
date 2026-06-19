@@ -8,7 +8,7 @@ export interface PredictionReport {
   top1Species: string;
   top1Knowledge: SpeciesKnowledge;
   top1Probability: number;
-  hasPoisonousInTop3: boolean;
+  hasRiskInTop3: boolean;
   requiresWarning: boolean;
   warningMessage: string | null;
 }
@@ -36,14 +36,8 @@ export function generatePredictionReport(
   const top1Knowledge =
     model.knowledge[top1.label] ?? missingKnowledgeFallback(top1.label);
 
-  // Fail-closed: any top-3 prediction whose edibility is
-  // Poisonous OR Unknown is treated as a "lookalike risk" so the
-  // warning pipeline surfaces a "Cannot rule out a toxic
-  // lookalike" message whenever the model isn't sure of its top
-  // picks. An "Unknown" edibility is not a clean bill of health;
-  // it is "we don't know if this will kill you", and that is
-  // exactly the situation we want to warn about.
-  const hasPoisonous = top3.some((p) => {
+  // Treat Poisonous or Unknown in the top 3 as a toxic-lookalike risk.
+  const hasRiskInTop3 = top3.some((p) => {
     const k = model.knowledge[p.label] ?? missingKnowledgeFallback(p.label);
     return (
       k.edibility === Edibility.Poisonous || k.edibility === Edibility.Unknown
@@ -53,7 +47,7 @@ export function generatePredictionReport(
   const { requiresWarning, warningMessage } = computeWarning(
     top1.probability,
     top1Knowledge.edibility,
-    hasPoisonous,
+    hasRiskInTop3,
   );
 
   return {
@@ -61,17 +55,13 @@ export function generatePredictionReport(
     top1Species: top1.label,
     top1Knowledge,
     top1Probability: top1.probability,
-    hasPoisonousInTop3: hasPoisonous,
+    hasRiskInTop3: hasRiskInTop3,
     requiresWarning,
     warningMessage,
   };
 }
 
 function missingKnowledgeFallback(species: string): SpeciesKnowledge {
-  // Fail-closed: an unknown species gets the same warning treatment
-  // as a confirmed poisonous one. Returning "Unknown" would let a
-  // dangerous mushroom slip through the warning pipeline because
-  // the user might not read the fine print. Better to over-warn.
   return {
     edibility: Edibility.Poisonous,
     notes: `No edibility data on file for "${species}". Treating as potentially poisonous; do not consume and verify with a certified mycologist.`,
@@ -81,7 +71,7 @@ function missingKnowledgeFallback(species: string): SpeciesKnowledge {
 function computeWarning(
   top1Prob: number,
   edibility: Edibility,
-  hasPoisonousInTop3: boolean,
+  hasRiskInTop3: boolean,
 ): { requiresWarning: boolean; warningMessage: string | null } {
   if (top1Prob < 0.5) {
     return {
@@ -90,7 +80,7 @@ function computeWarning(
     };
   }
 
-  if (hasPoisonousInTop3 && top1Prob < 0.85) {
+  if (hasRiskInTop3 && top1Prob < 0.85) {
     return {
       requiresWarning: true,
       warningMessage:
