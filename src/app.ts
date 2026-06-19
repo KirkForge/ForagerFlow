@@ -23,6 +23,7 @@ import { logger } from "@/core/logger";
 import { sanitizeText } from "@/core/sanitize";
 import { config } from "@/core/config";
 import { getEdibilityClass, createEl } from "@/ui/utils";
+import { isDataUrlThumbnail } from "@/services/history";
 
 export class AppController {
   private camera = new CameraService(config.captureSize);
@@ -218,7 +219,7 @@ export class AppController {
     const entryEl = createEl("div", "history-entry");
     entryEl.dataset["id"] = id;
 
-    if (entry.thumbnail) {
+    if (entry.thumbnail && isDataUrlThumbnail(entry.thumbnail)) {
       const thumb = document.createElement("img");
       thumb.src = entry.thumbnail;
       thumb.alt = `Thumbnail for ${species}`;
@@ -226,6 +227,8 @@ export class AppController {
       thumb.loading = "lazy";
       thumb.decoding = "async";
       entryEl.appendChild(thumb);
+    } else if (entry.thumbnail) {
+      logger.warn("Ignoring non-data URL thumbnail in history entry", entry.id);
     }
 
     const meta = createEl("div", "history-meta");

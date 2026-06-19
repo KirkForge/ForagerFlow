@@ -24,6 +24,17 @@ FROM nginx:alpine@sha256:d565d19ef132a5834f5897f602831ad2e40a36c26c625f2f94f9b3f
 
 RUN rm /etc/nginx/conf.d/default.conf
 
+COPY <<'SECURITY' /etc/nginx/conf.d/security-headers.conf
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "DENY" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+add_header Permissions-Policy "camera=self, microphone=(), geolocation=()" always;
+add_header Cross-Origin-Opener-Policy "same-origin" always;
+add_header Cross-Origin-Embedder-Policy "require-corp" always;
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'" always;
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+SECURITY
+
 COPY <<'NGINX' /etc/nginx/conf.d/default.conf
 server {
     listen 80;
@@ -31,16 +42,10 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
-    # Security headers applied globally and repeated in every location block
-    # because nginx add_header in a location replaces the parent headers.
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-Frame-Options "DENY" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Permissions-Policy "camera=self, microphone=(), geolocation=()" always;
-    add_header Cross-Origin-Opener-Policy "same-origin" always;
-    add_header Cross-Origin-Embedder-Policy "require-corp" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'" always;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    # Security headers are defined once and included everywhere that also
+    # sets its own add_header directives, because nginx does not inherit
+    # add_header from a parent context when a child context adds its own.
+    include /etc/nginx/conf.d/security-headers.conf;
 
     gzip on;
     gzip_vary on;
@@ -49,52 +54,24 @@ server {
     location /assets/ {
         expires 1y;
         add_header Cache-Control "public, immutable, max-age=31536000" always;
-        add_header X-Content-Type-Options "nosniff" always;
-        add_header X-Frame-Options "DENY" always;
-        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-        add_header Permissions-Policy "camera=self, microphone=(), geolocation=()" always;
-        add_header Cross-Origin-Opener-Policy "same-origin" always;
-        add_header Cross-Origin-Embedder-Policy "require-corp" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'" always;
-        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        include /etc/nginx/conf.d/security-headers.conf;
     }
 
     location = /index.html {
         add_header Cache-Control "no-cache, no-store, must-revalidate" always;
-        add_header X-Content-Type-Options "nosniff" always;
-        add_header X-Frame-Options "DENY" always;
-        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-        add_header Permissions-Policy "camera=self, microphone=(), geolocation=()" always;
-        add_header Cross-Origin-Opener-Policy "same-origin" always;
-        add_header Cross-Origin-Embedder-Policy "require-corp" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'" always;
-        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        include /etc/nginx/conf.d/security-headers.conf;
     }
 
     location /model/ {
         expires 7d;
         add_header Cache-Control "public, max-age=604800" always;
-        add_header X-Content-Type-Options "nosniff" always;
-        add_header X-Frame-Options "DENY" always;
-        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-        add_header Permissions-Policy "camera=self, microphone=(), geolocation=()" always;
-        add_header Cross-Origin-Opener-Policy "same-origin" always;
-        add_header Cross-Origin-Embedder-Policy "require-corp" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'" always;
-        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        include /etc/nginx/conf.d/security-headers.conf;
     }
 
     location /js/ {
         expires 1y;
         add_header Cache-Control "public, immutable, max-age=31536000" always;
-        add_header X-Content-Type-Options "nosniff" always;
-        add_header X-Frame-Options "DENY" always;
-        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-        add_header Permissions-Policy "camera=self, microphone=(), geolocation=()" always;
-        add_header Cross-Origin-Opener-Policy "same-origin" always;
-        add_header Cross-Origin-Embedder-Policy "require-corp" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'none'" always;
-        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        include /etc/nginx/conf.d/security-headers.conf;
     }
 
     location / {
