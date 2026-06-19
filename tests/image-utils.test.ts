@@ -1,49 +1,35 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createThumbnailDataUrl } from "@/services/image-utils";
+import { installMockCanvas } from "./helpers/canvas";
 
 describe("createThumbnailDataUrl", () => {
-  let originalCreateElement: typeof document.createElement;
+  let canvas: ReturnType<typeof installMockCanvas>;
 
   beforeEach(() => {
-    originalCreateElement = document.createElement;
+    canvas = installMockCanvas();
   });
 
   afterEach(() => {
-    document.createElement = originalCreateElement;
+    canvas.restore();
     vi.restoreAllMocks();
   });
 
-  function mockCanvas(dataUrl: string | null) {
-    document.createElement = vi.fn((tagName: string) => {
-      if (tagName !== "canvas") {
-        return originalCreateElement.call(document, tagName);
-      }
-
-      const canvas = {
-        width: 0,
-        height: 0,
-        getContext: vi.fn(() => ({
-          drawImage: vi.fn(),
-        })),
-        toDataURL: vi.fn(() => dataUrl ?? "data:image/jpeg;base64,MOCK"),
-      } as unknown as HTMLCanvasElement;
-
-      return canvas;
-    }) as typeof document.createElement;
+  function withCanvas(opts: Parameters<typeof installMockCanvas>[0]): void {
+    canvas.restore();
+    canvas = installMockCanvas(opts);
   }
 
   it("returns a data URL for an image element", () => {
-    mockCanvas("data:image/jpeg;base64,thumb1");
+    withCanvas({ thumbnail: "data:image/jpeg;base64,thumb1" });
     const img = new Image();
     Object.defineProperty(img, "naturalWidth", { value: 200 });
     Object.defineProperty(img, "naturalHeight", { value: 100 });
 
-    const result = createThumbnailDataUrl(img);
-    expect(result).toBe("data:image/jpeg;base64,thumb1");
+    expect(createThumbnailDataUrl(img)).toBe("data:image/jpeg;base64,thumb1");
   });
 
   it("returns null when source dimensions are zero", () => {
-    mockCanvas(null);
+    withCanvas({ thumbnail: null });
     const img = new Image();
     Object.defineProperty(img, "naturalWidth", { value: 0 });
     Object.defineProperty(img, "naturalHeight", { value: 0 });
@@ -52,16 +38,7 @@ describe("createThumbnailDataUrl", () => {
   });
 
   it("returns null when canvas context is unavailable", () => {
-    document.createElement = vi.fn((tagName: string) => {
-      if (tagName !== "canvas") {
-        return originalCreateElement.call(document, tagName);
-      }
-      return {
-        width: 0,
-        height: 0,
-        getContext: vi.fn(() => null),
-      } as unknown as HTMLCanvasElement;
-    }) as typeof document.createElement;
+    withCanvas({ context: null });
 
     const img = new Image();
     Object.defineProperty(img, "naturalWidth", { value: 100 });
@@ -71,10 +48,13 @@ describe("createThumbnailDataUrl", () => {
   });
 
   it("returns null for unsupported source types", () => {
+    canvas.restore();
     expect(createThumbnailDataUrl({} as HTMLImageElement)).toBeNull();
   });
 
   it("swallows canvas errors and returns null", () => {
+    canvas.restore();
+    const originalCreateElement = document.createElement;
     document.createElement = vi.fn((tagName: string) => {
       if (tagName !== "canvas") {
         return originalCreateElement.call(document, tagName);
@@ -87,7 +67,7 @@ describe("createThumbnailDataUrl", () => {
   });
 
   it("returns a thumbnail from a video element", () => {
-    mockCanvas("data:image/jpeg;base64,vid");
+    withCanvas({ thumbnail: "data:image/jpeg;base64,vid" });
     const video = document.createElement(
       "video",
     ) as unknown as HTMLVideoElement;
@@ -98,7 +78,7 @@ describe("createThumbnailDataUrl", () => {
   });
 
   it("returns null when source dimensions are zero for video", () => {
-    mockCanvas(null);
+    withCanvas({ thumbnail: null });
     const video = document.createElement(
       "video",
     ) as unknown as HTMLVideoElement;
@@ -109,6 +89,8 @@ describe("createThumbnailDataUrl", () => {
   });
 
   it("returns null when toDataURL throws", () => {
+    canvas.restore();
+    const originalCreateElement = document.createElement;
     document.createElement = vi.fn((tagName: string) => {
       if (tagName !== "canvas") {
         return originalCreateElement.call(document, tagName);

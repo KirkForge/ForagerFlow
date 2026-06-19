@@ -4,6 +4,7 @@ import {
   updateOnlineStatus,
 } from "@/services/connectivity";
 import { logger } from "@/core/logger";
+import { flushPromises } from "./helpers/promises";
 
 describe("connectivity", () => {
   let originalServiceWorker: Navigator["serviceWorker"];
@@ -90,7 +91,3 @@ describe("connectivity", () => {
     expect(badge.style.color).toBe("var(--warn)");
   });
 });
-
-function flushPromises(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}

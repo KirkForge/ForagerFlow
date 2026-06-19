@@ -7,48 +7,30 @@ import {
 } from "@/core/types";
 import { modelRegistry } from "@/data/model-registry";
 import { config } from "@/core/config";
+import {
+  installMockWorker,
+  sendWorkerMessage,
+  type MockWorker,
+} from "./helpers/worker";
+import { flushPromises, sleep } from "./helpers/promises";
 
 describe("InferenceService", () => {
-  interface WorkerMock {
-    postMessage: ReturnType<typeof vi.fn>;
-    terminate: ReturnType<typeof vi.fn>;
-    onmessage: ((e: MessageEvent) => void) | null;
-    onerror: ((e: ErrorEvent) => void) | null;
-  }
-
   let service: InferenceService;
-  let workerMock: WorkerMock;
-  let originalWorker: typeof globalThis.Worker;
+  let worker: MockWorker;
+  let workerEnv: ReturnType<typeof installMockWorker>;
   let originalNavigatorStorage: StorageManager | undefined;
 
-  function sendWorkerMessage(message: unknown) {
-    if (workerMock.onmessage) {
-      workerMock.onmessage(new MessageEvent("message", { data: message }));
-    }
-  }
-
   beforeEach(() => {
-    originalWorker = globalThis.Worker;
     originalNavigatorStorage = globalThis.navigator.storage;
-
-    class MockWorker {
-      postMessage = vi.fn();
-      terminate = vi.fn();
-      onmessage: ((e: MessageEvent) => void) | null = null;
-      onerror: ((e: ErrorEvent) => void) | null = null;
-      constructor() {
-        workerMock = this as unknown as WorkerMock;
-      }
-    }
-
-    globalThis.Worker = MockWorker as unknown as typeof globalThis.Worker;
-
+    workerEnv = installMockWorker((instance) => {
+      worker = instance;
+    });
     service = new InferenceService();
   });
 
   afterEach(() => {
     service.terminate();
-    globalThis.Worker = originalWorker;
+    workerEnv.restore();
     Object.defineProperty(globalThis.navigator, "storage", {
       value: originalNavigatorStorage,
       configurable: true,
@@ -57,11 +39,21 @@ describe("InferenceService", () => {
     vi.restoreAllMocks();
   });
 
+  function installStorageEstimate(
+    estimate: () => Promise<{ quota: number; usage: number }>,
+  ): void {
+    Object.defineProperty(globalThis.navigator, "storage", {
+      value: { estimate },
+      configurable: true,
+      writable: true,
+    });
+  }
+
   it("initializes a worker and switches to the default model", () => {
     service.initialize();
     service.switchModel(ModelKey.BVRA, { skipStorageCheck: true });
 
-    expect(workerMock.postMessage).toHaveBeenCalledWith(
+    expect(worker.postMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         type: WorkerCommandType.Switch,
         modelKey: ModelKey.BVRA,
@@ -83,14 +75,14 @@ describe("InferenceService", () => {
     service.infer(pixels, 224, 224);
     expect(statusEvents).toContain("Model still loading — request queued");
 
-    sendWorkerMessage({
+    sendWorkerMessage(worker, {
       type: InferenceWorkerMessageType.Status,
       text: "Ready",
       modelKey: ModelKey.BVRA,
     });
 
     expect(service.isReady()).toBe(true);
-    expect(workerMock.postMessage).toHaveBeenLastCalledWith(
+    expect(worker.postMessage).toHaveBeenLastCalledWith(
       expect.objectContaining({
         type: WorkerCommandType.Infer,
         modelKey: ModelKey.BVRA,
@@ -107,7 +99,7 @@ describe("InferenceService", () => {
 
     service.initialize();
     service.switchModel(ModelKey.BVRA, { skipStorageCheck: true });
-    sendWorkerMessage({
+    sendWorkerMessage(worker, {
       type: InferenceWorkerMessageType.Status,
       text: "Ready",
       modelKey: ModelKey.BVRA,
@@ -115,7 +107,7 @@ describe("InferenceService", () => {
 
     const logits = new Float32Array(modelRegistry[ModelKey.BVRA].labels.length);
     logits[0] = 1;
-    sendWorkerMessage({
+    sendWorkerMessage(worker, {
       type: InferenceWorkerMessageType.Result,
       logits: Array.from(logits),
       modelKey: ModelKey.BVRA,
@@ -130,13 +122,13 @@ describe("InferenceService", () => {
 
     service.initialize();
     service.switchModel(ModelKey.BVRA, { skipStorageCheck: true });
-    sendWorkerMessage({
+    sendWorkerMessage(worker, {
       type: InferenceWorkerMessageType.Status,
       text: "Ready",
       modelKey: ModelKey.BVRA,
     });
 
-    sendWorkerMessage({
+    sendWorkerMessage(worker, {
       type: InferenceWorkerMessageType.Result,
       logits: [0.5, 0.5],
       modelKey: ModelKey.BVRA,
@@ -153,7 +145,7 @@ describe("InferenceService", () => {
     service.onError((e) => errors.push(e));
 
     service.initialize();
-    sendWorkerMessage({
+    sendWorkerMessage(worker, {
       type: InferenceWorkerMessageType.Error,
       message: "model failed",
     });
@@ -166,7 +158,7 @@ describe("InferenceService", () => {
   it("terminates the worker and resets state", () => {
     service.initialize();
     service.terminate();
-    expect(workerMock.terminate).toHaveBeenCalled();
+    expect(worker.terminate).toHaveBeenCalled();
     expect(service.isReady()).toBe(false);
   });
 
@@ -180,7 +172,7 @@ describe("InferenceService", () => {
   it("skips storage check when requested", () => {
     service.initialize();
     service.switchModel(ModelKey.Dima806, { skipStorageCheck: true });
-    expect(workerMock.postMessage).toHaveBeenCalledWith(
+    expect(worker.postMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         type: WorkerCommandType.Switch,
         modelKey: ModelKey.Dima806,
@@ -190,18 +182,14 @@ describe("InferenceService", () => {
 
   it("performs storage check before loading a model", async () => {
     const estimate = vi.fn().mockResolvedValue({ quota: 2e9, usage: 1e9 });
-    Object.defineProperty(globalThis.navigator, "storage", {
-      value: { estimate },
-      configurable: true,
-      writable: true,
-    });
+    installStorageEstimate(estimate);
 
     service.initialize();
     service.switchModel(ModelKey.Dima806);
 
     await flushPromises();
     expect(estimate).toHaveBeenCalled();
-    expect(workerMock.postMessage).toHaveBeenCalledWith(
+    expect(worker.postMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         type: WorkerCommandType.Switch,
         modelKey: ModelKey.Dima806,
@@ -211,11 +199,7 @@ describe("InferenceService", () => {
 
   it("emits storageConfirm when free space is below threshold", async () => {
     const estimate = vi.fn().mockResolvedValue({ quota: 1e9, usage: 9e8 });
-    Object.defineProperty(globalThis.navigator, "storage", {
-      value: { estimate },
-      configurable: true,
-      writable: true,
-    });
+    installStorageEstimate(estimate);
 
     const confirmations: unknown[] = [];
     service.onStorageConfirm((c) => confirmations.push(c));
@@ -229,11 +213,7 @@ describe("InferenceService", () => {
 
   it("resumes model load after storage confirmation", async () => {
     const estimate = vi.fn().mockResolvedValue({ quota: 1e9, usage: 9e8 });
-    Object.defineProperty(globalThis.navigator, "storage", {
-      value: { estimate },
-      configurable: true,
-      writable: true,
-    });
+    installStorageEstimate(estimate);
 
     let confirmed = false;
     service.onStorageConfirm(() => {
@@ -246,7 +226,7 @@ describe("InferenceService", () => {
     expect(confirmed).toBe(true);
 
     service.resumeStorageConfirm();
-    expect(workerMock.postMessage).toHaveBeenLastCalledWith(
+    expect(worker.postMessage).toHaveBeenLastCalledWith(
       expect.objectContaining({
         type: WorkerCommandType.Switch,
         modelKey: ModelKey.Dima806,
@@ -257,7 +237,7 @@ describe("InferenceService", () => {
   it("ignores resumeStorageConfirm when no confirmation is pending", () => {
     service.initialize();
     service.resumeStorageConfirm();
-    expect(workerMock.postMessage).not.toHaveBeenCalledWith(
+    expect(worker.postMessage).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: WorkerCommandType.Switch }),
     );
   });
@@ -270,7 +250,7 @@ describe("InferenceService", () => {
     service.onStatus((s) => statuses.push(s));
 
     service.initialize();
-    sendWorkerMessage({
+    sendWorkerMessage(worker, {
       type: InferenceWorkerMessageType.Error,
       message: "recoverable",
     });
@@ -289,7 +269,7 @@ describe("InferenceService", () => {
     service.onError((e) => errors.push(e));
 
     service.initialize();
-    workerMock.onerror?.(new ErrorEvent("error", { message: "runtime crash" }));
+    worker.onerror?.(new ErrorEvent("error", { message: "runtime crash" }));
 
     (config as { maxInferenceRetries: number }).maxInferenceRetries =
       originalRetries;
@@ -299,7 +279,7 @@ describe("InferenceService", () => {
   it("drops queued inferences for stale models", () => {
     service.initialize();
     service.switchModel(ModelKey.BVRA, { skipStorageCheck: true });
-    sendWorkerMessage({
+    sendWorkerMessage(worker, {
       type: InferenceWorkerMessageType.Status,
       text: "Ready",
       modelKey: ModelKey.BVRA,
@@ -309,13 +289,13 @@ describe("InferenceService", () => {
     service.infer(pixels, 224, 224);
     service.switchModel(ModelKey.Dima806, { skipStorageCheck: true });
 
-    sendWorkerMessage({
+    sendWorkerMessage(worker, {
       type: InferenceWorkerMessageType.Status,
       text: "Ready",
       modelKey: ModelKey.Dima806,
     });
 
-    expect(workerMock.postMessage).not.toHaveBeenLastCalledWith(
+    expect(worker.postMessage).not.toHaveBeenLastCalledWith(
       expect.objectContaining({ modelKey: ModelKey.BVRA }),
     );
   });
@@ -330,7 +310,7 @@ describe("InferenceService", () => {
     service.initialize();
     service.switchModel(ModelKey.Dima806);
 
-    expect(workerMock.postMessage).toHaveBeenCalledWith(
+    expect(worker.postMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         type: WorkerCommandType.Switch,
         modelKey: ModelKey.Dima806,
@@ -340,11 +320,7 @@ describe("InferenceService", () => {
 
   it("skips storage check after it has been checked once", async () => {
     const estimate = vi.fn().mockResolvedValue({ quota: 2e9, usage: 1e9 });
-    Object.defineProperty(globalThis.navigator, "storage", {
-      value: { estimate },
-      configurable: true,
-      writable: true,
-    });
+    installStorageEstimate(estimate);
 
     service.initialize();
     service.switchModel(ModelKey.Dima806);
@@ -358,7 +334,7 @@ describe("InferenceService", () => {
   it("does not mark ready when status Ready has wrong modelKey", () => {
     service.initialize();
     service.switchModel(ModelKey.BVRA, { skipStorageCheck: true });
-    sendWorkerMessage({
+    sendWorkerMessage(worker, {
       type: InferenceWorkerMessageType.Status,
       text: "Ready",
       modelKey: ModelKey.Dima806,
@@ -374,7 +350,7 @@ describe("InferenceService", () => {
     const pixels = new ArrayBuffer(224 * 224 * 4);
     service.infer(pixels, 224, 224);
 
-    expect(workerMock.postMessage).not.toHaveBeenLastCalledWith(
+    expect(worker.postMessage).not.toHaveBeenLastCalledWith(
       expect.objectContaining({ type: WorkerCommandType.Infer }),
     );
   });
@@ -384,24 +360,16 @@ describe("InferenceService", () => {
     (config as { maxInferenceRetries: number }).maxInferenceRetries = 2;
 
     service.initialize();
-    sendWorkerMessage({
+    sendWorkerMessage(worker, {
       type: InferenceWorkerMessageType.Error,
       message: "recoverable",
     });
 
     service.terminate();
     expect(service.isReady()).toBe(false);
-    expect(workerMock.terminate).toHaveBeenCalled();
+    expect(worker.terminate).toHaveBeenCalled();
 
     (config as { maxInferenceRetries: number }).maxInferenceRetries =
       originalRetries;
   });
 });
-
-function flushPromises(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
