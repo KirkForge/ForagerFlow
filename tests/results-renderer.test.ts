@@ -87,7 +87,9 @@ describe("ResultsRenderer", () => {
 
     const predictions = root.querySelectorAll(".prediction");
     expect(predictions).toHaveLength(3);
-    expect(root.querySelector(".bar")?.getAttribute("style")).toContain("95%");
+    expect(root.querySelector(".bar")?.getAttribute("style")).toContain(
+      "width: 95.0%",
+    );
     expect(root.querySelector(".pct")?.textContent).toBe("95.0%");
   });
 

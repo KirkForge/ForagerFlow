@@ -16,6 +16,8 @@ import {
   exportHistory,
   importHistory,
 } from "@/services/history";
+import type { HistoryEntry } from "@/services/history";
+import { closeDB } from "@/services/history/db";
 import { initWebVitals } from "@/services/web-vitals";
 import { logger } from "@/core/logger";
 import { sanitizeText } from "@/core/sanitize";
@@ -220,6 +222,50 @@ export class AppController {
     slot.style.display = "block";
   }
 
+  private renderHistoryItem(entry: HistoryEntry): HTMLElement {
+    const date = sanitizeText(new Date(entry.timestamp).toLocaleDateString());
+    const model = sanitizeText(entry.modelKey);
+    const species = sanitizeText(entry.top1Species);
+    const edibility = sanitizeText(entry.top1Edibility);
+    const prob = (entry.top1Probability * 100).toFixed(1);
+    const id = sanitizeText(entry.id);
+    const edClass = getEdibilityClass(entry.top1Edibility);
+
+    const entryEl = createEl("div", "history-entry");
+    entryEl.dataset["id"] = id;
+
+    if (entry.thumbnail) {
+      const thumb = document.createElement("img");
+      thumb.src = entry.thumbnail;
+      thumb.alt = `Thumbnail for ${species}`;
+      thumb.className = "history-thumbnail";
+      thumb.loading = "lazy";
+      thumb.decoding = "async";
+      entryEl.appendChild(thumb);
+    }
+
+    const meta = createEl("div", "history-meta");
+    meta.appendChild(createEl("span", "history-date", date));
+    meta.appendChild(createEl("span", "history-model", model));
+    meta.appendChild(
+      createEl("span", `history-edibility ${edClass}`, edibility),
+    );
+    entryEl.appendChild(meta);
+    entryEl.appendChild(createEl("div", "history-name", species));
+    entryEl.appendChild(createEl("div", "history-prob", `${prob}% confidence`));
+
+    const delBtn = createEl(
+      "button",
+      "history-delete",
+      "×",
+    ) as HTMLButtonElement;
+    delBtn.dataset["id"] = id;
+    delBtn.setAttribute("aria-label", "Delete this entry");
+    entryEl.appendChild(delBtn);
+
+    return entryEl;
+  }
+
   private async renderHistory(): Promise<void> {
     if (this.#historyRenderPending) return;
     this.#historyRenderPending = true;
@@ -232,59 +278,35 @@ export class AppController {
 
     try {
       const entries = await getHistory(20);
-      list.innerHTML = "";
 
       if (entries.length === 0) {
+        list.innerHTML = "";
         list.appendChild(
           createEl("p", "history-empty", "No past identifications yet."),
         );
         return;
       }
 
-      for (const e of entries) {
-        const date = sanitizeText(new Date(e.timestamp).toLocaleDateString());
-        const model = sanitizeText(e.modelKey);
-        const species = sanitizeText(e.top1Species);
-        const edibility = sanitizeText(e.top1Edibility);
-        const prob = (e.top1Probability * 100).toFixed(1);
-        const id = sanitizeText(e.id);
-        const edClass = getEdibilityClass(e.top1Edibility);
-
-        const entryEl = createEl("div", "history-entry");
-
-        if (e.thumbnail) {
-          const thumb = document.createElement("img");
-          thumb.src = e.thumbnail;
-          thumb.alt = `Thumbnail for ${species}`;
-          thumb.className = "history-thumbnail";
-          thumb.loading = "lazy";
-          thumb.decoding = "async";
-          entryEl.appendChild(thumb);
-        }
-
-        const meta = createEl("div", "history-meta");
-        meta.appendChild(createEl("span", "history-date", date));
-        meta.appendChild(createEl("span", "history-model", model));
-        meta.appendChild(
-          createEl("span", `history-edibility ${edClass}`, edibility),
-        );
-        entryEl.appendChild(meta);
-        entryEl.appendChild(createEl("div", "history-name", species));
-        entryEl.appendChild(
-          createEl("div", "history-prob", `${prob}% confidence`),
-        );
-
-        const delBtn = createEl(
-          "button",
-          "history-delete",
-          "×",
-        ) as HTMLButtonElement;
-        delBtn.dataset["id"] = id;
-        delBtn.setAttribute("aria-label", "Delete this entry");
-        entryEl.appendChild(delBtn);
-
-        list.appendChild(entryEl);
+      const existing = new Map<string, HTMLElement>();
+      for (const child of Array.from(list.children)) {
+        const id = (child as HTMLElement).dataset["id"];
+        if (id) existing.set(id, child as HTMLElement);
       }
+
+      const fragment = document.createDocumentFragment();
+      for (const entry of entries) {
+        const id = entry.id;
+        const el = existing.get(id) ?? this.renderHistoryItem(entry);
+        existing.delete(id);
+        fragment.appendChild(el);
+      }
+
+      for (const [, el] of existing) {
+        el.remove();
+      }
+
+      list.innerHTML = "";
+      list.appendChild(fragment);
     } catch {
       list.innerHTML = "";
       list.appendChild(createEl("p", undefined, "Unable to load history."));
@@ -415,6 +437,7 @@ export class AppController {
 
     window.addEventListener("pagehide", (e) => {
       if (e.persisted) return;
+      void closeDB();
       this.camera.stop();
       inferenceService.terminate();
     });

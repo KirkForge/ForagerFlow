@@ -209,6 +209,15 @@ video {
   line-height: 1.2;
 }
 
+.prediction .prediction-name {
+  font-weight: 600;
+}
+
+.prediction .prediction-edibility {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
 .prediction .bar-wrap {
   flex: 1;
   height: 8px;
