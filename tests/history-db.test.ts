@@ -8,32 +8,28 @@ import {
   setMeta,
   closeDB,
 } from "@/services/history/db";
+import {
+  deleteHistoryDB,
+  createErrorRequest,
+  createBlockedRequest,
+  createMockTransaction,
+} from "./helpers/idb";
 
 const originalIndexedDBOpen = indexedDB.open;
 
-async function deleteHistoryDB(): Promise<void> {
-  await closeDB().catch(() => {
-    /* ignore closed/rejected connections */
-  });
-  await new Promise<void>((resolve, reject) => {
-    const req = indexedDB.deleteDatabase("foragerflow-history");
-    req.onsuccess = () => {
-      resolve();
-    };
-    req.onerror = () => {
-      reject(new Error(String(req.error)));
-    };
-  });
-}
-
 describe("history db", () => {
   beforeEach(async () => {
-    // Ensure a fresh database for each test.
+    await closeDB().catch(() => {
+      /* ignore closed/rejected connections */
+    });
     await deleteHistoryDB();
   });
 
   afterEach(async () => {
     indexedDB.open = originalIndexedDBOpen;
+    await closeDB().catch(() => {
+      /* ignore closed/rejected connections */
+    });
     await deleteHistoryDB();
   });
 
@@ -60,53 +56,21 @@ describe("history db", () => {
   });
 
   it("rejects when IndexedDB open fails", async () => {
-    const originalOpen = indexedDB.open;
-    indexedDB.open = vi.fn(() => {
-      const request = {
-        set onsuccess(_: () => void) {
-          /* no-op */
-        },
-        set onerror(handler: () => void) {
-          Object.defineProperty(this, "error", {
-            value: new Error("blocked"),
-            configurable: true,
-          });
-          handler();
-        },
-        set onupgradeneeded(_: () => void) {
-          /* no-op */
-        },
-        set onblocked(_: () => void) {
-          /* no-op */
-        },
-        result: null,
-      } as unknown as IDBOpenDBRequest;
-      return request;
-    });
+    indexedDB.open = vi.fn(() =>
+      createErrorRequest(new Error("blocked")),
+    ) as unknown as typeof indexedDB.open;
 
     await expect(openDB()).rejects.toThrow("blocked");
-    indexedDB.open = originalOpen;
   });
 
   it("rejects when transaction aborts", async () => {
     const db = await openDB();
     const originalTransaction = db.transaction.bind(db);
-    db.transaction = vi.fn(() => {
-      const tx = {
-        objectStore: () => ({
-          add: () => ({
-            set onsuccess(_: () => void) {},
-            set onerror(_: () => void) {},
-          }),
-        }),
-        set onabort(handler: () => void) {
-          handler();
-        },
-        set oncomplete(_: () => void) {},
-        set onerror(_: () => void) {},
-      } as unknown as IDBTransaction;
-      return tx;
-    }) as unknown as typeof db.transaction;
+    db.transaction = vi.fn().mockReturnValue(
+      createMockTransaction(STORE_NAME, {
+        abortError: new Error("aborted"),
+      }),
+    ) as unknown as typeof db.transaction;
 
     await expect(
       withTransaction(db, "readwrite", (store) => store.add({ id: "x" })),
@@ -119,26 +83,11 @@ describe("history db", () => {
   it("rejects when request errors", async () => {
     const db = await openDB();
     const originalTransaction = db.transaction.bind(db);
-    db.transaction = vi.fn(() => {
-      const tx = {
-        objectStore: () => ({
-          add: () => ({
-            set onsuccess(_: () => void) {},
-            set onerror(handler: () => void) {
-              Object.defineProperty(this, "error", {
-                value: new Error("add failed"),
-                configurable: true,
-              });
-              handler();
-            },
-          }),
-        }),
-        set onabort(_: () => void) {},
-        set oncomplete(_: () => void) {},
-        set onerror(_: () => void) {},
-      } as unknown as IDBTransaction;
-      return tx;
-    }) as unknown as typeof db.transaction;
+    db.transaction = vi.fn().mockReturnValue(
+      createMockTransaction(STORE_NAME, {
+        requestError: new Error("add failed"),
+      }),
+    ) as unknown as typeof db.transaction;
 
     await expect(
       withTransaction(db, "readwrite", (store) => store.add({ id: "x" })),
@@ -149,22 +98,11 @@ describe("history db", () => {
   });
 
   it("rejects when IndexedDB open is blocked", async () => {
-    const originalOpen = indexedDB.open;
-    indexedDB.open = vi.fn(() => {
-      const request = {
-        set onsuccess(_: () => void) {},
-        set onerror(_: () => void) {},
-        set onupgradeneeded(_: () => void) {},
-        set onblocked(handler: () => void) {
-          handler();
-        },
-        result: null,
-      } as unknown as IDBOpenDBRequest;
-      return request;
-    });
+    indexedDB.open = vi.fn(() =>
+      createBlockedRequest(),
+    ) as unknown as typeof indexedDB.open;
 
     await expect(openDB()).rejects.toThrow("blocked");
-    indexedDB.open = originalOpen;
   });
 
   it("applies migrations when upgrading from version 1", async () => {
