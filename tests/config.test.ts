@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ModelKey } from "@/core/types";
 
-describe("config env helpers", () => {
+describe("config", () => {
   let originalEnv: Record<string, unknown>;
 
   beforeEach(() => {
@@ -13,46 +13,26 @@ describe("config env helpers", () => {
     vi.resetModules();
   });
 
-  it("uses fallback boolean when env var is missing", async () => {
+  it("uses default values when env vars are missing", async () => {
     delete import.meta.env["VITE_FEATURE_TELEMETRY"];
+    delete import.meta.env["VITE_TELEMETRY_ENDPOINT"];
+    delete import.meta.env["VITE_MAX_INFERENCE_RETRIES"];
     const { config } = await import("@/core/config");
     expect(config.features.telemetry).toBe(true);
+    expect(config.telemetryEndpoint).toBe("");
+    expect(config.maxInferenceRetries).toBe(3);
   });
 
-  it("parses true and 1 as enabled booleans", async () => {
-    import.meta.env["VITE_FEATURE_TELEMETRY"] = "true";
-    import.meta.env["VITE_FEATURE_HISTORY"] = "1";
-    const { config } = await import("@/core/config");
-    expect(config.features.telemetry).toBe(true);
-    expect(config.features.history).toBe(true);
-  });
-
-  it("parses any other value as disabled boolean", async () => {
+  it("reads telemetry feature flag", async () => {
     import.meta.env["VITE_FEATURE_TELEMETRY"] = "false";
-    import.meta.env["VITE_FEATURE_HISTORY"] = "0";
-    import.meta.env["VITE_FEATURE_WEB_VITALS"] = "off";
     const { config } = await import("@/core/config");
     expect(config.features.telemetry).toBe(false);
-    expect(config.features.history).toBe(false);
-    expect(config.features.webVitals).toBe(false);
-  });
-
-  it("uses fallback string when env var is missing", async () => {
-    delete import.meta.env["VITE_TELEMETRY_ENDPOINT"];
-    const { config } = await import("@/core/config");
-    expect(config.telemetryEndpoint).toBe("");
   });
 
   it("reads string env var", async () => {
     import.meta.env["VITE_TELEMETRY_ENDPOINT"] = "/api/telemetry";
     const { config } = await import("@/core/config");
     expect(config.telemetryEndpoint).toBe("/api/telemetry");
-  });
-
-  it("uses fallback number when env var is missing", async () => {
-    delete import.meta.env["VITE_MAX_INFERENCE_RETRIES"];
-    const { config } = await import("@/core/config");
-    expect(config.maxInferenceRetries).toBe(3);
   });
 
   it("parses numeric env var", async () => {

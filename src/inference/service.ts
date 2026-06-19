@@ -31,33 +31,7 @@ export type ErrorHandler = (
 export type StorageConfirmHandler = (payload: {
   modelKey: ModelKey;
   freeBytes: number;
-  token: string;
 }) => void;
-
-function generateToken(): string {
-  if (
-    typeof crypto !== "undefined" &&
-    typeof crypto.randomUUID === "function"
-  ) {
-    return crypto.randomUUID();
-  }
-  const arr = new Uint8Array(16);
-  if (
-    typeof crypto !== "undefined" &&
-    typeof crypto.getRandomValues === "function"
-  ) {
-    crypto.getRandomValues(arr);
-  } else {
-    for (let i = 0; i < arr.length; i++) {
-      arr[i] = Math.floor(Math.random() * 256);
-    }
-  }
-  let hex = "";
-  for (const b of arr) {
-    hex += b.toString(16).padStart(2, "0");
-  }
-  return `${Date.now().toString(36)}-${hex}`;
-}
 
 export class InferenceService {
   private worker: InferenceWorker | null = null;
@@ -71,8 +45,8 @@ export class InferenceService {
     height: number;
     modelKey: ModelKey;
   }[] = [];
-  private pendingStorageToken: string | null = null;
-  private pendingModelKey: ModelKey | null = null;
+  private awaitingStorageConfirm = false;
+  private pendingStorageModelKey: ModelKey | null = null;
   private terminated = false;
 
   private onStatusHandler: StatusHandler | null = null;
@@ -225,14 +199,14 @@ export class InferenceService {
     this.onStatusHandler?.(`Loading ${model.name}...`);
   }
 
-  resumeStorageConfirm(token: string): void {
-    if (this.pendingStorageToken !== token || this.pendingModelKey === null) {
-      logger.warn("resumeStorageConfirm: token mismatch or expired");
+  resumeStorageConfirm(): void {
+    if (!this.awaitingStorageConfirm || this.pendingStorageModelKey === null) {
+      logger.warn("resumeStorageConfirm: no pending storage confirmation");
       return;
     }
-    const key = this.pendingModelKey;
-    this.pendingStorageToken = null;
-    this.pendingModelKey = null;
+    const key = this.pendingStorageModelKey;
+    this.awaitingStorageConfirm = false;
+    this.pendingStorageModelKey = null;
     this.onStatusHandler?.("Continuing model load...");
     this.switchModel(key, { skipStorageCheck: true });
   }
@@ -283,11 +257,10 @@ export class InferenceService {
 
     const minFree = config.minFreeBytesPerModel[key];
     if (freeBytes < minFree) {
-      const token = generateToken();
-      this.pendingStorageToken = token;
-      this.pendingModelKey = key;
+      this.awaitingStorageConfirm = true;
+      this.pendingStorageModelKey = key;
       const freeMB = Math.round(freeBytes / 1024 / 1024);
-      this.onStorageConfirmHandler?.({ modelKey: key, freeBytes, token });
+      this.onStorageConfirmHandler?.({ modelKey: key, freeBytes });
       this.onStatusHandler?.(
         `Low storage (${String(freeMB)} MB free). Awaiting confirmation.`,
       );
@@ -337,8 +310,8 @@ export class InferenceService {
       clearTimeout(this.retryTimeout);
       this.retryTimeout = null;
     }
-    this.pendingStorageToken = null;
-    this.pendingModelKey = null;
+    this.awaitingStorageConfirm = false;
+    this.pendingStorageModelKey = null;
     this.inferQueue = [];
     this.worker?.terminate();
     this.worker = null;

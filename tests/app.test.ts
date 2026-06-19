@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ModelKey, Edibility } from "@/core/types";
 import type { CaptureResult } from "@/services/camera";
+import type * as AppModule from "@/app";
 
 interface MockInferenceService {
   onStatus: (handler: (text: string) => void) => void;
@@ -131,7 +132,7 @@ function renderAppHTML(): void {
 }
 
 describe("AppController", () => {
-  let appModule: typeof import("@/app");
+  let appModule: typeof AppModule;
 
   beforeEach(async () => {
     vi.clearAllMocks();

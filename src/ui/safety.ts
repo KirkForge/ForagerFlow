@@ -260,7 +260,7 @@ export class SafetyUI {
       this.els.storageConfirmBody.textContent = `Your device reports ${String(freeMB)} MB of free storage. The selected model needs ${modelSize}. Continue anyway?`;
       const onAccept = () => {
         cleanup();
-        this.opts.inferenceService.resumeStorageConfirm(payload.token);
+        this.opts.inferenceService.resumeStorageConfirm();
       };
       const onCancel = () => {
         cleanup();

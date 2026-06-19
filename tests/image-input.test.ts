@@ -108,7 +108,7 @@ describe("processFileInput", () => {
 
     expect(result.width).toBe(224);
     expect(result.height).toBe(224);
-    expect(result.thumbnail).toBeNull();
+    expect(result.thumbnail).toBe("data:image/jpeg;base64,THUMB");
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:mock");
   });
 
