@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { processFileInput } from "@/services/image-input";
+import { installMockCanvas, createMockContext } from "./helpers/canvas";
 
 interface MockImageElement {
   onload: (() => void) | null;
@@ -52,37 +53,14 @@ function installImageMock(
   };
 }
 
-function mockCanvas(
-  imageDataBuffer: ArrayBuffer = new ArrayBuffer(224 * 224 * 4),
-  thumbnail: string | null = "data:image/jpeg;base64,THUMB",
-) {
-  const originalCreateElement = document.createElement;
-  document.createElement = vi.fn((tagName: string) => {
-    if (tagName === "canvas") {
-      return {
-        width: 0,
-        height: 0,
-        getContext: vi.fn(() => ({
-          drawImage: vi.fn(),
-          getImageData: vi.fn(() => ({
-            data: { buffer: imageDataBuffer },
-          })),
-        })),
-        toDataURL: vi.fn(() => thumbnail ?? "data:image/jpeg;base64,MOCK"),
-      } as unknown as HTMLCanvasElement;
-    }
-    return originalCreateElement.call(document, tagName);
-  }) as typeof document.createElement;
-  return originalCreateElement;
-}
-
 describe("processFileInput", () => {
-  let originalCreateElement: typeof document.createElement;
+  let canvas: ReturnType<typeof installMockCanvas>;
   let restoreImage: (() => void) | undefined;
   let originalCreateObjectURL: typeof URL.createObjectURL;
   let originalRevokeObjectURL: typeof URL.revokeObjectURL;
 
   beforeEach(() => {
+    canvas = installMockCanvas();
     originalCreateObjectURL = URL.createObjectURL;
     originalRevokeObjectURL = URL.revokeObjectURL;
     URL.createObjectURL = vi.fn(() => "blob:mock");
@@ -94,15 +72,20 @@ describe("processFileInput", () => {
       restoreImage();
       restoreImage = undefined;
     }
-    document.createElement = originalCreateElement;
+    canvas.restore();
     URL.createObjectURL = originalCreateObjectURL;
     URL.revokeObjectURL = originalRevokeObjectURL;
     vi.restoreAllMocks();
   });
 
+  function withCanvas(opts: Parameters<typeof installMockCanvas>[0]): void {
+    canvas.restore();
+    canvas = installMockCanvas(opts);
+  }
+
   it("resolves with buffer, dimensions and thumbnail", async () => {
     restoreImage = installImageMock();
-    originalCreateElement = mockCanvas();
+    withCanvas({ thumbnail: "data:image/jpeg;base64,THUMB" });
     const file = new File([], "mushroom.jpg", { type: "image/jpeg" });
     const result = await processFileInput(file);
 
@@ -114,18 +97,7 @@ describe("processFileInput", () => {
 
   it("rejects when canvas context is unavailable", async () => {
     restoreImage = installImageMock();
-    const originalCreateElementLocal = document.createElement;
-    document.createElement = vi.fn((tagName: string) => {
-      if (tagName === "canvas") {
-        return {
-          width: 0,
-          height: 0,
-          getContext: vi.fn(() => null),
-        } as unknown as HTMLCanvasElement;
-      }
-      return originalCreateElementLocal.call(document, tagName);
-    }) as typeof document.createElement;
-    originalCreateElement = originalCreateElementLocal;
+    withCanvas({ context: null });
 
     const file = new File([], "mushroom.jpg", { type: "image/jpeg" });
     await expect(processFileInput(file)).rejects.toThrow(
@@ -135,7 +107,6 @@ describe("processFileInput", () => {
 
   it("rejects when image fails to load", async () => {
     restoreImage = installImageMock({ fail: true });
-    originalCreateElement = mockCanvas();
 
     const file = new File([], "broken.jpg", { type: "image/jpeg" });
     await expect(processFileInput(file)).rejects.toThrow(
@@ -145,25 +116,15 @@ describe("processFileInput", () => {
 
   it("centers crop on non-square images", async () => {
     restoreImage = installImageMock({ naturalWidth: 600, naturalHeight: 400 });
-    const originalCreateElementLocal = document.createElement;
     const drawImage = vi.fn();
-    document.createElement = vi.fn((tagName: string) => {
-      if (tagName === "canvas") {
-        return {
-          width: 0,
-          height: 0,
-          getContext: vi.fn(() => ({
-            drawImage,
-            getImageData: vi.fn(() => ({
-              data: { buffer: new ArrayBuffer(112 * 112 * 4) },
-            })),
-          })),
-          toDataURL: vi.fn(() => "data:image/jpeg;base64,T"),
-        } as unknown as HTMLCanvasElement;
-      }
-      return originalCreateElementLocal.call(document, tagName);
-    }) as typeof document.createElement;
-    originalCreateElement = originalCreateElementLocal;
+    const ctx = createMockContext({
+      imageDataBuffer: new ArrayBuffer(112 * 112 * 4),
+    });
+    ctx.drawImage = drawImage;
+    withCanvas({
+      thumbnail: "data:image/jpeg;base64,T",
+      context: ctx,
+    });
 
     const file = new File([], "wide.jpg", { type: "image/jpeg" });
     await processFileInput(file, 112);

@@ -1,45 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { ResultsRenderer } from "@/ui/results";
-import { Edibility, ModelKey, type ModelRegistryEntry } from "@/core/types";
-import type { PredictionReport } from "@/inference/results";
-
-function makeReport(
-  overrides: Partial<PredictionReport> = {},
-): PredictionReport {
-  return {
-    top1Species: "Agaricus bisporus",
-    top1Probability: 0.95,
-    top1Knowledge: { edibility: Edibility.Edible, notes: "Button mushroom." },
-    predictions: [
-      { label: "Agaricus bisporus", probability: 0.95, index: 0 },
-      { label: "Amanita phalloides", probability: 0.03, index: 1 },
-      { label: "Russula emetica", probability: 0.02, index: 2 },
-    ],
-    hasRiskInTop3: false,
-    requiresWarning: false,
-    warningMessage: null,
-    ...overrides,
-  };
-}
-
-const mockModel: ModelRegistryEntry = {
-  key: ModelKey.BVRA,
-  name: "Test model",
-  size: "1 MB",
-  path: "./test.onnx",
-  labels: ["Agaricus bisporus", "Amanita phalloides", "Russula emetica"],
-  mean: [0.485, 0.456, 0.406],
-  std: [0.229, 0.224, 0.225],
-  expectedLabelCount: 3,
-  knowledge: {
-    "Agaricus bisporus": { edibility: Edibility.Edible, notes: "Safe." },
-    "Amanita phalloides": {
-      edibility: Edibility.Poisonous,
-      notes: "Death cap — fatal.",
-    },
-    "Russula emetica": { edibility: Edibility.Poisonous, notes: "Sickener." },
-  },
-};
+import { makeMockModel, makeReport } from "./helpers/fixtures";
 
 function renderResultsHTML(): HTMLElement {
   document.body.innerHTML = `
@@ -85,7 +46,7 @@ describe("ResultsRenderer", () => {
 
   it("renders predictions with bars and percentages", () => {
     const renderer = new ResultsRenderer(root);
-    renderer.render(makeReport(), mockModel);
+    renderer.render(makeReport(), makeMockModel());
 
     const predictions = root.querySelectorAll(".prediction");
     expect(predictions).toHaveLength(3);
@@ -103,7 +64,7 @@ describe("ResultsRenderer", () => {
         requiresWarning: true,
         warningMessage: "Low confidence — do not act on this prediction.",
       }),
-      mockModel,
+      makeMockModel(),
     );
 
     const warning = root.querySelector("#warning") as HTMLElement;
@@ -121,7 +82,7 @@ describe("ResultsRenderer", () => {
         warningMessage:
           "Cannot rule out a toxic lookalike. Do not consume. Always verify with a certified expert.",
       }),
-      mockModel,
+      makeMockModel(),
     );
 
     const warning = root.querySelector("#warning") as HTMLElement;
@@ -131,7 +92,7 @@ describe("ResultsRenderer", () => {
 
   it("renders knowledge panel with verify link", () => {
     const renderer = new ResultsRenderer(root);
-    renderer.render(makeReport(), mockModel);
+    renderer.render(makeReport(), makeMockModel());
 
     const knowledge = root.querySelector("#knowledge") as HTMLElement;
     expect(knowledge.style.display).toBe("block");
@@ -151,7 +112,10 @@ describe("ResultsRenderer", () => {
     const report = makeReport({
       predictions: [{ label: "Missing species", probability: 0.95, index: 0 }],
     });
-    renderer.render(report, { ...mockModel, labels: ["Missing species"] });
+    renderer.render(report, {
+      ...makeMockModel(),
+      labels: ["Missing species"],
+    });
 
     const label = root.querySelector(".prediction .label")!;
     expect(label.querySelector(".unknown")).toBeTruthy();
@@ -159,7 +123,7 @@ describe("ResultsRenderer", () => {
 
   it("clears on model selector change", () => {
     const renderer = new ResultsRenderer(root);
-    renderer.render(makeReport(), mockModel);
+    renderer.render(makeReport(), makeMockModel());
     expect(root.querySelectorAll(".prediction")).toHaveLength(3);
 
     const select = root.querySelector("#model-select") as HTMLSelectElement;

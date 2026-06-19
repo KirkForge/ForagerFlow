@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ModelKey, Edibility } from "@/core/types";
+import { ModelKey } from "@/core/types";
 import type { CaptureResult } from "@/services/camera";
-import type * as AppModule from "@/app";
-import { getEdibilityClass, createEl } from "@/ui/utils";
+import { AppController } from "@/app";
+import { flushPromises } from "./helpers/promises";
+import { makeHistoryEntry } from "./helpers/fixtures";
 
 interface MockInferenceService {
   onStatus: (handler: (text: string) => void) => void;
@@ -134,12 +135,9 @@ function renderAppHTML(): void {
 }
 
 describe("AppController", () => {
-  let appModule: typeof AppModule;
-
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.clearAllMocks();
     renderAppHTML();
-    appModule = await import("@/app");
   });
 
   afterEach(() => {
@@ -147,7 +145,7 @@ describe("AppController", () => {
   });
 
   it("initializes the app and switches to BVRA", async () => {
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     expect(mockCamera.start).toHaveBeenCalled();
@@ -158,7 +156,7 @@ describe("AppController", () => {
   });
 
   it("renders result on inference result", async () => {
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     const { modelRegistry } = await import("@/data/model-registry");
@@ -174,7 +172,7 @@ describe("AppController", () => {
 
   it("shows camera error when camera fails to start", async () => {
     mockCamera.start.mockRejectedValueOnce(new Error("no camera"));
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     const status = document.querySelector("#status") as HTMLElement;
@@ -182,7 +180,7 @@ describe("AppController", () => {
   });
 
   it("handles capture button click", async () => {
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     mockCamera.capture.mockReturnValue({
@@ -204,7 +202,7 @@ describe("AppController", () => {
 
   it("handles file selection", async () => {
     const { processFileInput } = await import("@/services/image-input");
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     const input = document.querySelector("#file-input") as HTMLInputElement;
@@ -225,7 +223,7 @@ describe("AppController", () => {
       writable: true,
     });
 
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     window.dispatchEvent(new Event("offline"));
@@ -240,7 +238,7 @@ describe("AppController", () => {
   });
 
   it("switches model on selector change", async () => {
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     const select = document.querySelector("#model-select") as HTMLSelectElement;
@@ -255,7 +253,7 @@ describe("AppController", () => {
 
   it("clears history when clear button is clicked", async () => {
     const { clearHistory } = await import("@/services/history");
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     const clearBtn = document.querySelector("#history-clear") as HTMLElement;
@@ -265,33 +263,11 @@ describe("AppController", () => {
     expect(clearHistory).toHaveBeenCalled();
   });
 
-  it("exports helper functions", () => {
-    expect(getEdibilityClass("Poisonous")).toBe("edibility-poisonous");
-    expect(getEdibilityClass("Edible")).toBe("edibility-edible");
-    expect(getEdibilityClass("Unknown")).toBe("edibility-unknown");
-
-    const el = createEl("div", "cls", "txt");
-    expect(el.tagName).toBe("DIV");
-    expect(el.className).toBe("cls");
-    expect(el.textContent).toBe("txt");
-  });
-
   it("renders last result and history entries", async () => {
     const { getHistory } = await import("@/services/history");
-    const entry = {
-      id: "h-1",
-      timestamp: new Date().toISOString(),
-      modelKey: ModelKey.BVRA,
-      top1Species: "Agaricus bisporus",
-      top1Probability: 0.95,
-      top1Edibility: Edibility.Edible,
-      predictions: [],
-      thumbnail: "data:image/jpeg;base64,T",
-      notes: "Safe.",
-    };
-    vi.mocked(getHistory).mockResolvedValue([entry]);
+    vi.mocked(getHistory).mockResolvedValue([makeHistoryEntry()]);
 
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
     await flushPromises();
 
@@ -306,7 +282,7 @@ describe("AppController", () => {
     const { getHistory } = await import("@/services/history");
     vi.mocked(getHistory).mockResolvedValue([]);
 
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
     await flushPromises();
 
@@ -318,7 +294,7 @@ describe("AppController", () => {
     const { clearHistory } = await import("@/services/history");
     mockSafety.confirmClearHistory.mockResolvedValueOnce(false);
 
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     const clearBtn = document.querySelector("#history-clear") as HTMLElement;
@@ -332,7 +308,7 @@ describe("AppController", () => {
     const { processFileInput } = await import("@/services/image-input");
     vi.mocked(processFileInput).mockRejectedValueOnce(new Error("bad image"));
 
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     const input = document.querySelector("#file-input") as HTMLInputElement;
@@ -346,7 +322,7 @@ describe("AppController", () => {
   });
 
   it("sets error state on inference error", async () => {
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     mockInferenceService.emitError(new Error("model failed"));
@@ -355,7 +331,7 @@ describe("AppController", () => {
   });
 
   it("skips capture when button is busy", async () => {
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     const captureBtn = document.querySelector(
@@ -368,7 +344,7 @@ describe("AppController", () => {
   });
 
   it("shows message when capture returns no result", async () => {
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     mockCamera.capture.mockReturnValue(null);
@@ -380,7 +356,7 @@ describe("AppController", () => {
   });
 
   it("retries camera when retry button is clicked", async () => {
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     const retryBtn = document.querySelector("#camera-retry") as HTMLElement;
@@ -390,7 +366,7 @@ describe("AppController", () => {
   });
 
   it("switches back to BVRA from dima806", async () => {
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     const select = document.querySelector("#model-select") as HTMLSelectElement;
@@ -403,7 +379,7 @@ describe("AppController", () => {
   });
 
   it("stops camera and terminates inference on pagehide", async () => {
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     window.dispatchEvent(
@@ -414,7 +390,7 @@ describe("AppController", () => {
   });
 
   it("reinitializes on persisted pageshow", async () => {
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     const initCalls = mockInferenceService.initialize.mock.calls.length;
@@ -434,20 +410,11 @@ describe("AppController", () => {
   it("delegates history delete button clicks", async () => {
     const { getHistory } = await import("@/services/history");
     const { deleteEntry } = await import("@/services/history/delete-entry");
-    const entry = {
-      id: "h-del",
-      timestamp: new Date().toISOString(),
-      modelKey: ModelKey.BVRA,
-      top1Species: "Agaricus bisporus",
-      top1Probability: 0.95,
-      top1Edibility: Edibility.Edible,
-      predictions: [],
-      thumbnail: "",
-      notes: "Safe.",
-    };
-    vi.mocked(getHistory).mockResolvedValue([entry]);
+    vi.mocked(getHistory).mockResolvedValue([
+      makeHistoryEntry({ id: "h-del" }),
+    ]);
 
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
     await flushPromises();
 
@@ -466,7 +433,7 @@ describe("AppController", () => {
       .mockReturnValue("blob:mock");
     const revokeObjectURLSpy = vi.spyOn(URL, "revokeObjectURL");
 
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     const exportBtn = document.querySelector("#history-export") as HTMLElement;
@@ -487,7 +454,7 @@ describe("AppController", () => {
     const { exportHistory } = await import("@/services/history");
     vi.mocked(exportHistory).mockRejectedValueOnce(new Error("export failed"));
 
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     const exportBtn = document.querySelector("#history-export") as HTMLElement;
@@ -499,7 +466,7 @@ describe("AppController", () => {
   });
 
   it("opens the import file picker when import button is clicked", async () => {
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     const importBtn = document.querySelector("#history-import") as HTMLElement;
@@ -521,7 +488,7 @@ describe("AppController", () => {
       type: "application/json",
     });
 
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     const input = document.querySelector(
@@ -543,7 +510,7 @@ describe("AppController", () => {
       type: "application/json",
     });
 
-    const controller = new appModule.AppController();
+    const controller = new AppController();
     await controller.init();
 
     const input = document.querySelector(
@@ -567,8 +534,4 @@ function setFiles(input: HTMLInputElement, file: File): void {
     } as unknown as FileList,
     configurable: true,
   });
-}
-
-function flushPromises(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
 }

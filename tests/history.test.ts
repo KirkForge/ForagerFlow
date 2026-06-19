@@ -11,27 +11,9 @@ import {
 } from "@/services/history";
 import { deleteEntry } from "@/services/history/delete-entry";
 import * as historyDb from "@/services/history/db";
-import type * as HistoryDb from "@/services/history/db";
 import { ModelKey, Edibility } from "@/core/types";
-import type { PredictionReport } from "@/inference/results";
-
-function makeReport(
-  overrides: Partial<PredictionReport> = {},
-): PredictionReport {
-  return {
-    top1Species: "Agaricus bisporus",
-    top1Probability: 0.95,
-    top1Knowledge: {
-      edibility: Edibility.Edible,
-      notes: "Button mushroom.",
-    },
-    predictions: [
-      { label: "Agaricus bisporus", probability: 0.95 },
-      { label: "Amanita phalloides", probability: 0.03 },
-    ],
-    ...overrides,
-  } as PredictionReport;
-}
+import { sleep } from "./helpers/promises";
+import { makeReport, makeHistoryEntry } from "./helpers/fixtures";
 
 describe("history with IndexedDB", () => {
   beforeEach(() => {
@@ -39,6 +21,7 @@ describe("history with IndexedDB", () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await clearHistory();
     localStorage.clear();
   });
@@ -121,18 +104,9 @@ describe("history with IndexedDB", () => {
   });
 
   it("HistoryEntry type is well-formed", () => {
-    // Type-level smoke test; runtime assertions guard the shape.
-    const entry: HistoryEntry = {
-      id: "test-1",
-      timestamp: new Date().toISOString(),
-      modelKey: ModelKey.BVRA,
-      top1Species: "Agaricus bisporus",
-      top1Probability: 0.95,
-      top1Edibility: Edibility.Edible,
+    const entry: HistoryEntry = makeHistoryEntry({
       predictions: [{ label: "Agaricus bisporus", probability: 0.95 }],
-      thumbnail: "",
-      notes: "Button mushroom.",
-    };
+    });
 
     expect(entry.id).toBeTruthy();
     expect(entry.timestamp).toBeTruthy();
@@ -143,72 +117,39 @@ describe("history with IndexedDB", () => {
 
   it("retries save without thumbnail on QuotaExceededError", async () => {
     let attempt = 0;
-    vi.doMock("@/services/history/db", async () => {
-      const actual = await vi.importActual<typeof HistoryDb>(
-        "@/services/history/db",
-      );
-      return {
-        ...actual,
-        openDB: async () => {
-          const db = await actual.openDB();
-          const originalTransaction = db.transaction.bind(db);
-          db.transaction = vi.fn((name: string, mode: IDBTransactionMode) => {
-            const tx = originalTransaction(name, mode);
-            const originalStore = tx.objectStore.bind(tx);
-            tx.objectStore = () => {
-              const store = originalStore(name);
-              const originalAdd = store.add.bind(store);
-              store.add = (value: unknown): IDBRequest<IDBValidKey> => {
-                attempt++;
-                const entry = value as { thumbnail?: string };
-                if (attempt === 1 && entry.thumbnail) {
-                  const err = new DOMException(
-                    "Quota exceeded",
-                    "QuotaExceededError",
-                  );
-                  const req = {
-                    set onsuccess(_: () => void) {},
-                    set onerror(handler: () => void) {
-                      handler();
-                    },
-                  };
-                  Object.defineProperty(req, "error", {
-                    value: err,
-                    configurable: true,
-                  });
-                  return req as unknown as IDBRequest<IDBValidKey>;
-                }
-                return originalAdd(value);
-              };
-              return store;
-            };
-            return tx;
-          }) as unknown as typeof db.transaction;
-          return db;
-        },
-      };
-    });
+    const withTransactionSpy = vi
+      .spyOn(historyDb, "withTransaction")
+      .mockImplementation(async (_db, _mode, callback) => {
+        const mockStore = {
+          add: (value: unknown) => {
+            attempt++;
+            const entry = value as { thumbnail?: string };
+            if (attempt === 1 && entry.thumbnail) {
+              throw new DOMException("Quota exceeded", "QuotaExceededError");
+            }
+            return `id-${String(attempt)}` as unknown as IDBRequest<IDBValidKey>;
+          },
+        } as unknown as IDBObjectStore;
+        return callback(mockStore) as unknown as Promise<string>;
+      });
 
-    const { saveIdentification } = await import("@/services/history");
     const report = makeReport();
     const id = await saveIdentification(report, ModelKey.BVRA, "thumb");
     expect(id).toBeTruthy();
+    expect(attempt).toBe(2);
 
-    vi.doUnmock("@/services/history/db");
+    withTransactionSpy.mockRestore();
   });
 
   it("returns empty history when IndexedDB read fails", async () => {
-    vi.doMock("@/services/history/db", () => ({
-      openDB: vi.fn().mockRejectedValue(new Error("idb unavailable")),
-      withTransaction: vi.fn(),
-      STORE_NAME: "identifications",
-    }));
+    const openDBSpy = vi
+      .spyOn(historyDb, "openDB")
+      .mockRejectedValue(new Error("idb unavailable"));
 
-    const { getHistory } = await import("@/services/history");
     const entries = await getHistory(10);
     expect(entries).toEqual([]);
 
-    vi.doUnmock("@/services/history/db");
+    openDBSpy.mockRestore();
   });
 
   it("throws when save fails for a non-quota reason", async () => {
@@ -299,17 +240,12 @@ describe("history with IndexedDB", () => {
       version: 1,
       exportedAt: new Date().toISOString(),
       entries: [
-        {
+        makeHistoryEntry({
           id: "imp-1",
-          timestamp: new Date().toISOString(),
-          modelKey: ModelKey.BVRA,
           top1Species: "Imported",
           top1Probability: 0.8,
           top1Edibility: Edibility.Unknown,
-          predictions: [],
-          thumbnail: "",
-          notes: "",
-        },
+        }),
       ],
     };
 
@@ -329,7 +265,3 @@ describe("history with IndexedDB", () => {
     await expect(importHistory('{"version":1}')).rejects.toThrow("no entries");
   });
 });
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { flushPromises } from "./helpers/promises";
 
 const init = vi.fn().mockResolvedValue(undefined);
 const MockAppController = vi.fn(function () {
@@ -36,7 +37,3 @@ describe("main bootstrap", () => {
     expect(status?.textContent).toBe("Failed to initialize. Please reload.");
   });
 });
-
-function flushPromises(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
