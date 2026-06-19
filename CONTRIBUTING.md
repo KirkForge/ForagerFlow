@@ -1,7 +1,5 @@
 # Contributing to ForagerFlow
 
-Thank you for your interest in contributing! This guide covers the essentials.
-
 ## Development Setup
 
 1. **Prerequisites**: Node.js 22+, pnpm 10+
@@ -19,7 +17,7 @@ Thank you for your interest in contributing! This guide covers the essentials.
 
 ```
 src/
-  core/         — Shared types, errors, logger, config, telemetry, emitter
+  core/         — Shared types, errors, logger, config, telemetry
   data/         — Model registry, labels, knowledge JSON
   inference/    — Worker, service, softmax, results
   services/     — Camera, connectivity, history, image-input, web-vitals
@@ -29,19 +27,16 @@ src/
                   footer, capture-busy state, model-picker gate, storage
                   confirm, clear-history confirm)
   css/          — Stylesheet
-  main.ts       — App controller (entry point)
+  app.ts        — App controller
+  main.ts       — Entry point
   sw.ts         — Service worker
-  index.html     — SPA shell (modals, sticky footer, last-result slot
-                  all live here, not in JS-rendered DOM)
+  index.html     — SPA shell
 tests/          — Unit tests (Vitest + jsdom)
 scripts/        — CI helpers, label verification, built-dist smoke test,
                   real-ONNX inference smoke test
 pwa/            — Export target and ONNX drop directory. Contains only
                   pwa/model/ (the BVRA canonical class list and the
-                  exported *.onnx / *.onnx.data files). There is no
-                  pwa/js/, pwa/css/, pwa/index.html, or pwa/sw.js —
-                  those were the legacy hand-rolled vanilla-JS app
-                  and have been removed.
+                  exported *.onnx / *.onnx.data files).
 public/         — Static assets copied verbatim into dist/ by Vite.
                   Contains the vendored ort.min.js + ort-wasm-* files
                   and manifest.webmanifest.
@@ -59,19 +54,15 @@ dist/           — Build output. The deployable.
 ## Architecture
 
 ### Inference Pipeline
-1. `AppController` → `InferenceService` (TypedEmitter) → Web Worker
-2. Worker loads ONNX model, preprocesses pixels, runs inference
-3. Results flow back: Worker → InferenceService → AppController → ResultsRenderer
-4. Auto-retry on recoverable errors (max 3 retries with exponential backoff)
-5. Inference requests are queued when model is still loading
-6. `inferenceService.switchModel(key)` checks `navigator.storage.estimate()`
-   before any large model load and emits a `storageConfirm` event the UI
-   listens for to gate the download on a confirm modal
+1. `AppController` → `InferenceService` (callback handlers) → Web Worker
+2. Worker loads the ONNX model, preprocesses pixels, runs inference
+3. Results flow back: Worker → `InferenceService` → `AppController` → `ResultsRenderer`
+4. `InferenceService` retries recoverable worker errors up to 3 times with exponential backoff
+5. Requests made while the model is loading are queued and flushed when ready
+6. `inferenceService.switchModel()` checks `navigator.storage.estimate()` before large model loads and invokes the registered storage-confirm handler so the UI can gate the download
 
 ### State Management
-- `ApplicationState` enum: Loading → CameraActive → Processing → Done
-- `TypedEmitter` for type-safe events
-- `config` module for feature flags
+- `config` module for feature flags and env-var overrides
 - `SafetyUI` owns all dialogs and the sticky footer; `AppController` blocks on it before opening the camera
 
 ### Error Handling
@@ -81,11 +72,9 @@ dist/           — Build output. The deployable.
 - `sanitizeText()` for user-visible strings
 
 ### Persistence
-- Identification history stored in IndexedDB via
-  `services/history/index.ts`. Per-row deletion lives in
-  `services/history/delete-entry.ts` and is dynamically imported by
-  the click handler so Vite can code-split it.
-- Service Worker caches app shell (versioned) and models (lazy)
+- Identification history stored in IndexedDB via `services/history/index.ts`
+- Per-row deletion lives in `services/history/delete-entry.ts` and is dynamically imported by the click handler
+- Service Worker caches the app shell (versioned) and models (lazy)
 
 ## Testing
 
