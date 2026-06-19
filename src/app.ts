@@ -22,23 +22,7 @@ import { initWebVitals } from "@/services/web-vitals";
 import { logger } from "@/core/logger";
 import { sanitizeText } from "@/core/sanitize";
 import { config } from "@/core/config";
-
-export function getEdibilityClass(ed: string): string {
-  if (ed === "Poisonous") return "edibility-poisonous";
-  if (ed === "Edible") return "edibility-edible";
-  return "edibility-unknown";
-}
-
-export function createEl(
-  tag: string,
-  className?: string,
-  text?: string,
-): HTMLElement {
-  const el = document.createElement(tag);
-  if (className) el.className = className;
-  if (text !== undefined) el.textContent = text;
-  return el;
-}
+import { getEdibilityClass, createEl } from "@/ui/utils";
 
 export class AppController {
   private camera = new CameraService(config.captureSize);

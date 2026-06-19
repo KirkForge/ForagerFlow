@@ -77,14 +77,14 @@ def main():
 
     # 4b. ONNX model files. These aren't produced by pnpm build itself — the
     #     postbuild script and release workflow copy them in, and local devs
-    #     should run scripts/copy-models-to-dist.sh. Warn if missing.
+    #     should run scripts/copy-models-to-dist.cjs. Warn if missing.
     models = list((DIST / "model").glob("*.onnx")) if (DIST / "model").exists() else []
     if len(models) != 2:
         print(
             f"  WARN: dist/model/ has {len(models)} .onnx file(s) — expected 2"
             f" (fungitastic.onnx, dima806.onnx). The release workflow copies"
             f" them in; locally run the export scripts and then"
-            f" `bash scripts/copy-models-to-dist.sh`."
+            f" `node scripts/copy-models-to-dist.cjs`."
         )
     else:
         print(f"  dist/model/ has {len(models)} ONNX files  OK")

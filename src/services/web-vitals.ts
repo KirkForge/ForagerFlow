@@ -1,7 +1,6 @@
 /**
  * Lightweight Web Vitals collector.
- * Captures performance metrics and feeds them into the telemetry system.
- * Only active in production; in dev, metrics are logged to console.
+ * Captures LCP, CLS, and TTFB and feeds them into the telemetry system.
  */
 
 import { recordTelemetry } from "@/core/telemetry";
@@ -32,11 +31,6 @@ function reportMetric(metric: MetricEntry): void {
   });
 }
 
-/**
- * Initialize Web Vitals collection.
- * Uses the Performance Observer API to capture LCP, FID, CLS, INP, TTFB.
- * Falls back gracefully in environments that do not support the API.
- */
 export function initWebVitals(): void {
   if (webVitalsCollected) return;
   webVitalsCollected = true;

@@ -23,12 +23,11 @@ export const config = {
     [ModelKey.Dima806]:
       envNumber("VITE_DIMA806_MIN_FREE_MB", 500) * 1024 * 1024,
   },
-  storageEstimateTimeoutMs: envNumber(
-    "VITE_STORAGE_ESTIMATE_TIMEOUT_MS",
-    1500,
-  ),
+  storageEstimateTimeoutMs: envNumber("VITE_STORAGE_ESTIMATE_TIMEOUT_MS", 1500),
   telemetryEndpoint: envString("VITE_TELEMETRY_ENDPOINT", ""),
   features: {
-    telemetry: (import.meta.env["VITE_FEATURE_TELEMETRY"] as string | undefined) !== "false",
+    telemetry:
+      (import.meta.env["VITE_FEATURE_TELEMETRY"] as string | undefined) !==
+      "false",
   },
 } as const;

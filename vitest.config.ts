@@ -22,7 +22,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
-      exclude: ["src/sw.ts", "src/vite-env.d.ts", "src/index.html"],
+      exclude: ["src/sw.ts", "src/vite-env.d.ts"],
       thresholds: {
         branches: 70,
         functions: 70,

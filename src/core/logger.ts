@@ -20,10 +20,8 @@ class Logger {
 
   debug(...args: unknown[]): void {
     if (this.shouldLog("debug")) {
-      if (import.meta.env.DEV) {
-        // eslint-disable-next-line no-console
-        console.debug("[FORAGERFLOW]", ...args);
-      }
+      // eslint-disable-next-line no-console
+      console.debug("[FORAGERFLOW]", ...args);
     }
   }
 

@@ -9,7 +9,7 @@ Offline-first PWA for mushroom identification using ONNX models running entirely
 The HuggingFace repos ([`BVRA/resnext50_32x4d.in1k_ft_fungitastic-mini_224`](https://huggingface.co/BVRA/resnext50_32x4d.in1k_ft_fungitastic-mini_224) and [`dima806/mushrooms_image_detection`](https://huggingface.co/dima806/mushrooms_image_detection)) ship **PyTorch checkpoints only**. The ONNX weights are produced locally by exporting from PyTorch, then shipped as part of the PWA bundle.
 
 - This repo contains **no ONNX weights** — only the export scripts.
-- CI runs typecheck, lint, format check, tests, build, dist/label verification, e2e, and audit. It does not export ONNX models.
+- CI runs typecheck, lint, tests, build, dist/label verification, and e2e. It does not export ONNX models.
 - A separate **`release.yml`** workflow exports both ONNX models and attaches the full `dist/` bundle as a release asset.
 
 ## Setup (local dev)
@@ -37,7 +37,7 @@ The HuggingFace repos ([`BVRA/resnext50_32x4d.in1k_ft_fungitastic-mini_224`](htt
 
 ## Configuration
 
-Copy `.env.example` to `.env` to set optional runtime values such as `VITE_TELEMETRY_ENDPOINT`, `VITE_TELEMETRY_BUFFER_SIZE`, and feature flags.
+Copy `.env.example` to `.env` to set optional runtime values such as `VITE_TELEMETRY_ENDPOINT` and feature flags.
 
 ## Documentation
 
@@ -84,7 +84,7 @@ Safety UI:
 - Capture button busy state to prevent double submits.
 - Clear-history confirmation.
 - Warnings for low confidence, poisonous top-1, and poisonous lookalikes in the top 3.
-- dima806 model hidden on low-memory or slow-connection devices; first use shows a size warning.
+- dima806 model gated by a first-use size warning and a storage-estimate confirmation.
 - Storage-estimate confirmation before large model downloads when free space is below 500 MB.
 
 ## Models

@@ -3,7 +3,9 @@ import { ResultsRenderer } from "@/ui/results";
 import { Edibility, ModelKey, type ModelRegistryEntry } from "@/core/types";
 import type { PredictionReport } from "@/inference/results";
 
-function makeReport(overrides: Partial<PredictionReport> = {}): PredictionReport {
+function makeReport(
+  overrides: Partial<PredictionReport> = {},
+): PredictionReport {
   return {
     top1Species: "Agaricus bisporus",
     top1Probability: 0.95,
@@ -13,7 +15,7 @@ function makeReport(overrides: Partial<PredictionReport> = {}): PredictionReport
       { label: "Amanita phalloides", probability: 0.03, index: 1 },
       { label: "Russula emetica", probability: 0.02, index: 2 },
     ],
-    hasPoisonousInTop3: false,
+    hasRiskInTop3: false,
     requiresWarning: false,
     warningMessage: null,
     ...overrides,
@@ -76,9 +78,9 @@ describe("ResultsRenderer", () => {
 
     renderer.clear();
     expect(predictions.children).toHaveLength(0);
-    expect((root.querySelector("#knowledge") as HTMLElement).style.display).toBe(
-      "none",
-    );
+    expect(
+      (root.querySelector("#knowledge") as HTMLElement).style.display,
+    ).toBe("none");
   });
 
   it("renders predictions with bars and percentages", () => {
@@ -114,7 +116,7 @@ describe("ResultsRenderer", () => {
     renderer.render(
       makeReport({
         top1Probability: 0.7,
-        hasPoisonousInTop3: true,
+        hasRiskInTop3: true,
         requiresWarning: true,
         warningMessage:
           "Cannot rule out a toxic lookalike. Do not consume. Always verify with a certified expert.",
@@ -133,7 +135,9 @@ describe("ResultsRenderer", () => {
 
     const knowledge = root.querySelector("#knowledge") as HTMLElement;
     expect(knowledge.style.display).toBe("block");
-    expect(knowledge.querySelector("h3")?.textContent).toBe("Agaricus bisporus");
+    expect(knowledge.querySelector("h3")?.textContent).toBe(
+      "Agaricus bisporus",
+    );
 
     const link = knowledge.querySelector("a") as HTMLAnchorElement;
     expect(link).toBeTruthy();

@@ -5,10 +5,9 @@ import type { InferenceService } from "@/inference/service";
 
 class MockInferenceService {
   resumeStorageConfirm = vi.fn();
-  private storageHandler: ((payload: {
-    modelKey: ModelKey;
-    freeBytes: number;
-  }) => void) | null = null;
+  private storageHandler:
+    | ((payload: { modelKey: ModelKey; freeBytes: number }) => void)
+    | null = null;
 
   onStorageConfirm(
     handler: (payload: { modelKey: ModelKey; freeBytes: number }) => void,

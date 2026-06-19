@@ -17,8 +17,12 @@ async function deleteHistoryDB(): Promise<void> {
   });
   await new Promise<void>((resolve, reject) => {
     const req = indexedDB.deleteDatabase("foragerflow-history");
-    req.onsuccess = () => { resolve(); };
-    req.onerror = () => { reject(new Error(String(req.error))); };
+    req.onsuccess = () => {
+      resolve();
+    };
+    req.onerror = () => {
+      reject(new Error(String(req.error)));
+    };
   });
 }
 
@@ -172,8 +176,12 @@ describe("history db", () => {
           db.createObjectStore("identifications", { keyPath: "id" });
         }
       };
-      req.onsuccess = () => { resolve(req.result); };
-      req.onerror = () => { reject(new Error(String(req.error))); };
+      req.onsuccess = () => {
+        resolve(req.result);
+      };
+      req.onerror = () => {
+        reject(new Error(String(req.error)));
+      };
     });
     expect(v1.objectStoreNames.contains("history_meta")).toBe(false);
     v1.close();
@@ -190,4 +198,3 @@ describe("history db", () => {
     expect(value).toBe("2024-01-01T00:00:00Z");
   });
 });
-

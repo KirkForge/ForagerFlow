@@ -109,5 +109,3 @@ export async function setMeta(key: string, value: unknown): Promise<void> {
     };
   });
 }
-
-export { META_STORE_NAME };

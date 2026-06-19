@@ -3,39 +3,13 @@ import { createThumbnailDataUrl } from "@/services/image-utils";
 
 describe("createThumbnailDataUrl", () => {
   let originalCreateElement: typeof document.createElement;
-  let originalImageBitmap: typeof globalThis.ImageBitmap;
-  let originalOffscreenCanvas: typeof globalThis.OffscreenCanvas;
-
-  function ensureGlobalConstructors() {
-    if (typeof globalThis.ImageBitmap === "undefined") {
-      globalThis.ImageBitmap = class {
-        width = 100;
-        height = 100;
-      } as unknown as typeof ImageBitmap;
-    }
-    if (typeof globalThis.OffscreenCanvas === "undefined") {
-      globalThis.OffscreenCanvas = class {
-        width = 100;
-        height = 100;
-        constructor(_w?: number, _h?: number) {
-          if (_w !== undefined) this.width = _w;
-          if (_h !== undefined) this.height = _h;
-        }
-      } as unknown as typeof OffscreenCanvas;
-    }
-  }
 
   beforeEach(() => {
     originalCreateElement = document.createElement;
-    originalImageBitmap = globalThis.ImageBitmap;
-    originalOffscreenCanvas = globalThis.OffscreenCanvas;
-    ensureGlobalConstructors();
   });
 
   afterEach(() => {
     document.createElement = originalCreateElement;
-    globalThis.ImageBitmap = originalImageBitmap;
-    globalThis.OffscreenCanvas = originalOffscreenCanvas;
     vi.restoreAllMocks();
   });
 
@@ -114,7 +88,9 @@ describe("createThumbnailDataUrl", () => {
 
   it("returns a thumbnail from a video element", () => {
     mockCanvas("data:image/jpeg;base64,vid");
-    const video = document.createElement("video") as unknown as HTMLVideoElement;
+    const video = document.createElement(
+      "video",
+    ) as unknown as HTMLVideoElement;
     Object.defineProperty(video, "videoWidth", { value: 200 });
     Object.defineProperty(video, "videoHeight", { value: 100 });
 
@@ -123,7 +99,9 @@ describe("createThumbnailDataUrl", () => {
 
   it("returns null when source dimensions are zero for video", () => {
     mockCanvas(null);
-    const video = document.createElement("video") as unknown as HTMLVideoElement;
+    const video = document.createElement(
+      "video",
+    ) as unknown as HTMLVideoElement;
     Object.defineProperty(video, "videoWidth", { value: 0 });
     Object.defineProperty(video, "videoHeight", { value: 0 });
 

@@ -51,7 +51,7 @@ describe("connectivity", () => {
     });
 
     registerServiceWorker();
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
 
     expect(warnSpy).toHaveBeenCalledWith(
       "Service Worker registration failed: network error",
@@ -59,8 +59,6 @@ describe("connectivity", () => {
   });
 
   it("does nothing when service worker is unsupported", () => {
-    // Simulate a browser that lacks serviceWorker by removing the property
-    // so that the `"serviceWorker" in navigator` guard is false.
     Reflect.deleteProperty(navigator, "serviceWorker");
 
     expect(registerServiceWorker).not.toThrow();
@@ -92,3 +90,7 @@ describe("connectivity", () => {
     expect(badge.style.color).toBe("var(--warn)");
   });
 });
+
+function flushPromises(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}

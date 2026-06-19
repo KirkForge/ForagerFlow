@@ -125,12 +125,8 @@ async function loadModel(
   }
 }
 
-interface UnknownWorkerCommand {
-  type: string;
-}
-
 async function handleWorkerMessage(
-  e: MessageEvent<WorkerCommand | UnknownWorkerCommand>,
+  e: MessageEvent<WorkerCommand | { type: string }>,
 ): Promise<void> {
   const { type } = e.data;
 
@@ -198,7 +194,7 @@ async function handleWorkerMessage(
 
 self.addEventListener(
   "message",
-  (e: MessageEvent<WorkerCommand | UnknownWorkerCommand>) => {
+  (e: MessageEvent<WorkerCommand | { type: string }>) => {
     void handleWorkerMessage(e);
   },
 );

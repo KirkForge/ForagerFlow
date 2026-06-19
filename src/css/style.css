@@ -2,13 +2,12 @@
   --bg: #0f1115;
   --panel: #161a20;
   --text: #e4e6eb;
-  --muted: #9ca3af;
+  --text-muted: #9ca3af;
   --accent: #22c55e;
   --danger: #ef4444;
   --warn: #f59e0b;
   --border: #22262e;
   --surface-1: #1a1f26;
-  --text-muted: #9ca3af;
   --space-1: 8px;
   --space-2: 12px;
   --radius-sm: 4px;
@@ -62,7 +61,7 @@ header .badge {
   padding: 4px 8px;
   border-radius: 999px;
   background: #1f2937;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 #controls {
@@ -76,7 +75,7 @@ header .badge {
 
 #controls label {
   font-size: 12px;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 #controls select {
@@ -187,7 +186,7 @@ video {
 
 .status {
   font-size: 12px;
-  color: var(--muted);
+  color: var(--text-muted);
   margin-bottom: 8px;
 }
 
@@ -237,7 +236,7 @@ video {
   width: 42px;
   text-align: right;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--text-muted);
 }
 
 .edible {
@@ -267,7 +266,7 @@ video {
 .knowledge p {
   margin: 0;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--text-muted);
   line-height: 1.5;
 }
 
@@ -293,7 +292,7 @@ video {
     --bg: #f8f9fa;
     --panel: #ffffff;
     --text: #1a1a2e;
-    --muted: #6b7280;
+    --text-muted: #6b7280;
     --accent: #15803d;
     --danger: #b91c1c;
     --warn: #b45309;
@@ -452,10 +451,7 @@ video {
 
 /* ─── Phone-first safety ────────────────────────────── */
 
-/* Sticky footer. Sits at the end of the #app flex column, which is
-   100dvh tall. The camera-wrap above is `flex: 1 1 auto` so it
-   shrinks to make room. The footer is always present, always
-   visible, always at the bottom — it cannot be scrolled past. */
+/* Sticky footer at the bottom of the flex column. */
 #safety-footer {
   flex: 0 0 auto;
   display: flex;
@@ -483,11 +479,7 @@ video {
   outline-offset: 2px;
 }
 
-/* Capture-button busy state. The button itself is the round white
-   ring overlaid on the camera preview. When `data-busy="true"` we
-   fill the ring with a dimmer overlay and add a spinning ring so
-   the user gets immediate visual confirmation that their tap
-   registered. */
+/* Capture-button busy state. */
 #capture-btn[data-busy="true"] {
   background: rgba(255, 255, 255, 0.45);
   cursor: progress;
@@ -508,10 +500,7 @@ video {
   }
 }
 
-/* First-run safety modal. Native <dialog> with showModal() gives
-   us a real top layer and an automatic backdrop. The form is the
-   only way to dismiss it; the submit button is disabled until the
-   user checks the acknowledgement. */
+/* Modal dialogs. */
 #safety-modal,
 #model-confirm-modal,
 #storage-confirm-modal,
@@ -623,9 +612,7 @@ video {
   outline-offset: 2px;
 }
 
-/* Last-identification callout. Shown above the camera on app start
-   when history is non-empty. Compact band so it doesn't push the
-   camera off-screen on small phones. */
+/* Last-identification callout above the camera. */
 #last-result {
   flex: 0 0 auto;
   padding: 8px 16px;

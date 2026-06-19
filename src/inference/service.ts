@@ -25,9 +25,7 @@ export type ResultHandler = (result: {
   logits: Float32Array;
   modelKey: ModelKey;
 }) => void;
-export type ErrorHandler = (
-  error: InferenceError | LabelMismatchError,
-) => void;
+export type ErrorHandler = (error: InferenceError | LabelMismatchError) => void;
 export type StorageConfirmHandler = (payload: {
   modelKey: ModelKey;
   freeBytes: number;
@@ -98,12 +96,11 @@ export class InferenceService {
             break;
           }
           case InferenceWorkerMessageType.Result: {
-            if (
-              e.data.logits.length !== this.getActiveModel().expectedLabelCount
-            ) {
+            const activeModel = this.getActiveModel();
+            if (e.data.logits.length !== activeModel.expectedLabelCount) {
               this.onErrorHandler?.(
                 new LabelMismatchError(
-                  this.getActiveModel().labels.length,
+                  activeModel.expectedLabelCount,
                   e.data.logits.length,
                 ),
               );

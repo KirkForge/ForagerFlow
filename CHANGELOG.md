@@ -15,8 +15,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com).
 - Camera-permission fallback button that triggers the file input.
 - Last-identification callout above the viewfinder.
 - Clear-history confirmation modal.
-- dima806 model gating: hidden on low-memory/slow connections; size warning on first use elsewhere.
-- Pre-load storage confirmation when free space is below 500 MB.
+- dima806 model gating: size warning on first use and pre-load storage confirmation when free space is below threshold.
 - "Verify this species online" link that opens a Google search in a new tab.
 - `verify:dist` and `verify:inference` scripts.
 
@@ -25,17 +24,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com).
 - `InferenceService` uses explicit callback handlers (`onStatus`, `onResult`, `onError`, `onStorageConfirm`) instead of an event emitter.
 - `src/services/history.ts` split into `history/index.ts` + dynamically imported `history/delete-entry.ts`.
 - `scripts/verify-labels.cjs` now reads from `src/data/`.
-- README corrected: removed false CI claims, clarified `e2e:ci`, and added Configuration section.
+- README corrected: removed false CI/format/audit claims, clarified dima806 gating, and dropped references to unimplemented `VITE_TELEMETRY_BUFFER_SIZE`.
 - CONTRIBUTING.md architecture section updated to match the current callback-based service and removed references to `TypedEmitter`/`ApplicationState`.
 - AGENTS.md trimmed: removed generic server-security checklist irrelevant to a client-side PWA and reduced the GitNexus section to a pointer to `CLAUDE.md`.
+- `.env.example` and `src/core/config.ts` trimmed to the actually implemented `VITE_FEATURE_TELEMETRY`; removed unimplemented feature flags and `VITE_TELEMETRY_BUFFER_SIZE`.
+- `InferenceService` label-mismatch error now uses `expectedLabelCount` consistently.
+- `PredictionReport.hasPoisonousInTop3` renamed to `hasRiskInTop3` to reflect that "Unknown" edibility is also treated as a risk.
+- `getEdibilityClass()` and `createEl()` moved from `app.ts` to new `src/ui/utils.ts` so `app.ts` does not export internal helpers.
+- CSS variable `--muted` removed in favor of `--text-muted`; verbose HTML/CSS comments trimmed.
 
 ### Removed
 - Legacy `pwa/index.html`, `pwa/sw.js`, `pwa/css/style.css`, and `pwa/js/*`. `pwa/model/` remains the export target.
+- Dead `src/data/index.ts` barrel (nothing imported `@/data`).
+- Redundant re-export of `META_STORE_NAME` from `src/services/history/db.ts`.
+- Unused `ImageBitmap`/`OffscreenCanvas` polyfills in `tests/image-utils.test.ts`.
+- Redundant `src/index.html` from `vitest.config.ts` coverage exclusions.
 
 ### Fixed
 - Vite "mixed dynamic+static import" warning for `src/services/history.ts`.
 - README inconsistency about the `pwa/` directory and test count.
 - In-app safety message could be missed by returning users; it is now shown before camera access with a persistent sticky footer.
+- Privacy policy no longer claims telemetry is buffered in `localStorage`; it logs or beacons depending on configuration.
+- Model card warning description now matches the code (toxic lookalike warning fires when top-1 confidence is below 85%).
+- `scripts/test-dist.py` references to the model-copy script now point to `copy-models-to-dist.cjs`.
+- `logger.debug` no longer silently drops output outside dev; it logs whenever the level allows.
+- `src/ui/safety.ts` indentation for `bindStorageConfirmFromService`.
+- `tests/results.test.ts` unknown-species test now actually exercises an `Unknown` edibility in the top 3.
 
 ## [2.1.0] — 2025-05-28
 
