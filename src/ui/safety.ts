@@ -63,7 +63,6 @@ export class SafetyUI {
     this.bindStorageConfirmFromService();
 
     if (this.hasAcknowledged()) {
-      this.applyCapabilityGate();
       return;
     }
 
@@ -82,7 +81,6 @@ export class SafetyUI {
         }
         this.els.safetyModal.removeEventListener("cancel", onCancel);
         this.els.safetyModal.close();
-        this.applyCapabilityGate();
         resolve();
       };
       const onCancel = (e: Event) => {
@@ -219,41 +217,7 @@ export class SafetyUI {
     });
   }
 
-  private bindModelCapabilityGate(): void {
-    const opt = this.els.modelSelect.querySelector<HTMLOptionElement>(
-      `option[value="${ModelKey.Dima806}"]`,
-    );
-    if (!opt) return;
-
-    const nav = navigator as unknown as {
-      deviceMemory?: number;
-      hardwareConcurrency?: number;
-      connection?: { effectiveType?: string };
-    };
-    const lowMem = typeof nav.deviceMemory === "number" && nav.deviceMemory < 4;
-    const lowCores =
-      typeof nav.hardwareConcurrency === "number" &&
-      nav.hardwareConcurrency < 4;
-    const conn = nav.connection;
-    const slowNet =
-      !!conn &&
-      typeof conn.effectiveType === "string" &&
-      ["slow-2g", "2g", "3g"].includes(conn.effectiveType);
-
-    if (lowMem || lowCores || slowNet) {
-      opt.hidden = true;
-      opt.disabled = true;
-      if (this.els.modelSelect.value === "dima806") {
-        this.els.modelSelect.value = ModelKey.BVRA;
-      }
-    }
-  }
-
-  private applyCapabilityGate(): void {
-    this.bindModelCapabilityGate();
-  }
-
-  private bindStorageConfirmFromService(): void {
+private bindStorageConfirmFromService(): void {
     this.opts.inferenceService.onStorageConfirm((payload) => {
       const freeMB = Math.round(payload.freeBytes / 1024 / 1024);
       const modelSize = modelRegistry[payload.modelKey].size;
