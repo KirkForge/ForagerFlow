@@ -1,0 +1,72 @@
+# --- Dependencies ---
+node_modules/
+.venv/
+venv/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Build artifacts ---
+dist/
+build/
+*.tsbuildinfo
+
+# --- Test artifacts ---
+test-results/
+playwright-report/
+coverage/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Caching ---
+CACHEDIR.TAG
+
+# --- LLM planning / AI session notes ---
+llm/
+state.md
+
+# --- Model snapshots from HuggingFace (generated) ---
+models--*/
+snapshots/
+
+# --- Local ONNX weights are included in production builds ---
+# pwa/model/*.onnx is intentionally NOT ignored here so the builder stage can
+# copy the exported weights into dist/model/. Exclude only partial/data sidecars
+# that should not be shipped as standalone files.
+pwa/model/*.onnx.data
+pwa/model/*.onnx.external-data
+
+# --- Secrets & credentials ---
+*.pem
+*.key
+*_token*
+credentials*
+secrets*
+.env
+.env.*
+token.json
+token_*.json
+*token*.json
+*.pickle
+client_secret*.json
+credentials.json
+
+# --- VCS ---
+.git/
+.gitignore
+
+# --- Assistant tooling ---
+.claude/
+.gitnexus/
+graphify-out/
+AGENTS.md
+CLAUDE.md

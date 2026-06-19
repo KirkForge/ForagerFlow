@@ -9,14 +9,6 @@ export enum ModelKey {
   Dima806 = "dima806",
 }
 
-export enum ApplicationState {
-  Loading = "loading",
-  CameraActive = "camera_active",
-  CameraError = "camera_error",
-  Processing = "processing",
-  Done = "done",
-}
-
 export enum InferenceWorkerMessageType {
   Status = "status",
   Result = "result",

@@ -10,9 +10,9 @@ The HuggingFace repos (`BVRA/resnext50_32x4d.in1k_ft_fungitastic-mini_224` and `
 
 **This means:**
 
-- The GitHub repo intentionally contains **no ONNX weights** — only the export scripts. (Earlier in-repo `.onnx` files were shape-only stubs that referenced missing `.onnx.data` sidecars and would crash at inference; they are no longer tracked.)
-- The CI on every push (`ci.yml`) builds the JS bundle only. No Python, no PyTorch, no 420 MB of weights — runs in ~30 s.
-- A separate **`release.yml` workflow** runs only on GitHub release (or manual dispatch) and does the heavy lifting: installs PyTorch, exports both ONNX models, smoke-tests their output shapes, then bundles the JS and uploads the result as a release asset.
+- The GitHub repo contains **no ONNX weights** — only the export scripts.
+- The CI on every push (`ci.yml`) runs typecheck, lint, format check, tests, build, dist/label verification, e2e, and audit. It does not export ONNX models or download PyTorch weights.
+- A separate **`release.yml` workflow** runs only on release (or manual dispatch): installs PyTorch, exports both ONNX models, smoke-tests their shapes, and attaches the full `dist/` bundle as a release asset.
 
 ## Setup (local dev)
 
@@ -39,6 +39,16 @@ The HuggingFace repos (`BVRA/resnext50_32x4d.in1k_ft_fungitastic-mini_224` and `
 
 4. Open `http://localhost:5173` in a browser.
 
+## Configuration
+
+Copy `.env.example` to `.env` to set optional runtime values such as `VITE_TELEMETRY_ENDPOINT`, `VITE_TELEMETRY_BUFFER_SIZE`, and feature flags.
+
+## Documentation
+
+- [Privacy policy](docs/privacy-policy.md)
+- [Accessibility statement](docs/accessibility-statement.md)
+- [Model card](docs/model-card.md)
+
 ## Cutting a release
 
 Tag a commit and push the tag, or use the GitHub UI:
@@ -52,61 +62,36 @@ Then on GitHub, draft a release for that tag and publish it. The `release.yml` w
 
 To do a dry-run build without publishing a release, use the Actions tab → "Release" → "Run workflow".
 
+## Repository name
+
+`KirkForge_Android-Forager` is the original repo path. The implementation is a Vite + TypeScript **PWA**; the deployable artifact is the static `dist/` bundle. It can be wrapped as an Android **Trusted Web Activity (TWA)** or installed directly from the browser. The app brand is **ForagerFlow**.
+
+## Deploy with Docker
+
+After exporting the ONNX weights into `pwa/model/`, build and run the production container locally:
+
+```bash
+docker build -t foragerflow:prod .
+docker run -d -p 8080:80 foragerflow:prod
+```
+
+Then open `http://localhost:8080`. The image uses pinned `node:22-alpine` and `nginx:alpine` digests, serves with COOP/COEP/CSP/HSTS headers, and runs the nginx worker as an unprivileged user.
+
 ## Safety
 
-**This app runs client-side inference with no remote API.** All predictions are local.
+**All inference is client-side.** No images or predictions leave the device.
 
-The app will:
+The app identifies species; it **does not certify edibility**. It will not tell you a mushroom is safe to eat. Always confirm with a certified mycologist or poison control center before consuming anything foraged.
 
-- Show a full-screen first-run acknowledgement that must be checked before
-  the camera opens. You are agreeing that you understand the app is not a
-  substitute for expert identification.
-- Display a sticky footer at the bottom of the screen at all times:
-  *"Never eat a wild mushroom based on this app."*
-- Surface a "Verify this species online" link under each top-1 prediction
-  that opens a Google search for the species name in a new tab. Use it.
-- Show per-prediction warnings on low confidence, poisonous lookalikes in
-  the top 3, poisonous top-1, and unknown edibility.
+Safety UI:
 
-The app will **not**:
-
-- Tell you a mushroom is safe to eat. It identifies species; it does not
-  certify edibility. Even a 99.9% match on a deadly species is a 0.1%
-  chance of misidentification.
-- Phone home, log your images, or contact any safety service.
-
-**Always verify identifications with a certified mycologist or your local poison control center before consuming any wild mushroom.**
-
-### Phone-first safety behaviour
-
-Because this app is designed to be used in the field on a phone:
-
-- The first-run safety modal is `showModal()` with a `<dialog>` top layer.
-  It cannot be dismissed by tapping outside it. The "Continue" button
-  stays disabled until the acknowledgement checkbox is checked.
-- The sticky footer is always visible at the bottom of the viewport, in
-  the same 32–36 px band the OS uses for navigation chrome. It cannot
-  be scrolled past.
-- The capture button has a busy state (`data-busy="true"`) with a
-  spinner overlay and is disabled while inference is running, so a
-  wet thumb cannot double-fire and submit two inferences.
-- On app start, the most recent identification is shown as a callout
-  above the camera viewfinder, so a returning user can verify a species
-  they identified earlier without scrolling.
-- The "Clear history" button opens a confirm dialog before destroying
-  IndexedDB data. A one-tap data loss is not possible.
-- The 330 MB dima806 model is hidden from the dropdown on devices that
-  report `navigator.deviceMemory < 4`, `hardwareConcurrency < 4`, or
-  `connection.effectiveType` in `{slow-2g, 2g, 3g}`. On capable
-  devices, the first time the user picks it, a confirm modal explains
-  the size and the offline cache implication.
-- Before any large model download, the app calls
-  `navigator.storage.estimate()` and shows a confirm modal if there is
-  less than 500 MB of free storage. Users on 32 GB phones get a
-  chance to cancel before the OS starts evicting their camera roll.
-- Camera-permission denial no longer relies on a `<label for=...>`
-  that needs the input to be visible next to it. The fallback is a
-  full-width "Choose a photo" button that taps a hidden file input.
+- Full-screen first-run acknowledgement before camera access.
+- Sticky footer: *"Never eat a wild mushroom based on this app."*
+- Capture button busy state prevents double submits.
+- Clear-history requires confirmation.
+- Warnings for low confidence, poisonous top-1, and poisonous lookalikes in the top 3.
+- dima806 model hidden on low-memory or slow-connection devices and gated by a size warning on first use.
+- Storage-estimate confirmation before large model downloads when free space is below 500 MB.
 
 ## Models
 
@@ -118,24 +103,19 @@ Because this app is designed to be used in the field on a phone:
 ```bash
 pnpm typecheck              # tsc --noEmit
 pnpm lint                   # eslint
-pnpm test                   # vitest run (see package.json "test")
+pnpm format                 # prettier --write
+pnpm format:check           # prettier --check
+pnpm test                   # vitest run (interactive, see package.json "test")
+pnpm test:ci                # vitest run (CI mode)
 pnpm build                  # vite build → dist/
 node scripts/verify-labels.cjs   # label/logit alignment + knowledge coverage
 pnpm verify:dist            # python3 scripts/test-dist.py — built-asset smoke checks
+pnpm e2e                    # playwright test — browser smoke tests
+pnpm e2e:ci                 # CI=true playwright test --project=chromium --project=firefox
 pnpm verify:inference       # python3 scripts/test-inference.py — real-ONNX sanity (requires export)
-pnpm verify                 # the whole battery: typecheck + lint + test + build + verify:dist + verify:labels
+pnpm verify                 # the whole battery: typecheck + lint + test:ci + build + verify:dist + verify:labels
 ```
 
-`verify:dist` asserts that `sw.js` exists, `ort.min.js` is present at
-`/js/ort.min.js`, the worker uses `importScripts` and the `wasm`
-execution provider, the CSP includes `wasm-unsafe-eval`, and the
-built HTML points at the worker correctly. Catches the regressions
-that have hit the bundle in past builds (ort free var, sw.ts missing
-from vite inputs, CSP missing `wasm-unsafe-eval`).
+`verify:dist` checks the built bundle for required assets, `importScripts` worker loading, the `wasm` execution provider, and `wasm-unsafe-eval` in the CSP.
 
-`verify-labels` asserts that the BVRA labels in
-`src/data/labels-bvra.json` match the canonical class list shipped
-with the ONNX model (`pwa/model/fungitastic-classes.json`) exactly,
-order-sensitive, and that every unique label has an entry in
-`src/data/knowledge-bvra.json`. The dima806 side asserts the label
-array has 100 unique entries and that each has a knowledge entry.
+`verify:labels` checks that BVRA labels match the canonical class list order and that every label has a knowledge entry. dima806 labels are checked for 100 unique entries with knowledge coverage.

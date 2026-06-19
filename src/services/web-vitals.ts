@@ -17,6 +17,11 @@ interface MetricEntry {
 
 let webVitalsCollected = false;
 
+/** Test-only hook to reset the collection guard. */
+export function __resetForTests(): void {
+  webVitalsCollected = false;
+}
+
 function reportMetric(metric: MetricEntry): void {
   recordTelemetry("web-vital", {
     name: metric.name,
@@ -46,7 +51,12 @@ export function initWebVitals(): void {
           reportMetric({
             name: "LCP",
             value: lastEntry.startTime,
-            rating: lastEntry.startTime < 2500 ? "good" : lastEntry.startTime < 4000 ? "needs-improvement" : "poor",
+            rating:
+              lastEntry.startTime < 2500
+                ? "good"
+                : lastEntry.startTime < 4000
+                  ? "needs-improvement"
+                  : "poor",
             delta: lastEntry.startTime,
             navigationType: "navigate",
           });
@@ -60,14 +70,22 @@ export function initWebVitals(): void {
       let clsValue = 0;
       const clsObserver = new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) {
-          if (!(entry as PerformanceEntry & { hadRecentInput?: boolean }).hadRecentInput) {
+          if (
+            !(entry as PerformanceEntry & { hadRecentInput?: boolean })
+              .hadRecentInput
+          ) {
             clsValue += (entry as PerformanceEntry & { value: number }).value;
           }
         }
         reportMetric({
           name: "CLS",
           value: clsValue,
-          rating: clsValue < 0.1 ? "good" : clsValue < 0.25 ? "needs-improvement" : "poor",
+          rating:
+            clsValue < 0.1
+              ? "good"
+              : clsValue < 0.25
+                ? "needs-improvement"
+                : "poor",
           delta: clsValue,
           navigationType: "navigate",
         });

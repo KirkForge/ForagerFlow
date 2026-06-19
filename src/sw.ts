@@ -2,18 +2,20 @@
 
 declare const self: ServiceWorkerGlobalScope;
 
-const CACHE_SHELL = "foragerflow-shell-v6";
-const CACHE_MODELS = "foragerflow-models-v6";
+// Injected by Vite at build time.
+declare const __APP_VERSION__: string;
 
-// The shell is small: index.html, manifest, and the wasm. The main JS/CSS
-// are emitted with content hashes by Vite, so we don't enumerate them —
-// we cache them on first fetch (cache-on-demand for the shell too).
+const CACHE_SHELL = `foragerflow-shell-${__APP_VERSION__}`;
+const CACHE_MODELS = `foragerflow-models-${__APP_VERSION__}`;
+
 const SHELL_ASSETS: string[] = [
   "/",
   "/index.html",
   "/manifest.webmanifest",
   "/js/ort.min.js",
   "/js/ort-wasm-simd-threaded.wasm",
+  "/js/ort-wasm-simd-threaded.jsep.mjs",
+  "/js/ort-wasm-simd-threaded.jsep.wasm",
 ];
 
 const MODEL_PATH_PREFIX = "/model/";
@@ -48,20 +50,44 @@ self.addEventListener("fetch", (e: FetchEvent) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
 
+  // Navigation requests: network-first so a new deployment's index.html
+  // is served immediately, with cached fallback for offline.
+  if (req.mode === "navigate" || url.pathname === "/index.html") {
+    e.respondWith(handleNavigation(req));
+    return;
+  }
+
   // Model files (large, .onnx + .onnx.data sidecars) — cache on first load.
   if (url.pathname.startsWith(MODEL_PATH_PREFIX)) {
     e.respondWith(handleModelRequest(req));
     return;
   }
 
-  // WASM artifacts (ort-wasm-simd-threaded.wasm etc.) — cache on first load.
+  // WASM artifacts (ort-wasm-*.wasm etc.) — cache on first load.
   if (WASM_PATH_PATTERNS.some((p) => url.pathname.includes(p))) {
     e.respondWith(handleModelRequest(req));
     return;
   }
 
-  e.respondWith(handleShellRequest(req));
+  // Hashed assets and other same-origin static files:
+  // stale-while-revalidate so updates propagate without blocking first paint.
+  e.respondWith(handleStaticRequest(req));
 });
+
+async function handleNavigation(req: Request): Promise<Response> {
+  const cache = await caches.open(CACHE_SHELL);
+  try {
+    const networkRes = await fetch(req);
+    if (networkRes.ok) {
+      await cache.put("/index.html", networkRes.clone());
+    }
+    return networkRes;
+  } catch {
+    const cached = await cache.match("/index.html");
+    if (cached) return cached;
+    return new Response("Offline — no cached app shell", { status: 503 });
+  }
+}
 
 async function handleModelRequest(req: Request): Promise<Response> {
   const cache = await caches.open(CACHE_MODELS);
@@ -75,37 +101,26 @@ async function handleModelRequest(req: Request): Promise<Response> {
     }
     return networkRes;
   } catch {
-    return new Response(
-      "Model unavailable offline. Connect to download.",
-      {
-        status: 503,
-        statusText: "Service Unavailable",
-        headers: { "Content-Type": "text/plain" },
-      },
-    );
+    return new Response("Model unavailable offline. Connect to download.", {
+      status: 503,
+      statusText: "Service Unavailable",
+      headers: { "Content-Type": "text/plain" },
+    });
   }
 }
 
-async function handleShellRequest(req: Request): Promise<Response> {
+async function handleStaticRequest(req: Request): Promise<Response> {
   const cache = await caches.open(CACHE_SHELL);
   const cached = await cache.match(req);
-  if (cached) return cached;
 
-  try {
-    const networkRes = await fetch(req);
-    // Cache successful same-origin responses on demand so hashed assets
-    // (/assets/main-*.js etc.) become available offline after first load.
+  const networkFetch = fetch(req).then(async (networkRes) => {
     if (networkRes.ok && new URL(req.url).origin === self.location.origin) {
       await cache.put(req, networkRes.clone());
     }
     return networkRes;
-  } catch {
-    if (req.mode === "navigate") {
-      const index = await cache.match("/index.html");
-      if (index) return index;
-    }
-    return new Response("Offline", { status: 503 });
-  }
+  });
+
+  return cached ?? (await networkFetch);
 }
 
 export {};

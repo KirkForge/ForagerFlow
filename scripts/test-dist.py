@@ -75,15 +75,16 @@ def main():
             sys.exit(1)
     print(f"  all required dist files present  OK ({len(required)} files)")
 
-    # 4b. ONNX model files. These aren't produced by pnpm build — the
-    #     release workflow copies them in separately, and local devs
-    #     should run scripts/copy-models.sh (TODO). Warn if missing.
+    # 4b. ONNX model files. These aren't produced by pnpm build itself — the
+    #     postbuild script and release workflow copy them in, and local devs
+    #     should run scripts/copy-models-to-dist.sh. Warn if missing.
     models = list((DIST / "model").glob("*.onnx")) if (DIST / "model").exists() else []
     if len(models) != 2:
         print(
             f"  WARN: dist/model/ has {len(models)} .onnx file(s) — expected 2"
             f" (fungitastic.onnx, dima806.onnx). The release workflow copies"
-            f" them in; locally you must run the export scripts and cp to dist/model/."
+            f" them in; locally run the export scripts and then"
+            f" `bash scripts/copy-models-to-dist.sh`."
         )
     else:
         print(f"  dist/model/ has {len(models)} ONNX files  OK")
@@ -128,6 +129,18 @@ def main():
         print("FAIL: CSP missing 'wasm-unsafe-eval' — ort wasm will be blocked")
         sys.exit(1)
     print(f"  CSP includes wasm-unsafe-eval  OK")
+
+    # 7. Docker/nginx CSP must not relax the dist CSP.
+    dockerfile = Path("Dockerfile")
+    if dockerfile.exists():
+        docker = dockerfile.read_text()
+        if "default-src 'self'" not in docker:
+            print("FAIL: Dockerfile CSP missing default-src 'self'")
+            sys.exit(1)
+        if "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'" not in docker:
+            print("FAIL: Dockerfile CSP script-src too loose or missing wasm-unsafe-eval")
+            sys.exit(1)
+        print(f"  Dockerfile CSP baseline checked  OK")
 
     print()
     print("All built-asset smoke checks passed.")

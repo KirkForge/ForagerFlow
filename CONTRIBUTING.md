@@ -69,19 +69,16 @@ dist/           — Build output. The deployable.
    listens for to gate the download on a confirm modal
 
 ### State Management
-- `ApplicationState` enum tracks app lifecycle: Loading → CameraActive → Processing → Done
-- `TypedEmitter` provides type-safe event binding
-- `config` module provides runtime feature flags and settings
-- `SafetyUI` (in `src/ui/safety.ts`) owns every `<dialog>` and the sticky
-  footer. `AppController` constructs it once on init and blocks on
-  `safetyUI.init()` to ensure the first-run modal is acknowledged
-  before the camera opens.
+- `ApplicationState` enum: Loading → CameraActive → Processing → Done
+- `TypedEmitter` for type-safe events
+- `config` module for feature flags
+- `SafetyUI` owns all dialogs and the sticky footer; `AppController` blocks on it before opening the camera
 
 ### Error Handling
-- All custom errors extend `AppError` with `code` and `recoverable` flags
+- Custom errors extend `AppError` with `code` and `recoverable` flags
 - `LabelMismatchError` for model/logit count mismatches
 - Worker errors trigger automatic retry with backoff
-- `sanitizeText()` is used for all user-visible strings in innerHTML
+- `sanitizeText()` for user-visible strings
 
 ### Persistence
 - Identification history stored in IndexedDB via
@@ -93,9 +90,7 @@ dist/           — Build output. The deployable.
 ## Testing
 
 - Run: `pnpm test`
-- Coverage: `pnpm test:coverage` is broken on vitest 4.x — see
-  `foragerflow-dist-build` memory note. Stick to `pnpm test` and
-  trust the count in the test runner output.
+- Coverage: `pnpm test:coverage` runs but currently exits non-zero because global thresholds (70%) are not met. Use it to inspect uncovered code; rely on `pnpm test` for the green gate.
 - Test files live in `tests/` and use `@/` path aliases matching `src/`
 - Mock browser APIs (IndexedDB, camera, canvas) in unit tests
 - Never skip tests. If a test is flaky, mark it with `.skip()` and file an issue.
@@ -108,6 +103,7 @@ dist/           — Build output. The deployable.
 - [ ] `pnpm build` succeeds
 - [ ] `pnpm verify:labels` passes (label/logit alignment)
 - [ ] `pnpm verify:dist` passes (built-asset smoke test)
+- [ ] Secret scan passes (`trufflehog filesystem . --only-verified --no-update --exclude-paths=.trufflehog-exclude.txt --fail`)
 - [ ] No secrets or large files committed
 - [ ] Commit messages follow `type(scope): message` format
 
