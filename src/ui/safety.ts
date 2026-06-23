@@ -138,6 +138,7 @@ export class SafetyUI {
     const accepted = await this.showConfirmModal(this.els.modelConfirm);
     if (accepted) {
       this.markDima806Confirmed();
+      this.opts.inferenceService.preloadModel(ModelKey.Dima806);
       this.els.modelSelect.value = ModelKey.Dima806;
       this.els.modelSelect.dispatchEvent(new Event("change"));
     }

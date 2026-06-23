@@ -12,6 +12,9 @@ export const enMessages: Messages = {
   "model.ariaLabel": "Select inference model",
   "model.bvra": "Specialist (215 classes, ~90 MB)",
   "model.dima806": "General (100 classes, ~330 MB)",
+  "model.progressLabel": "{{model}} — {{phase}}",
+  "model.progressDownload": "download",
+  "model.progressCompile": "compile",
 
   // Camera
   "camera.ariaLabel": "Live camera preview",

@@ -88,6 +88,7 @@ describe("createWorker", () => {
   it("loads a model and reports Ready when switched", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
+      headers: { get: vi.fn().mockReturnValue(null) },
       arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
     } as unknown as Response);
 
@@ -105,6 +106,48 @@ describe("createWorker", () => {
       expect(msg?.["text"]).toBe("Ready");
       expect(msg?.["modelKey"]).toBe(ModelKey.BVRA);
     });
+  });
+
+  it("reports download progress when content-length and body are available", async () => {
+    const total = 100;
+    const chunk1 = new Uint8Array(25).fill(1);
+    const chunk2 = new Uint8Array(25).fill(2);
+    const chunk3 = new Uint8Array(50).fill(3);
+    const reader = {
+      read: vi
+        .fn()
+        .mockResolvedValueOnce({ done: false, value: chunk1 })
+        .mockResolvedValueOnce({ done: false, value: chunk2 })
+        .mockResolvedValueOnce({ done: false, value: chunk3 })
+        .mockResolvedValueOnce({ done: true }),
+      releaseLock: vi.fn(),
+    };
+    fetchMock.mockResolvedValue({
+      ok: true,
+      headers: { get: vi.fn().mockReturnValue(String(total)) },
+      body: { getReader: () => reader },
+    } as unknown as Response);
+
+    ctx.dispatch({
+      type: "switch",
+      modelPath: "/model/streamed.onnx",
+      modelKey: ModelKey.BVRA,
+      mean: [0, 0, 0],
+      std: [1, 1, 1],
+    });
+
+    await vi.waitFor(() => {
+      const progressMessages = (ctx.postMessage.mock.calls as [unknown][])
+        .map(([m]) => m as Record<string, unknown>)
+        .filter((m) => m["type"] === InferenceWorkerMessageType.Progress);
+      expect(progressMessages.length).toBeGreaterThanOrEqual(2);
+      expect(progressMessages.some((m) => m["phase"] === "download")).toBe(true);
+      expect(progressMessages.some((m) => m["phase"] === "compile")).toBe(true);
+    });
+
+    const lastMsg = lastMessage();
+    expect(lastMsg?.["type"]).toBe(InferenceWorkerMessageType.Status);
+    expect(lastMsg?.["text"]).toBe("Ready");
   });
 
   it("reports an error when the model fetch fails", async () => {
@@ -131,6 +174,7 @@ describe("createWorker", () => {
   it("disposes the previous session when switching models", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
+      headers: { get: vi.fn().mockReturnValue(null) },
       arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
     } as unknown as Response);
 
@@ -180,6 +224,7 @@ describe("createWorker", () => {
   it("runs inference and posts logits for the loaded model", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
+      headers: { get: vi.fn().mockReturnValue(null) },
       arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
     } as unknown as Response);
 
@@ -229,6 +274,7 @@ describe("createWorker", () => {
   it("posts an error when inference throws", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
+      headers: { get: vi.fn().mockReturnValue(null) },
       arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
     } as unknown as Response);
 

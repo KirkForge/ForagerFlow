@@ -20,6 +20,12 @@ interface InferenceWorker extends Worker {
 
 export type { WorkerMessage, WorkerCommand };
 
+export interface LoadProgress {
+  modelKey: ModelKey;
+  phase: "download" | "compile";
+  percent: number;
+}
+
 export type StatusHandler = (text: string) => void;
 export type ResultHandler = (result: {
   logits: Float32Array;
@@ -30,6 +36,7 @@ export type StorageConfirmHandler = (payload: {
   modelKey: ModelKey;
   freeBytes: number;
 }) => void;
+export type ProgressHandler = (progress: LoadProgress) => void;
 
 export class InferenceService {
   private worker: InferenceWorker | null = null;
@@ -51,6 +58,9 @@ export class InferenceService {
   private onResultHandler: ResultHandler | null = null;
   private onErrorHandler: ErrorHandler | null = null;
   private onStorageConfirmHandler: StorageConfirmHandler | null = null;
+  private onProgressHandler: ProgressHandler | null = null;
+  private activeProgress: LoadProgress | null = null;
+  private idleTimeout: ReturnType<typeof setTimeout> | null = null;
 
   onStatus(handler: StatusHandler): void {
     this.onStatusHandler = handler;
@@ -66,6 +76,10 @@ export class InferenceService {
 
   onStorageConfirm(handler: StorageConfirmHandler): void {
     this.onStorageConfirmHandler = handler;
+  }
+
+  onProgress(handler: ProgressHandler): void {
+    this.onProgressHandler = handler;
   }
 
   initialize(): void {
@@ -90,9 +104,21 @@ export class InferenceService {
             ) {
               this.ready = true;
               this.retryCount = 0;
+              this.activeProgress = null;
+              this.resetIdleTimer();
               this.flushInferQueue();
             }
             this.onStatusHandler?.(e.data.text);
+            break;
+          }
+          case InferenceWorkerMessageType.Progress: {
+            const progressWithKey = {
+              modelKey: this.currentModelKey,
+              phase: e.data.phase,
+              percent: e.data.percent,
+            };
+            this.activeProgress = progressWithKey;
+            this.onProgressHandler?.(progressWithKey);
             break;
           }
           case InferenceWorkerMessageType.Result: {
@@ -194,6 +220,45 @@ export class InferenceService {
     };
     this.worker?.postMessage(cmd);
     this.onStatusHandler?.(`Loading ${model.name}...`);
+    this.activeProgress = {
+      modelKey: key,
+      phase: "download",
+      percent: 0,
+    };
+  }
+
+  getActiveProgress(): LoadProgress | null {
+    return this.activeProgress;
+  }
+
+  resetIdleTimer(): void {
+    if (this.idleTimeout) {
+      clearTimeout(this.idleTimeout);
+      this.idleTimeout = null;
+    }
+    const idleMs = config.modelIdleUnloadMs;
+    if (idleMs <= 0 || this.terminated) return;
+    this.idleTimeout = setTimeout(() => {
+      this.idleTimeout = null;
+      this.unloadWorker();
+    }, idleMs);
+  }
+
+  private unloadWorker(): void {
+    if (this.terminated || this.inferQueue.length > 0) return;
+    logger.debug("Idle unload: releasing model worker");
+    this.worker?.terminate();
+    this.worker = null;
+    this.ready = false;
+    this.activeProgress = null;
+    this.onStatusHandler?.("Model unloaded after idle timeout");
+  }
+
+  preloadModel(key: ModelKey): void {
+    if (!this.worker) {
+      this.initialize();
+    }
+    this.switchModel(key);
   }
 
   resumeStorageConfirm(): void {
@@ -278,6 +343,7 @@ export class InferenceService {
       this.onStatusHandler?.("Model still loading — request queued");
       return;
     }
+    this.resetIdleTimer();
     const cmd: WorkerCommand = {
       type: WorkerCommandType.Infer,
       modelKey: this.currentModelKey,
@@ -307,16 +373,22 @@ export class InferenceService {
       clearTimeout(this.retryTimeout);
       this.retryTimeout = null;
     }
+    if (this.idleTimeout) {
+      clearTimeout(this.idleTimeout);
+      this.idleTimeout = null;
+    }
     this.awaitingStorageConfirm = false;
     this.pendingStorageModelKey = null;
     this.inferQueue = [];
     this.worker?.terminate();
     this.worker = null;
     this.ready = false;
+    this.activeProgress = null;
     this.onStatusHandler = null;
     this.onResultHandler = null;
     this.onErrorHandler = null;
     this.onStorageConfirmHandler = null;
+    this.onProgressHandler = null;
   }
 }
 

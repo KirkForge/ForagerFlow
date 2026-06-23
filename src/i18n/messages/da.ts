@@ -12,6 +12,9 @@ export const daMessages: Messages = {
   "model.ariaLabel": "Vælg identifikationsmodel",
   "model.bvra": "Specialist (215 arter, ~90 MB)",
   "model.dima806": "Generel (100 arter, ~330 MB)",
+  "model.progressLabel": "{{model}} — {{phase}}",
+  "model.progressDownload": "download",
+  "model.progressCompile": "kompilering",
 
   // Camera
   "camera.ariaLabel": "Live kameravisning",

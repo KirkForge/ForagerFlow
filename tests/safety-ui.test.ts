@@ -5,6 +5,7 @@ import type { InferenceService } from "@/inference/service";
 
 class MockInferenceService {
   resumeStorageConfirm = vi.fn();
+  preloadModel = vi.fn();
   private storageHandler:
     | ((payload: { modelKey: ModelKey; freeBytes: number }) => void)
     | null = null;

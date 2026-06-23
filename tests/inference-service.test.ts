@@ -21,6 +21,7 @@ describe("InferenceService", () => {
   let originalNavigatorStorage: StorageManager | undefined;
 
   beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     originalNavigatorStorage = globalThis.navigator.storage;
     workerEnv = installMockWorker((instance) => {
       worker = instance;
@@ -37,6 +38,7 @@ describe("InferenceService", () => {
       writable: true,
     });
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   function installStorageEstimate(
@@ -91,6 +93,51 @@ describe("InferenceService", () => {
       }),
       [pixels],
     );
+  });
+
+  it("emits progress messages while loading", () => {
+    const progressEvents: unknown[] = [];
+    service.onProgress((p) => progressEvents.push(p));
+
+    service.initialize();
+    service.switchModel(ModelKey.BVRA, { skipStorageCheck: true });
+
+    sendWorkerMessage(worker, {
+      type: InferenceWorkerMessageType.Progress,
+      phase: "download",
+      percent: 50,
+    });
+
+    expect(progressEvents).toHaveLength(1);
+    expect(progressEvents[0]).toMatchObject({
+      modelKey: ModelKey.BVRA,
+      phase: "download",
+      percent: 50,
+    });
+    expect(service.getActiveProgress()).toMatchObject({
+      modelKey: ModelKey.BVRA,
+      percent: 50,
+    });
+  });
+
+  it("clears active progress when model is ready", () => {
+    service.initialize();
+    service.switchModel(ModelKey.BVRA, { skipStorageCheck: true });
+
+    sendWorkerMessage(worker, {
+      type: InferenceWorkerMessageType.Progress,
+      phase: "compile",
+      percent: 90,
+    });
+    expect(service.getActiveProgress()).not.toBeNull();
+
+    sendWorkerMessage(worker, {
+      type: InferenceWorkerMessageType.Status,
+      text: "Ready",
+      modelKey: ModelKey.BVRA,
+    });
+
+    expect(service.getActiveProgress()).toBeNull();
   });
 
   it("emits result with valid logits", () => {
@@ -371,5 +418,96 @@ describe("InferenceService", () => {
 
     (config as { maxInferenceRetries: number }).maxInferenceRetries =
       originalRetries;
+  });
+
+  it("unloads the worker after idle timeout", () => {
+    const originalIdleMs = config.modelIdleUnloadMs;
+    (config as { modelIdleUnloadMs: number }).modelIdleUnloadMs = 100;
+
+    service.initialize();
+    service.switchModel(ModelKey.BVRA, { skipStorageCheck: true });
+    sendWorkerMessage(worker, {
+      type: InferenceWorkerMessageType.Status,
+      text: "Ready",
+      modelKey: ModelKey.BVRA,
+    });
+    expect(service.isReady()).toBe(true);
+
+    vi.advanceTimersByTime(100);
+    expect(worker.terminate).toHaveBeenCalled();
+    expect(service.isReady()).toBe(false);
+
+    (config as { modelIdleUnloadMs: number }).modelIdleUnloadMs = originalIdleMs;
+  });
+
+  it("resets the idle timer on inference", () => {
+    const originalIdleMs = config.modelIdleUnloadMs;
+    (config as { modelIdleUnloadMs: number }).modelIdleUnloadMs = 100;
+
+    service.initialize();
+    service.switchModel(ModelKey.BVRA, { skipStorageCheck: true });
+    sendWorkerMessage(worker, {
+      type: InferenceWorkerMessageType.Status,
+      text: "Ready",
+      modelKey: ModelKey.BVRA,
+    });
+
+    vi.advanceTimersByTime(80);
+    service.infer(new ArrayBuffer(224 * 224 * 4), 224, 224);
+    vi.advanceTimersByTime(80);
+
+    expect(worker.terminate).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(20);
+    expect(worker.terminate).toHaveBeenCalled();
+
+    (config as { modelIdleUnloadMs: number }).modelIdleUnloadMs = originalIdleMs;
+  });
+
+  it("does not unload the worker when idle timeout is disabled", () => {
+    const originalIdleMs = config.modelIdleUnloadMs;
+    (config as { modelIdleUnloadMs: number }).modelIdleUnloadMs = 0;
+
+    service.initialize();
+    service.switchModel(ModelKey.BVRA, { skipStorageCheck: true });
+    sendWorkerMessage(worker, {
+      type: InferenceWorkerMessageType.Status,
+      text: "Ready",
+      modelKey: ModelKey.BVRA,
+    });
+
+    vi.advanceTimersByTime(1000);
+    expect(worker.terminate).not.toHaveBeenCalled();
+
+    (config as { modelIdleUnloadMs: number }).modelIdleUnloadMs = originalIdleMs;
+  });
+
+  it("preloads a model by spawning the worker and switching", () => {
+    const secondService = new InferenceService();
+    const preloadedStatuses: string[] = [];
+    secondService.onStatus((s) => preloadedStatuses.push(s));
+
+    secondService.preloadModel(ModelKey.BVRA);
+    const newWorker = workerEnv.instances[workerEnv.instances.length - 1];
+
+    expect(newWorker).toBeDefined();
+    if (!newWorker) {
+      throw new Error("Expected a worker instance to be created");
+    }
+    expect(newWorker.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: WorkerCommandType.Switch,
+        modelKey: ModelKey.BVRA,
+      }),
+    );
+
+    sendWorkerMessage(newWorker, {
+      type: InferenceWorkerMessageType.Status,
+      text: "Ready",
+      modelKey: ModelKey.BVRA,
+    });
+
+    expect(secondService.isReady()).toBe(true);
+    expect(preloadedStatuses).toContain("Ready");
+    secondService.terminate();
   });
 });

@@ -24,6 +24,7 @@ export const config = {
       envNumber("VITE_DIMA806_MIN_FREE_MB", 500) * 1024 * 1024,
   },
   storageEstimateTimeoutMs: envNumber("VITE_STORAGE_ESTIMATE_TIMEOUT_MS", 1500),
+  modelIdleUnloadMs: envNumber("VITE_MODEL_IDLE_UNLOAD_MS", 0),
   telemetryEndpoint: envString("VITE_TELEMETRY_ENDPOINT", ""),
   features: {
     telemetry:

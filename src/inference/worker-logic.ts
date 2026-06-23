@@ -75,6 +75,17 @@ export function createWorker(
     return createTensor("float32", tensorData, [1, 3, height, width]);
   }
 
+  function postProgress(
+    phase: "download" | "compile",
+    percent: number,
+  ): void {
+    self.postMessage({
+      type: InferenceWorkerMessageType.Progress,
+      phase,
+      percent: Math.max(0, Math.min(100, Math.round(percent))),
+    });
+  }
+
   async function loadModel(
     modelPath: string,
     modelKey: string,
@@ -90,11 +101,38 @@ export function createWorker(
       if (!resp.ok) {
         throw new Error(`Failed to fetch model: HTTP ${String(resp.status)}`);
       }
-      const buf = new Uint8Array(await resp.arrayBuffer());
+
+      let buf: Uint8Array;
+      const contentLength = Number(resp.headers.get("content-length") ?? NaN);
+      const reader = resp.body?.getReader();
+      if (reader && Number.isFinite(contentLength) && contentLength > 0) {
+        let received = 0;
+        const chunks: Uint8Array[] = [];
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          received += value.length;
+          postProgress("download", (received / contentLength) * 100);
+        }
+        buf = new Uint8Array(received);
+        let offset = 0;
+        for (const chunk of chunks) {
+          buf.set(chunk, offset);
+          offset += chunk.length;
+        }
+      } else {
+        postProgress("download", 0);
+        buf = new Uint8Array(await resp.arrayBuffer());
+        postProgress("download", 100);
+      }
+
+      postProgress("compile", 0);
       const newSession = await ort.InferenceSession.create(buf, {
         executionProviders: ["wasm"],
         graphOptimizationLevel: "all",
       });
+      postProgress("compile", 100);
 
       // Dispose the previous session so its native memory is released promptly
       // instead of waiting for GC.

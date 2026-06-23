@@ -15,9 +15,17 @@ interface MockInferenceService {
     handler: (result: { logits: Float32Array; modelKey: ModelKey }) => void,
   ) => void;
   onError: (handler: (error: Error) => void) => void;
+  onProgress: (
+    handler: (progress: { modelKey: ModelKey; phase: string; percent: number }) => void,
+  ) => void;
   emitStatus: (text: string) => void;
   emitResult: (result: { logits: Float32Array; modelKey: ModelKey }) => void;
   emitError: (error: Error) => void;
+  emitProgress: (progress: {
+    modelKey: ModelKey;
+    phase: string;
+    percent: number;
+  }) => void;
   initialize: ReturnType<typeof vi.fn>;
   switchModel: ReturnType<typeof vi.fn>;
   infer: ReturnType<typeof vi.fn>;
@@ -31,6 +39,9 @@ const mockInferenceService = vi.hoisted<MockInferenceService>(() => {
     | ((result: { logits: Float32Array; modelKey: ModelKey }) => void)
     | null = null;
   let errorHandler: ((error: Error) => void) | null = null;
+  let progressHandler:
+    | ((progress: { modelKey: ModelKey; phase: string; percent: number }) => void)
+    | null = null;
   return {
     onStatus: (handler) => {
       statusHandler = handler;
@@ -41,10 +52,18 @@ const mockInferenceService = vi.hoisted<MockInferenceService>(() => {
     onError: (handler) => {
       errorHandler = handler;
     },
+    onProgress: (handler) => {
+      progressHandler = handler;
+    },
     emitStatus: (text: string) => statusHandler?.(text),
     emitResult: (result: { logits: Float32Array; modelKey: ModelKey }) =>
       resultHandler?.(result),
     emitError: (error: Error) => errorHandler?.(error),
+    emitProgress: (progress: {
+      modelKey: ModelKey;
+      phase: string;
+      percent: number;
+    }) => progressHandler?.(progress),
     initialize: vi.fn(),
     switchModel: vi.fn(),
     infer: vi.fn(),
@@ -181,6 +200,17 @@ function renderAppHTML(): void {
       <button id="camera-retry">Retry</button>
       <input id="location-toggle" type="checkbox" />
       <span id="location-status"></span>
+      <div id="results">
+        <div id="model-progress" role="status" hidden>
+          <div class="model-progress-label">
+            <span id="model-progress-text"></span>
+            <span id="model-progress-pct"></span>
+          </div>
+          <div class="model-progress-track">
+            <div id="model-progress-bar" class="model-progress-bar"></div>
+          </div>
+        </div>
+      </div>
     </div>
     <dialog id="history-detail-modal">
       <div id="history-detail-content">
@@ -235,6 +265,27 @@ describe("AppController", () => {
     });
 
     expect(mockRenderer.render).toHaveBeenCalled();
+  });
+
+  it("updates the model progress UI", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    mockInferenceService.emitProgress({
+      modelKey: ModelKey.BVRA,
+      phase: "download",
+      percent: 42,
+    });
+
+    const progressEl = document.querySelector("#model-progress") as HTMLElement;
+    const progressText = document.querySelector("#model-progress-text") as HTMLElement;
+    const progressPct = document.querySelector("#model-progress-pct") as HTMLElement;
+    const progressBar = document.querySelector("#model-progress-bar") as HTMLElement;
+
+    expect(progressEl.hidden).toBe(false);
+    expect(progressText.textContent).toContain("Specialist");
+    expect(progressPct.textContent).toBe("42%");
+    expect(progressBar.style.width).toBe("42%");
   });
 
   it("shows camera error when camera fails to start", async () => {

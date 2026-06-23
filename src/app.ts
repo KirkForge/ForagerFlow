@@ -17,6 +17,7 @@ import {
   HistoryDetailPanel,
 } from "@/ui";
 import type { ComparisonItem } from "@/ui/comparison";
+import type { LoadProgress } from "@/inference/service";
 import {
   saveIdentification,
   getHistory,
@@ -53,6 +54,10 @@ export class AppController {
   cameraWrap: HTMLElement;
   focusReticle: HTMLElement | null = null;
   recaptureBtn: HTMLButtonElement | null = null;
+  progressEl: HTMLElement;
+  progressTextEl: HTMLElement;
+  progressPctEl: HTMLElement;
+  progressBarEl: HTMLElement;
   cameraErrorEl: HTMLElement;
   fileFallbackBtn: HTMLButtonElement | null = null;
   fileInputEl: HTMLInputElement | null = null;
@@ -81,6 +86,10 @@ export class AppController {
       document.querySelector<HTMLElement>("#focus-reticle");
     this.recaptureBtn =
       document.querySelector<HTMLButtonElement>("#recapture-btn");
+    this.progressEl = this.require("#model-progress");
+    this.progressTextEl = this.require("#model-progress-text");
+    this.progressPctEl = this.require("#model-progress-pct");
+    this.progressBarEl = this.require("#model-progress-bar");
     this.cameraErrorEl = this.require("#camera-error");
     this.fileFallbackBtn =
       document.querySelector<HTMLButtonElement>("#file-fallback-btn");
@@ -137,6 +146,10 @@ export class AppController {
       this.statusEl.textContent = text;
     });
 
+    inferenceService.onProgress((progress) => {
+      this.updateModelProgress(progress);
+    });
+
     inferenceService.onResult(({ logits, modelKey }) => {
       try {
         const model = modelRegistry[modelKey];
@@ -145,6 +158,7 @@ export class AppController {
         this.renderer.render(report, model);
         this.setCaptureBusy(false);
         this.setRecaptureVisible(true);
+        this.hideModelProgress();
         void saveIdentification(
           report,
           modelKey,
@@ -278,6 +292,26 @@ export class AppController {
     this.recaptureBtn.hidden = !visible;
   }
 
+  private updateModelProgress(progress: LoadProgress): void {
+    this.progressEl.hidden = false;
+    const phaseText =
+      progress.phase === "download"
+        ? t("model.progressDownload")
+        : t("model.progressCompile");
+    this.progressTextEl.textContent = t("model.progressLabel", {
+      model: modelRegistry[progress.modelKey].name,
+      phase: phaseText,
+    });
+    const pct = `${String(progress.percent)}%`;
+    this.progressPctEl.textContent = pct;
+    this.progressBarEl.style.width = pct;
+  }
+
+  private hideModelProgress(): void {
+    this.progressEl.hidden = true;
+    this.progressBarEl.style.width = "0%";
+  }
+
   private handleRecapture(): void {
     this.renderer.clear();
     this.detailPanel.close();
@@ -286,6 +320,7 @@ export class AppController {
     this.#lastReport = undefined;
     this.statusEl.textContent = t("status.cameraActive");
     this.setRecaptureVisible(false);
+    this.hideModelProgress();
     if ("vibrate" in navigator) {
       navigator.vibrate(10);
     }
@@ -346,6 +381,7 @@ export class AppController {
     this.historyDetailPanel.close();
     this.#lastReport = undefined;
     this.setRecaptureVisible(false);
+    this.hideModelProgress();
     inferenceService.switchModel(key);
   }
 
