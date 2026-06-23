@@ -18,6 +18,7 @@ export const daMessages: Messages = {
   "capture.ariaLabel": "Tag billede og identificér svamp",
   "camera.torchOn": "Sluk lommelygte",
   "camera.torchOff": "Tænd lommelygte",
+  "camera.focusAria": "Fokuspunkt",
   "camera.error": "Kameraet er ikke tilgængeligt.",
   "camera.retry": "Prøv kamera igen",
   "camera.choosePhoto": "Vælg et foto",

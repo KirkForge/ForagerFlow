@@ -171,6 +171,27 @@ video {
   border-color: rgba(255, 235, 160, 0.9);
 }
 
+#focus-reticle {
+  position: absolute;
+  width: 56px;
+  height: 56px;
+  border: 2px solid rgba(255, 235, 160, 0.9);
+  border-radius: 8px;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0.8);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
+  z-index: 3;
+}
+
+#focus-reticle.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, -50%) scale(1);
+}
+
 @media (max-width: 480px) {
   #capture-btn {
     width: 80px;

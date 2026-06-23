@@ -48,6 +48,8 @@ export class AppController {
   videoEl: HTMLVideoElement;
   captureBtn: HTMLButtonElement;
   torchBtn: HTMLButtonElement | null = null;
+  cameraWrap: HTMLElement;
+  focusReticle: HTMLElement | null = null;
   cameraErrorEl: HTMLElement;
   fileFallbackBtn: HTMLButtonElement | null = null;
   fileInputEl: HTMLInputElement | null = null;
@@ -60,6 +62,7 @@ export class AppController {
   #pendingThumbnail: string | null = null;
   #pendingLocation: GeoLocation | undefined;
   #lastReport: PredictionReport | undefined;
+  #focusReticleTimeout: number | undefined;
 
   constructor() {
     this.statusEl = this.require("#status");
@@ -70,6 +73,9 @@ export class AppController {
     ) as unknown as HTMLButtonElement;
     this.torchBtn = document.querySelector<HTMLButtonElement>("#torch-btn");
     this.updateTorchButton(false);
+    this.cameraWrap = this.require("#camera-wrap");
+    this.focusReticle =
+      document.querySelector<HTMLElement>("#focus-reticle");
     this.cameraErrorEl = this.require("#camera-error");
     this.fileFallbackBtn =
       document.querySelector<HTMLButtonElement>("#file-fallback-btn");
@@ -205,6 +211,37 @@ export class AppController {
         navigator.vibrate(20);
       }
     }
+  }
+
+  private handleVideoPointerDown(e: PointerEvent): void {
+    e.preventDefault();
+    const point = CameraService.mapDomPointToNormalized(
+      this.videoEl,
+      e.clientX,
+      e.clientY,
+    );
+    if (!point) return;
+    void (async () => {
+      const ok = await this.camera.focusAt(point.x, point.y);
+      if (ok) {
+        this.showFocusReticle(e.clientX, e.clientY);
+        if ("vibrate" in navigator) {
+          navigator.vibrate(15);
+        }
+      }
+    })();
+  }
+
+  private showFocusReticle(clientX: number, clientY: number): void {
+    if (!this.focusReticle) return;
+    const rect = this.cameraWrap.getBoundingClientRect();
+    this.focusReticle.style.left = `${String(clientX - rect.left)}px`;
+    this.focusReticle.style.top = `${String(clientY - rect.top)}px`;
+    this.focusReticle.classList.add("active");
+    window.clearTimeout(this.#focusReticleTimeout);
+    this.#focusReticleTimeout = window.setTimeout(() => {
+      this.focusReticle?.classList.remove("active");
+    }, 1200);
   }
 
   private handleCapture(): void {
@@ -636,6 +673,10 @@ export class AppController {
 
     this.torchBtn?.addEventListener("click", () => {
       void this.handleTorchToggle();
+    });
+
+    this.videoEl.addEventListener("pointerdown", (e) => {
+      this.handleVideoPointerDown(e);
     });
 
     this.fileInputEl?.addEventListener("change", (e) => {

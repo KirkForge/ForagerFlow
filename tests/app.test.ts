@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ModelKey } from "@/core/types";
 import type { CaptureResult } from "@/services/camera";
+import type * as CameraModule from "@/services/camera";
 import { AppController } from "@/app";
 import { ResultsRenderer } from "@/ui";
 import { flushPromises } from "./helpers/promises";
@@ -60,6 +61,7 @@ const mockCamera = vi.hoisted(() => ({
   torchSupported: vi.fn().mockReturnValue(false),
   isTorchOn: vi.fn().mockReturnValue(false),
   setTorch: vi.fn().mockResolvedValue(false),
+  focusAt: vi.fn().mockResolvedValue(false),
 }));
 
 const mockRenderer = vi.hoisted(() => ({
@@ -86,11 +88,19 @@ vi.mock("@/inference/service", () => ({
   inferenceService: mockInferenceService,
 }));
 
-vi.mock("@/services/camera", () => ({
-  CameraService: vi.fn(function () {
-    return mockCamera;
-  }),
-}));
+vi.mock("@/services/camera", async () => {
+  const actual = await vi.importActual<typeof CameraModule>("@/services/camera");
+  return {
+    CameraService: Object.assign(
+      vi.fn(function () {
+        return mockCamera;
+      }),
+      {
+        mapDomPointToNormalized: actual.CameraService.mapDomPointToNormalized,
+      },
+    ),
+  };
+});
 
 vi.mock("@/services/image-input", () => ({
   processFileInput: vi.fn().mockResolvedValue({
@@ -134,9 +144,12 @@ function renderAppHTML(): void {
     <div id="app">
       <div id="status"></div>
       <div id="badge"></div>
-      <video id="video"></video>
-      <button id="capture-btn">Capture</button>
-      <button id="torch-btn" hidden>🔦</button>
+      <div id="camera-wrap">
+        <video id="video"></video>
+        <div id="focus-reticle" hidden></div>
+        <button id="capture-btn">Capture</button>
+        <button id="torch-btn" hidden>🔦</button>
+      </div>
       <div id="camera-error"></div>
       <button id="file-fallback-btn">Upload</button>
       <input id="file-input" type="file" />
@@ -676,6 +689,58 @@ describe("AppController", () => {
 
     const torchBtn = document.querySelector<HTMLButtonElement>("#torch-btn")!;
     expect(torchBtn.hidden).toBe(true);
+  });
+
+  it("focuses on video tap when supported", async () => {
+    vi.mocked(mockCamera.focusAt).mockResolvedValue(true);
+
+    const controller = new AppController();
+    await controller.init();
+
+    const video = document.querySelector<HTMLVideoElement>("#video")!;
+    Object.defineProperty(video, "videoWidth", { value: 640 });
+    Object.defineProperty(video, "videoHeight", { value: 480 });
+    vi.spyOn(video, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 320,
+      height: 320,
+    } as DOMRect);
+
+    video.dispatchEvent(
+      new PointerEvent("pointerdown", { clientX: 160, clientY: 160, bubbles: true }),
+    );
+    await flushPromises();
+
+    expect(mockCamera.focusAt).toHaveBeenCalledWith(0.5, 0.5);
+    const reticle = document.querySelector<HTMLElement>("#focus-reticle")!;
+    expect(reticle.classList.contains("active")).toBe(true);
+  });
+
+  it("does not show reticle when focus is unsupported", async () => {
+    vi.mocked(mockCamera.focusAt).mockResolvedValue(false);
+
+    const controller = new AppController();
+    await controller.init();
+
+    const video = document.querySelector<HTMLVideoElement>("#video")!;
+    Object.defineProperty(video, "videoWidth", { value: 640 });
+    Object.defineProperty(video, "videoHeight", { value: 480 });
+    vi.spyOn(video, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 320,
+      height: 320,
+    } as DOMRect);
+
+    video.dispatchEvent(
+      new PointerEvent("pointerdown", { clientX: 80, clientY: 80, bubbles: true }),
+    );
+    await flushPromises();
+
+    expect(mockCamera.focusAt).toHaveBeenCalled();
+    const reticle = document.querySelector<HTMLElement>("#focus-reticle")!;
+    expect(reticle.classList.contains("active")).toBe(false);
   });
 });
 

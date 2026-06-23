@@ -5,12 +5,16 @@ import { sleep } from "./helpers/promises";
 
 function createMockTrack(
   torchCapable = false,
+  focusModes: string[] = [],
+  exposureModes: string[] = [],
 ): MediaStreamTrack {
+  const caps: Record<string, unknown> = {};
+  if (torchCapable) caps["torch"] = true;
+  if (focusModes.length > 0) caps["focusMode"] = focusModes;
+  if (exposureModes.length > 0) caps["exposureMode"] = exposureModes;
   return {
     stop: vi.fn(),
-    getCapabilities: vi.fn(() =>
-      torchCapable ? { torch: true } : {},
-    ),
+    getCapabilities: vi.fn(() => caps),
     applyConstraints: vi.fn().mockResolvedValue(undefined),
   } as unknown as MediaStreamTrack;
 }
@@ -207,5 +211,138 @@ describe("CameraService", () => {
     camera.stop();
 
     expect(camera.isTorchOn()).toBe(false);
+  });
+
+  it("maps DOM touch points to normalized video coordinates", () => {
+    const video = {
+      videoWidth: 640,
+      videoHeight: 480,
+      getBoundingClientRect: () => ({
+        left: 0,
+        top: 0,
+        width: 320,
+        height: 320,
+      }),
+    } as unknown as HTMLVideoElement;
+
+    // Element is square (320x320), video is 4:3 landscape (640x480). With
+    // cover, height fills and width is cropped: scale = 320/480 ≈ 0.667,
+    // scaled width = 426.67, offsetX = (320 - 426.67) / 2 ≈ -53.33.
+    const topLeft = CameraService.mapDomPointToNormalized(video, 0, 0);
+    expect(topLeft).not.toBeNull();
+    if (!topLeft) return;
+    expect(topLeft.x).toBeCloseTo(0.125, 5);
+    expect(topLeft.y).toBeCloseTo(0, 5);
+
+    const center = CameraService.mapDomPointToNormalized(video, 160, 160);
+    expect(center).toEqual({ x: 0.5, y: 0.5 });
+
+    const bottomRight = CameraService.mapDomPointToNormalized(video, 320, 320);
+    expect(bottomRight).not.toBeNull();
+    if (!bottomRight) return;
+    expect(bottomRight.x).toBeCloseTo(0.875, 5);
+    expect(bottomRight.y).toBeCloseTo(1, 5);
+  });
+
+  it("returns null when video dimensions are not available", () => {
+    const video = {
+      videoWidth: 0,
+      videoHeight: 0,
+      getBoundingClientRect: () => ({
+        left: 0,
+        top: 0,
+        width: 320,
+        height: 320,
+      }),
+    } as unknown as HTMLVideoElement;
+
+    expect(CameraService.mapDomPointToNormalized(video, 100, 100)).toBeNull();
+  });
+
+  it("detects focus support from video track capabilities", async () => {
+    const track = createMockTrack(false, ["continuous", "manual"]);
+    installMediaDevices(createMockStream(track));
+
+    const video = createMockVideoElement();
+    await camera.start(video);
+
+    expect(camera.focusSupported()).toBe(true);
+  });
+
+  it("detects exposure support as focus support", async () => {
+    const track = createMockTrack(false, [], ["auto", "manual"]);
+    installMediaDevices(createMockStream(track));
+
+    const video = createMockVideoElement();
+    await camera.start(video);
+
+    expect(camera.focusSupported()).toBe(true);
+  });
+
+  it("reports focus unsupported when no manual modes are available", async () => {
+    const track = createMockTrack(false, ["continuous"], ["auto"]);
+    installMediaDevices(createMockStream(track));
+
+    const video = createMockVideoElement();
+    await camera.start(video);
+
+    expect(camera.focusSupported()).toBe(false);
+  });
+
+  it("applies focus and exposure constraints on tap", async () => {
+    const track = createMockTrack(false, ["manual"], ["manual"]);
+    installMediaDevices(createMockStream(track));
+
+    const video = createMockVideoElement();
+    await camera.start(video);
+
+    expect(await camera.focusAt(0.5, 0.5)).toBe(true);
+    expect(track.applyConstraints).toHaveBeenCalledWith({
+      advanced: [
+        {
+          focusMode: "manual",
+          exposureMode: "manual",
+          pointsOfInterest: [{ x: 0.5, y: 0.5 }],
+        },
+      ],
+    });
+  });
+
+  it("applies only supported constraint modes on tap", async () => {
+    const track = createMockTrack(false, ["manual"], []);
+    installMediaDevices(createMockStream(track));
+
+    const video = createMockVideoElement();
+    await camera.start(video);
+
+    expect(await camera.focusAt(0.25, 0.75)).toBe(true);
+    expect(track.applyConstraints).toHaveBeenCalledWith({
+      advanced: [
+        {
+          focusMode: "manual",
+          pointsOfInterest: [{ x: 0.25, y: 0.75 }],
+        },
+      ],
+    });
+  });
+
+  it("returns false when focus and exposure are unsupported", async () => {
+    installMediaDevices(createMockStream());
+
+    const video = createMockVideoElement();
+    await camera.start(video);
+
+    expect(await camera.focusAt(0.5, 0.5)).toBe(false);
+  });
+
+  it("returns false when applyConstraints fails for focus", async () => {
+    const track = createMockTrack(false, ["manual"]);
+    track.applyConstraints = vi.fn().mockRejectedValue(new Error("denied"));
+    installMediaDevices(createMockStream(track));
+
+    const video = createMockVideoElement();
+    await camera.start(video);
+
+    expect(await camera.focusAt(0.5, 0.5)).toBe(false);
   });
 });
