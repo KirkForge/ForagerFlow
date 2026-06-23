@@ -84,6 +84,11 @@ const mockComparisonPanel = vi.hoisted(() => ({
   close: vi.fn(),
 }));
 
+const mockHistoryDetailPanel = vi.hoisted(() => ({
+  open: vi.fn(),
+  close: vi.fn(),
+}));
+
 vi.mock("@/inference/service", () => ({
   inferenceService: mockInferenceService,
 }));
@@ -137,6 +142,9 @@ vi.mock("@/ui", () => ({
   PredictionComparisonPanel: vi.fn(function () {
     return mockComparisonPanel;
   }),
+  HistoryDetailPanel: vi.fn(function () {
+    return mockHistoryDetailPanel;
+  }),
 }));
 
 function renderAppHTML(): void {
@@ -174,6 +182,21 @@ function renderAppHTML(): void {
       <input id="location-toggle" type="checkbox" />
       <span id="location-status"></span>
     </div>
+    <dialog id="history-detail-modal">
+      <div id="history-detail-content">
+        <div class="detail-header">
+          <h2 id="history-detail-title"></h2>
+          <button id="history-detail-close" type="button" value="close">×</button>
+        </div>
+        <div id="history-detail-body">
+          <img id="history-detail-thumbnail" class="history-detail-thumbnail" alt="" hidden />
+          <div id="history-detail-meta" class="detail-meta"></div>
+          <p id="history-detail-notes" class="detail-notes"></p>
+          <p id="history-detail-safety" class="detail-safety"></p>
+          <a id="history-detail-verify" class="verify-link" href="#"></a>
+        </div>
+      </div>
+    </dialog>
   `;
 }
 
@@ -468,6 +491,43 @@ describe("AppController", () => {
 
     await flushPromises();
     expect(deleteEntry).toHaveBeenCalledWith("h-del");
+  });
+
+  it("opens history detail when an entry is clicked", async () => {
+    const { getHistory } = await import("@/services/history");
+    const entry = makeHistoryEntry({ id: "h-detail", top1Species: "Amanita muscaria" });
+    vi.mocked(getHistory).mockResolvedValue([entry]);
+
+    const controller = new AppController();
+    await controller.init();
+    await flushPromises();
+
+    const list = document.querySelector("#history-list") as HTMLElement;
+    const entryEl = list.querySelector(".history-entry") as HTMLElement;
+    entryEl.click();
+
+    await flushPromises();
+    expect(mockHistoryDetailPanel.open).toHaveBeenCalledWith(entry);
+  });
+
+  it("does not open history detail when delete button is clicked", async () => {
+    const { getHistory } = await import("@/services/history");
+    const { deleteEntry } = await import("@/services/history/delete-entry");
+    vi.mocked(getHistory).mockResolvedValue([
+      makeHistoryEntry({ id: "h-no-detail" }),
+    ]);
+
+    const controller = new AppController();
+    await controller.init();
+    await flushPromises();
+
+    const list = document.querySelector("#history-list") as HTMLElement;
+    const delBtn = list.querySelector(".history-delete") as HTMLElement;
+    delBtn.click();
+
+    await flushPromises();
+    expect(deleteEntry).toHaveBeenCalled();
+    expect(mockHistoryDetailPanel.open).not.toHaveBeenCalled();
   });
 
   it("exports history when export button is clicked", async () => {

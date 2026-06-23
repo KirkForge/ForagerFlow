@@ -14,6 +14,7 @@ import {
   SafetyUI,
   SpeciesDetailPanel,
   PredictionComparisonPanel,
+  HistoryDetailPanel,
 } from "@/ui";
 import type { ComparisonItem } from "@/ui/comparison";
 import {
@@ -42,6 +43,7 @@ export class AppController {
   renderer: ResultsRenderer;
   detailPanel: SpeciesDetailPanel;
   comparisonPanel: PredictionComparisonPanel;
+  historyDetailPanel: HistoryDetailPanel;
   safety!: SafetyUI;
   statusEl: HTMLElement;
   badgeEl: HTMLElement;
@@ -113,6 +115,7 @@ export class AppController {
     });
     this.detailPanel = new SpeciesDetailPanel();
     this.comparisonPanel = new PredictionComparisonPanel();
+    this.historyDetailPanel = new HistoryDetailPanel();
   }
 
   async init(): Promise<void> {
@@ -279,6 +282,7 @@ export class AppController {
     this.renderer.clear();
     this.detailPanel.close();
     this.comparisonPanel.close();
+    this.historyDetailPanel.close();
     this.#lastReport = undefined;
     this.statusEl.textContent = t("status.cameraActive");
     this.setRecaptureVisible(false);
@@ -339,6 +343,7 @@ export class AppController {
     this.renderer.clear();
     this.detailPanel.close();
     this.comparisonPanel.close();
+    this.historyDetailPanel.close();
     this.#lastReport = undefined;
     this.setRecaptureVisible(false);
     inferenceService.switchModel(key);
@@ -392,6 +397,19 @@ export class AppController {
 
     if (items.length >= 2) {
       this.comparisonPanel.open(items);
+    }
+  }
+
+  private async openHistoryDetail(id: string): Promise<void> {
+    if (!id) return;
+    try {
+      const entries = await getHistory(20);
+      const entry = entries.find((e) => e.id === id);
+      if (entry) {
+        this.historyDetailPanel.open(entry);
+      }
+    } catch (err) {
+      logger.error("Failed to open history detail:", err);
     }
   }
 
@@ -768,20 +786,25 @@ export class AppController {
 
     const historyList = document.getElementById("history-list");
     historyList?.addEventListener("click", (e) => {
-      const btn = (e.target as HTMLElement).closest<HTMLElement>(
-        ".history-delete",
-      );
-      if (!btn) return;
-      const id = btn.dataset["id"];
-      if (!id) return;
-      void (async () => {
-        const { deleteEntry } = await import(
-          /* @vite-ignore */ "@/services/history/delete-entry"
-        );
-        await deleteEntry(id);
-        void this.renderHistory();
-        void this.renderLastResult();
-      })();
+      const target = e.target as HTMLElement;
+      const btn = target.closest<HTMLElement>(".history-delete");
+      if (btn) {
+        const id = btn.dataset["id"];
+        if (!id) return;
+        void (async () => {
+          const { deleteEntry } = await import(
+            /* @vite-ignore */ "@/services/history/delete-entry"
+          );
+          await deleteEntry(id);
+          void this.renderHistory();
+          void this.renderLastResult();
+        })();
+        return;
+      }
+      const entryEl = target.closest<HTMLElement>(".history-entry");
+      if (entryEl) {
+        void this.openHistoryDetail(entryEl.dataset["id"] ?? "");
+      }
     });
 
     window.addEventListener("pagehide", (e) => {

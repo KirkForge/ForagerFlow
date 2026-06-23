@@ -718,7 +718,8 @@ video {
 #storage-confirm-modal,
 #clear-confirm-modal,
 #species-detail-modal,
-#comparison-modal {
+#comparison-modal,
+#history-detail-modal {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 20px;
@@ -733,7 +734,8 @@ video {
 #storage-confirm-modal::backdrop,
 #clear-confirm-modal::backdrop,
 #species-detail-modal::backdrop,
-#comparison-modal::backdrop {
+#comparison-modal::backdrop,
+#history-detail-modal::backdrop {
   background: rgba(0, 0, 0, 0.7);
 }
 #safety-modal h2,
@@ -932,6 +934,42 @@ video {
 .detail-calibrated {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* ─── History detail modal ──────────────────────────── */
+#history-detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 70vh;
+}
+
+.history-detail-thumbnail {
+  width: 100%;
+  max-height: 30vh;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--surface-1);
+}
+
+.history-detail-thumbnail[hidden] {
+  display: none;
+}
+
+.history-detail-date,
+.history-detail-model,
+.history-detail-location {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.history-detail-location {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.history-detail-location::before {
+  content: "📍 ";
 }
 
 /* ─── Prediction comparison ───────────────────────── */

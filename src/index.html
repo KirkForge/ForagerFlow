@@ -378,6 +378,46 @@
       </div>
     </dialog>
 
+    <dialog
+      id="history-detail-modal"
+      aria-labelledby="history-detail-title"
+      aria-describedby="history-detail-body"
+    >
+      <div id="history-detail-content">
+        <div class="detail-header">
+          <h2 id="history-detail-title"></h2>
+          <button
+            id="history-detail-close"
+            type="button"
+            value="close"
+            aria-label="Luk historikdetaljer"
+          >
+            ×
+          </button>
+        </div>
+        <div id="history-detail-body">
+          <img
+            id="history-detail-thumbnail"
+            class="history-detail-thumbnail"
+            alt=""
+            hidden
+          />
+          <div id="history-detail-meta" class="detail-meta"></div>
+          <p id="history-detail-notes" class="detail-notes"></p>
+          <p id="history-detail-safety" class="detail-safety"></p>
+          <a
+            id="history-detail-verify"
+            class="verify-link"
+            target="_blank"
+            rel="noopener noreferrer"
+            href="#"
+          >
+            Bekræft arten online →
+          </a>
+        </div>
+      </div>
+    </dialog>
+
     <script type="module" src="/main.ts"></script>
   </body>
 </html>
