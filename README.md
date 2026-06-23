@@ -118,13 +118,15 @@ pnpm format                 # prettier --write
 pnpm format:check           # prettier --check
 pnpm test                   # vitest run
 pnpm test:ci                # vitest run (CI mode)
+pnpm test:coverage          # vitest with 80% threshold enforcement
 pnpm build                  # vite build → dist/
 node scripts/verify-labels.cjs   # label/logit alignment + knowledge coverage
 pnpm verify:dist            # built-asset smoke checks
+pnpm verify:bundle          # main bundle gzip budget check
 pnpm e2e                    # playwright smoke tests
 pnpm e2e:ci                 # CI=true playwright chromium + firefox
 pnpm verify:inference       # real-ONNX sanity (requires export)
-pnpm verify                 # typecheck + lint + test:ci + build + verify:dist + verify:labels
+pnpm verify                 # typecheck + lint + test:ci + build + verify:dist + verify:labels + verify:bundle
 ```
 
 `verify:dist` checks the built bundle for required assets, `importScripts` worker loading, the `wasm` execution provider, and `wasm-unsafe-eval` in the CSP.

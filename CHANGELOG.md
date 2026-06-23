@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com).
 ## [Unreleased]
 
 ### Added
+- Engineering guide: `docs/engineering.md`.
+- Custom ESLint rule `local/no-raw-ui-strings` to keep user-visible text in the i18n catalogue.
+- Test coverage for error classes, telemetry edge cases, assetlinks generation, SafetyUI flows, i18n edge cases, and history validation paths.
 - History thumbnails generated for camera frames and file inputs.
 - Expanded test suite: IndexedDB history, camera, image-utils, inference-service, and safety-UI tests.
 - Telemetry pipeline: localStorage buffering, optional `sendBeacon` sink, dev console sink; gated by feature flag.
@@ -20,6 +23,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com).
 - `verify:dist` and `verify:inference` scripts.
 
 ### Changed
+- Vitest coverage thresholds raised to **80%** for branches, functions, lines, and statements.
+- TypeScript `noImplicitReturns` enabled and all code/tests updated.
+- `scripts/generate-assetlinks.cjs` refactored to exported functions for unit-test coverage.
+- `src/app.ts` "Error displaying result." status copy moved to the i18n catalogue and loaded via `t("status.displayError")`.
 - `scripts/test-inference.py` now has explicit `smoke` and `top5` modes; `package.json` calls the smoke mode. Smoke passes for both exported ONNX models.
 - `InferenceService` uses explicit callback handlers (`onStatus`, `onResult`, `onError`, `onStorageConfirm`) instead of an event emitter.
 - `src/services/history.ts` split into `history/index.ts` + dynamically imported `history/delete-entry.ts`.
@@ -41,6 +48,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com).
 - Redundant `src/index.html` from `vitest.config.ts` coverage exclusions.
 
 ### Fixed
+- Lint and type errors in newly expanded test files after enabling stricter TypeScript and the raw-UI-string rule.
 - Vite "mixed dynamic+static import" warning for `src/services/history.ts`.
 - README inconsistency about the `pwa/` directory and test count.
 - In-app safety message could be missed by returning users; it is now shown before camera access with a persistent sticky footer.

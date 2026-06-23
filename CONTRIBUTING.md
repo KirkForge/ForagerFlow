@@ -78,20 +78,18 @@ dist/           — Build output. The deployable.
 
 ## Testing
 
-- Run: `pnpm test`
-- Coverage: `pnpm test:coverage` runs but currently exits non-zero because global thresholds (70%) are not met. Use it to inspect uncovered code; rely on `pnpm test` for the green gate.
+- Run: `pnpm test:ci`
+- Coverage: `pnpm test:coverage` enforces **80%** thresholds for branches, functions, lines, and statements. Keep it green.
 - Test files live in `tests/` and use `@/` path aliases matching `src/`
 - Mock browser APIs (IndexedDB, camera, canvas) in unit tests
 - Never skip tests. If a test is flaky, mark it with `.skip()` and file an issue.
 
 ## Pull Request Checklist
 
-- [ ] `pnpm typecheck` passes
-- [ ] `pnpm lint` passes
-- [ ] `pnpm test` passes
-- [ ] `pnpm build` succeeds
-- [ ] `pnpm verify:labels` passes (label/logit alignment)
-- [ ] `pnpm verify:dist` passes (built-asset smoke test)
+- [ ] `pnpm verify` passes (typecheck + lint + test:ci + build + verify:dist + verify:labels + verify:bundle)
+- [ ] `pnpm test:coverage` passes (80% thresholds)
+- [ ] Impact analysis run with GitNexus MCP for any changed symbols (see `CLAUDE.md` / `AGENTS.md`)
+- [ ] `detect_changes({scope: "compare", base_ref: "main"})` reviewed before commit
 - [ ] Secret scan passes (`trufflehog filesystem . --only-verified --no-update --exclude-paths=.trufflehog-exclude.txt --fail`)
 - [ ] No secrets or large files committed
 - [ ] Commit messages follow `type(scope): message` format
