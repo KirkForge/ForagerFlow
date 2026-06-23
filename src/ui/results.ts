@@ -2,6 +2,7 @@ import type { PredictionReport } from "@/inference/results";
 import { Edibility } from "@/core/types";
 import type { ModelRegistryEntry } from "@/core/types";
 import { sanitizeText } from "@/core/sanitize";
+import { t } from "@/i18n";
 
 export class ResultsRenderer {
   private container: HTMLElement;
@@ -42,7 +43,7 @@ export class ResultsRenderer {
     if (top) {
       const k = model.knowledge[top.label] ?? {
         edibility: Edibility.Unknown,
-        notes: "No data available.",
+        notes: t("knowledge.noData"),
       };
       const verifyUrl = new URL("https://www.google.com/search");
       verifyUrl.searchParams.set("q", `${top.label} mushroom identification`);
@@ -50,13 +51,13 @@ export class ResultsRenderer {
       this.knowledgeEl.innerHTML = `
         <h3>${sanitizeText(top.label)}</h3>
         <p>${sanitizeText(k.notes)}</p>
-        <a class="verify-link" target="_blank" rel="noopener noreferrer" href="${verifyUrl.toString()}">Verify this species online →</a>
+        <a class="verify-link" target="_blank" rel="noopener noreferrer" href="${verifyUrl.toString()}">${t("prediction.verifyOnline")}</a>
       `;
       const verify = this.knowledgeEl.querySelector(".verify-link");
       if (verify) {
         verify.setAttribute(
           "aria-label",
-          `Verify ${top.label} online (opens in new tab)`,
+          t("prediction.verifyAriaLabel", { species: top.label }),
         );
       }
       this.knowledgeEl.style.display = "block";
@@ -69,13 +70,17 @@ export class ResultsRenderer {
   ): string {
     const k = model.knowledge[item.label] ?? {
       edibility: Edibility.Unknown,
-      notes: "No data available.",
+      notes: t("knowledge.noData"),
     };
     const pct = (item.probability * 100).toFixed(1);
     const isPoison = k.edibility === Edibility.Poisonous;
     const isUnknown = k.edibility === Edibility.Unknown;
     const edClass = isPoison ? "poisonous" : isUnknown ? "unknown" : "edible";
-    const edText = isPoison ? "POISONOUS" : isUnknown ? "Unknown" : "Edible";
+    const edText = isPoison
+      ? t("prediction.poisonous")
+      : isUnknown
+        ? t("prediction.unknown")
+        : t("prediction.edible");
 
     return `
       <div class="prediction">

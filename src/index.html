@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="da">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,26 +8,26 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; font-src 'self'"
     />
-    <title>Foragerflow</title>
+    <title>ForagerFlow</title>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="stylesheet" href="/css/style.css" />
   </head>
   <body>
-    <div id="app" aria-label="Foragerflow mushroom identifier">
+    <div id="app" aria-label="ForagerFlow svampeidentifikation">
       <header role="banner">
         <span aria-hidden="true" style="font-size: 20px">&#127812;</span>
-        <h1>Foragerflow</h1>
+        <h1>ForagerFlow</h1>
         <span id="badge" class="badge" role="status" aria-live="polite"
           >Online</span
         >
       </header>
 
-      <div id="controls" role="group" aria-label="Model selection">
+      <div id="controls" role="group" aria-label="Vælg identifikationsmodel">
         <label for="model-select">Model:</label>
-        <select id="model-select" aria-label="Select inference model">
-          <option value="bvra">Specialist (215 classes, ~90 MB)</option>
+        <select id="model-select" aria-label="Vælg identifikationsmodel">
+          <option value="bvra">Specialist (215 arter, ~90 MB)</option>
           <option value="dima806" data-capability-gated="true">
-            General (100 classes, ~330 MB)
+            Generel (100 arter, ~330 MB)
           </option>
         </select>
       </div>
@@ -35,22 +35,22 @@
       <div
         id="last-result"
         role="region"
-        aria-label="Last identification"
+        aria-label="Seneste identifikation"
         style="display: none"
       ></div>
 
-      <div id="camera-wrap" role="region" aria-label="Camera viewfinder">
+      <div id="camera-wrap" role="region" aria-label="Kameravisning">
         <video
           id="video"
           autoplay
           playsinline
           muted
-          aria-label="Live camera preview"
+          aria-label="Live kameravisning"
         ></video>
         <button
           id="capture-btn"
           type="button"
-          aria-label="Capture and identify mushroom"
+          aria-label="Tag billede og identificér svamp"
         ></button>
         <div
           id="camera-error"
@@ -58,44 +58,40 @@
           aria-live="assertive"
           style="display: none"
         >
-          <p>Camera unavailable.</p>
+          <p>Kameraet er ikke tilgængeligt.</p>
           <button
             id="camera-retry"
             type="button"
-            aria-label="Retry camera access"
+            aria-label="Prøv kameraadgang igen"
           >
-            Retry camera
+            Prøv kamera igen
           </button>
           <button
             id="file-fallback-btn"
             type="button"
-            aria-label="Choose a photo from your device"
+            aria-label="Vælg et foto fra din enhed"
           >
-            Choose a photo
+            Vælg et foto
           </button>
           <input
             type="file"
             id="file-input"
             accept="image/*"
-            aria-label="Select an image file"
+            aria-label="Vælg en billedfil"
           />
         </div>
       </div>
 
-      <div id="results" role="region" aria-label="Inference results">
+      <div id="results" role="region" aria-label="Identifikationsresultater">
         <div id="status" class="status" role="status" aria-live="polite">
-          Loading...
+          Indlæser...
         </div>
-        <div
-          id="predictions"
-          aria-label="Top predictions"
-          aria-live="polite"
-        ></div>
+        <div id="predictions" aria-label="Top forslag" aria-live="polite"></div>
         <div
           id="knowledge"
           class="knowledge"
           role="region"
-          aria-label="Species details"
+          aria-label="Artens detaljer"
           style="display: none"
         ></div>
         <div
@@ -107,40 +103,46 @@
         ></div>
       </div>
 
-      <div id="history-panel" role="region" aria-label="Identification history">
+      <div
+        id="history-panel"
+        role="region"
+        aria-label="Identifikationshistorik"
+      >
         <div class="history-header">
-          <h2>History</h2>
+          <h2>Historik</h2>
           <div class="history-actions">
-            <button id="history-export" aria-label="Export history to file">
-              Export
+            <button id="history-export" aria-label="Eksportér historik til fil">
+              Eksportér
             </button>
-            <button id="history-import" aria-label="Import history from file">
-              Import
+            <button id="history-import" aria-label="Importér historik fra fil">
+              Importér
             </button>
             <input
               type="file"
               id="history-import-input"
               accept="application/json"
-              aria-label="History backup file"
+              aria-label="Historik-sikkerhedskopi"
               style="display: none"
             />
           </div>
-          <button id="history-clear" aria-label="Clear all history">
-            Clear
-          </button>
+          <button id="history-clear" aria-label="Ryd al historik">Ryd</button>
         </div>
-        <div id="history-list" aria-label="Past identifications"></div>
+        <div id="history-list" aria-label="Tidligere identifikationer"></div>
       </div>
     </div>
 
-    <div id="safety-footer" role="contentinfo" aria-label="Safety notice">
-      <strong>Never eat a wild mushroom based on this app.</strong>
+    <div
+      id="safety-footer"
+      role="contentinfo"
+      aria-label="Sikkerhedsmeddelelse"
+    >
+      <strong>Spis aldrig en vild svamp baseret på denne app.</strong>
       <a
         id="find-mycologist-link"
         href="https://www.google.com/search?q=certified+mycologist+near+me"
         target="_blank"
         rel="noopener noreferrer"
-        >Find a mycologist</a
+        >Find en svampekyndig</a
       >
     </div>
 
@@ -150,36 +152,37 @@
       aria-describedby="safety-modal-body"
     >
       <form method="dialog" id="safety-form">
-        <h2 id="safety-modal-title">Before you identify a mushroom</h2>
+        <h2 id="safety-modal-title">Før du identificerer en svamp</h2>
         <div id="safety-modal-body">
           <p>
-            ForagerFlow runs AI inference on your phone. It can be wrong —
-            including about whether a mushroom is safe to eat. Misidentification
-            can cause severe illness or death.
+            ForagerFlow kører AI-analyse på din telefon. Den kan tage fejl —
+            også om hvorvidt en svamp er sikker at spise. Fejlidentifikation kan
+            forårsage alvorlig sygdom eller død.
           </p>
           <p>
             <strong
-              >Do not eat any wild mushroom based solely on this app.</strong
+              >Spis aldrig en vild svamp udelukkende baseret på denne
+              app.</strong
             >
-            Always verify with a certified mycologist or your local poison
-            control center.
+            Få altid bekræftet af en autoriseret svampekyndig eller dit lokale
+            giftinformationscenter.
           </p>
           <ul>
-            <li>Top-1 confidence is not a safety guarantee.</li>
+            <li>Top-1-sikkerhed er ikke en sikkerhedsgaranti.</li>
             <li>
-              "Edible" in the result panel is a model output, not a
-              recommendation.
+              "Spiselig" i resultatpanelet er en modeloutput, ikke en
+              anbefaling.
             </li>
-            <li>This app is offline; it cannot call any safety service.</li>
+            <li>Appen er offline; den kan ikke ringe til nogen nødtjeneste.</li>
           </ul>
         </div>
         <label id="safety-modal-ack-label">
           <input type="checkbox" id="safety-modal-ack" required />
-          I understand this app is not a substitute for expert identification.
+          Jeg forstår, at denne app ikke erstatter ekspertidentifikation.
         </label>
         <div class="safety-modal-actions">
           <button type="submit" id="safety-modal-continue" disabled>
-            Continue
+            Fortsæt
           </button>
         </div>
       </form>
@@ -191,15 +194,15 @@
       aria-describedby="model-confirm-body"
     >
       <form method="dialog" id="model-confirm-form">
-        <h2 id="model-confirm-title">Download a 330&nbsp;MB model?</h2>
+        <h2 id="model-confirm-title">Download en 330&nbsp;MB model?</h2>
         <p id="model-confirm-body">
-          The General (dima806) model will be downloaded on first use and cached
-          for offline use. This may take a moment on a slow connection and will
-          use approximately 330 MB of your device's storage.
+          Den generelle (dima806) model downloades ved første brug og caches til
+          offline brug. Det kan tage et øjeblik på en langsom forbindelse og vil
+          bruge cirka 330 MB af enhedens lagerplads.
         </p>
         <div class="safety-modal-actions">
           <button type="button" id="model-confirm-cancel" value="cancel">
-            Cancel
+            Annullér
           </button>
           <button type="button" id="model-confirm-accept" value="accept">
             Download
@@ -214,17 +217,17 @@
       aria-describedby="storage-confirm-body"
     >
       <form method="dialog" id="storage-confirm-form">
-        <h2 id="storage-confirm-title">Low device storage</h2>
+        <h2 id="storage-confirm-title">Lav lagerplads på enheden</h2>
         <p id="storage-confirm-body">
-          Your device reports less than 500 MB of free storage. The selected
-          model needs ~330 MB. Continue anyway?
+          Din enhed rapporterer mindre end 500 MB ledig lagerplads. Den valgte
+          model kræver ~330 MB. Fortsæt alligevel?
         </p>
         <div class="safety-modal-actions">
           <button type="button" id="storage-confirm-cancel" value="cancel">
-            Cancel
+            Annullér
           </button>
           <button type="button" id="storage-confirm-accept" value="accept">
-            Continue anyway
+            Fortsæt alligevel
           </button>
         </div>
       </form>
@@ -236,17 +239,17 @@
       aria-describedby="clear-confirm-body"
     >
       <form method="dialog" id="clear-confirm-form">
-        <h2 id="clear-confirm-title">Clear all history?</h2>
+        <h2 id="clear-confirm-title">Ryd al historik?</h2>
         <p id="clear-confirm-body">
-          This will permanently remove every saved identification on this
-          device. This cannot be undone.
+          Dette fjerner permanent alle gemte identifikationer på denne enhed.
+          Det kan ikke fortrydes.
         </p>
         <div class="safety-modal-actions">
           <button type="button" id="clear-confirm-cancel" value="cancel">
-            Cancel
+            Annullér
           </button>
           <button type="button" id="clear-confirm-accept" value="accept">
-            Clear all
+            Ryd alt
           </button>
         </div>
       </form>

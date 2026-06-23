@@ -4,6 +4,7 @@ import type { CaptureResult } from "@/services/camera";
 import { AppController } from "@/app";
 import { flushPromises } from "./helpers/promises";
 import { makeHistoryEntry } from "./helpers/fixtures";
+import { setLocale } from "@/i18n";
 
 interface MockInferenceService {
   onStatus: (handler: (text: string) => void) => void;
@@ -137,6 +138,7 @@ function renderAppHTML(): void {
 describe("AppController", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setLocale("en");
     renderAppHTML();
   });
 

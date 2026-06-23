@@ -1,9 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { generatePredictionReport } from "@/inference/results";
 import { Edibility, type ModelRegistryEntry } from "@/core/types";
 import { makeMockModel } from "./helpers/fixtures";
+import { setLocale } from "@/i18n";
 
 describe("generatePredictionReport", () => {
+  beforeEach(() => {
+    setLocale("en");
+  });
   it("generates report with correct number of predictions", () => {
     const logits = new Float32Array([2.0, 0.5, 1.0]);
     const report = generatePredictionReport(logits, makeMockModel());

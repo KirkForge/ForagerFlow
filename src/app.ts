@@ -24,6 +24,7 @@ import { sanitizeText } from "@/core/sanitize";
 import { config } from "@/core/config";
 import { getEdibilityClass, createEl } from "@/ui/utils";
 import { isDataUrlThumbnail } from "@/services/history";
+import { t } from "@/i18n";
 
 export class AppController {
   private camera = new CameraService(config.captureSize);
@@ -115,10 +116,10 @@ export class AppController {
   private async startCamera(): Promise<void> {
     try {
       await this.camera.start(this.videoEl);
-      this.statusEl.textContent = "Camera active. Tap shutter to identify.";
+      this.statusEl.textContent = t("status.cameraActive");
       this.cameraErrorEl.style.display = "none";
     } catch {
-      this.statusEl.textContent = "Camera error. Try file input.";
+      this.statusEl.textContent = t("status.cameraError");
       this.cameraErrorEl.style.display = "flex";
     }
   }
@@ -127,11 +128,11 @@ export class AppController {
     if (this.captureBtn.dataset["busy"] === "true") return;
     const result = this.camera.capture();
     if (!result) {
-      this.statusEl.textContent = "Camera not ready. Wait a moment.";
+      this.statusEl.textContent = t("status.cameraNotReady");
       return;
     }
     this.setCaptureBusy(true);
-    this.statusEl.textContent = "Identifying…";
+    this.statusEl.textContent = t("status.identifying");
     this.#pendingThumbnail = result.thumbnail;
     inferenceService.infer(result.buffer, result.width, result.height);
   }
@@ -150,12 +151,12 @@ export class AppController {
     try {
       const result = await processFileInput(file);
       this.setCaptureBusy(true);
-      this.statusEl.textContent = "Identifying…";
+      this.statusEl.textContent = t("status.identifying");
       this.#pendingThumbnail = result.thumbnail;
       inferenceService.infer(result.buffer, result.width, result.height);
     } catch (err) {
       logger.error("File processing failed:", err);
-      this.statusEl.textContent = "Failed to process image.";
+      this.statusEl.textContent = t("status.processImageError");
       this.setCaptureBusy(false);
     }
   }
@@ -192,7 +193,7 @@ export class AppController {
     slot.innerHTML = "";
     const inner = createEl("div", "last-result-inner");
     inner.appendChild(
-      createEl("div", "last-result-label", "Last identification"),
+      createEl("div", "last-result-label", t("history.lastIdentification")),
     );
     inner.appendChild(createEl("div", "last-result-species", species));
 
@@ -222,7 +223,7 @@ export class AppController {
     if (entry.thumbnail && isDataUrlThumbnail(entry.thumbnail)) {
       const thumb = document.createElement("img");
       thumb.src = entry.thumbnail;
-      thumb.alt = `Thumbnail for ${species}`;
+      thumb.alt = t("history.thumbnailAlt", { species });
       thumb.className = "history-thumbnail";
       thumb.loading = "lazy";
       thumb.decoding = "async";
@@ -239,7 +240,9 @@ export class AppController {
     );
     entryEl.appendChild(meta);
     entryEl.appendChild(createEl("div", "history-name", species));
-    entryEl.appendChild(createEl("div", "history-prob", `${prob}% confidence`));
+    entryEl.appendChild(
+      createEl("div", "history-prob", t("history.confidence", { prob })),
+    );
 
     const delBtn = createEl(
       "button",
@@ -247,7 +250,7 @@ export class AppController {
       "×",
     ) as HTMLButtonElement;
     delBtn.dataset["id"] = id;
-    delBtn.setAttribute("aria-label", "Delete this entry");
+    delBtn.setAttribute("aria-label", t("history.deleteEntryAria"));
     entryEl.appendChild(delBtn);
 
     return entryEl;
@@ -268,9 +271,7 @@ export class AppController {
 
       if (entries.length === 0) {
         list.innerHTML = "";
-        list.appendChild(
-          createEl("p", "history-empty", "No past identifications yet."),
-        );
+        list.appendChild(createEl("p", "history-empty", t("history.empty")));
         return;
       }
 
@@ -296,7 +297,7 @@ export class AppController {
       list.appendChild(fragment);
     } catch {
       list.innerHTML = "";
-      list.appendChild(createEl("p", undefined, "Unable to load history."));
+      list.appendChild(createEl("p", undefined, t("history.loadError")));
     } finally {
       this.#historyRenderPending = false;
     }
@@ -311,7 +312,7 @@ export class AppController {
       void this.renderLastResult();
     } catch (err) {
       logger.error("Failed to clear history:", err);
-      this.statusEl.textContent = "Failed to clear history.";
+      this.statusEl.textContent = t("status.clearHistoryError");
     }
   }
 
@@ -327,10 +328,10 @@ export class AppController {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      this.statusEl.textContent = "History exported.";
+      this.statusEl.textContent = t("status.historyExported");
     } catch (err) {
       logger.error("Failed to export history:", err);
-      this.statusEl.textContent = "Failed to export history.";
+      this.statusEl.textContent = t("status.exportHistoryError");
     }
   }
 
@@ -344,10 +345,12 @@ export class AppController {
       const count = await importHistory(text);
       void this.renderHistory();
       void this.renderLastResult();
-      this.statusEl.textContent = `Imported ${String(count)} history entries.`;
+      this.statusEl.textContent = t("status.historyImported", {
+        count: String(count),
+      });
     } catch (err) {
       logger.error("Failed to import history:", err);
-      this.statusEl.textContent = "Failed to import history.";
+      this.statusEl.textContent = t("status.importHistoryError");
     } finally {
       input.value = "";
     }
