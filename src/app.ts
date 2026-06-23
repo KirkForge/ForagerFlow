@@ -9,7 +9,13 @@ import {
 } from "@/services/connectivity";
 import { generatePredictionReport } from "@/inference/results";
 import { modelRegistry } from "@/data/model-registry";
-import { ResultsRenderer, SafetyUI, SpeciesDetailPanel } from "@/ui";
+import {
+  ResultsRenderer,
+  SafetyUI,
+  SpeciesDetailPanel,
+  PredictionComparisonPanel,
+} from "@/ui";
+import type { ComparisonItem } from "@/ui/comparison";
 import {
   saveIdentification,
   getHistory,
@@ -34,6 +40,7 @@ export class AppController {
   private camera = new CameraService(config.captureSize);
   renderer: ResultsRenderer;
   detailPanel: SpeciesDetailPanel;
+  comparisonPanel: PredictionComparisonPanel;
   safety!: SafetyUI;
   statusEl: HTMLElement;
   badgeEl: HTMLElement;
@@ -68,8 +75,12 @@ export class AppController {
       onPredictionClick: (label) => {
         this.openSpeciesDetail(label);
       },
+      onComparisonShow: (labels) => {
+        this.openComparison(labels);
+      },
     });
     this.detailPanel = new SpeciesDetailPanel();
+    this.comparisonPanel = new PredictionComparisonPanel();
   }
 
   async init(): Promise<void> {
@@ -194,6 +205,7 @@ export class AppController {
     const key = select.value === "dima806" ? ModelKey.Dima806 : ModelKey.BVRA;
     this.renderer.clear();
     this.detailPanel.close();
+    this.comparisonPanel.close();
     this.#lastReport = undefined;
     inferenceService.switchModel(key);
   }
@@ -219,6 +231,34 @@ export class AppController {
       notes: t("knowledge.noData"),
     };
     this.detailPanel.open(label, prediction, knowledge, confidence);
+  }
+
+  private openComparison(labels: string[]): void {
+    if (labels.length < 2 || !this.#lastReport) return;
+
+    const modelKey = inferenceService.getActiveModelKey();
+    const model = modelRegistry[modelKey];
+    const items: ComparisonItem[] = [];
+
+    for (const label of labels) {
+      const prediction = this.#lastReport.predictions.find(
+        (p) => p.label === label,
+      );
+      if (!prediction) continue;
+      const knowledge = model.knowledge[label] ?? {
+        edibility: Edibility.Unknown,
+        notes: t("knowledge.noData"),
+      };
+      items.push({
+        prediction,
+        knowledge,
+        confidence: this.#lastReport.confidence,
+      });
+    }
+
+    if (items.length >= 2) {
+      this.comparisonPanel.open(items);
+    }
   }
 
   handleOfflineChange(): void {

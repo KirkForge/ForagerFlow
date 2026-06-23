@@ -59,6 +59,14 @@ export const enMessages: Messages = {
   "confidence.reliabilityMedium": "Medium reliability",
   "confidence.reliabilityLow": "Low reliability",
 
+  // Comparison
+  "comparison.title": "Compare species",
+  "comparison.closeAria": "Close comparison",
+  "comparison.toggle": "Compare",
+  "comparison.show": "Show comparison",
+  "comparison.selectAria": "Select {{species}} for comparison",
+  "comparison.maxReached": "Max {{max}} species",
+
   // Warnings
   "warning.lowConfidence": "Low confidence — do not act on this prediction.",
   "warning.toxicLookalike":

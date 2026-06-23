@@ -7,6 +7,8 @@ import { getLocalizedNotes } from "@/i18n/knowledge";
 
 export interface ResultsRendererOptions {
   onPredictionClick?: (label: string) => void;
+  onComparisonChange?: (labels: string[]) => void;
+  onComparisonShow?: (labels: string[]) => void;
 }
 
 export class ResultsRenderer {
@@ -16,6 +18,11 @@ export class ResultsRenderer {
   private warningEl: HTMLElement;
   private modelSelect: HTMLSelectElement;
   private onPredictionClick: ((label: string) => void) | undefined;
+  private onComparisonChange: ((labels: string[]) => void) | undefined;
+  private onComparisonShow: ((labels: string[]) => void) | undefined;
+  private compareActive = false;
+  private selectedLabels = new Set<string>();
+  private readonly maxCompare = 3;
 
   constructor(root: HTMLElement, opts: ResultsRendererOptions = {}) {
     this.container = root;
@@ -24,8 +31,11 @@ export class ResultsRenderer {
     this.warningEl = this.require("#warning");
     this.modelSelect = this.require("#model-select") as HTMLSelectElement;
     this.onPredictionClick = opts.onPredictionClick;
+    this.onComparisonChange = opts.onComparisonChange;
+    this.onComparisonShow = opts.onComparisonShow;
     this.bindModelSelector();
     this.bindPredictionClicks();
+    this.bindComparisonControls();
   }
 
   clear(): void {
@@ -33,19 +43,25 @@ export class ResultsRenderer {
     this.knowledgeEl.innerHTML = "";
     this.knowledgeEl.style.display = "none";
     this.warningEl.style.display = "none";
+    this.compareActive = false;
+    this.selectedLabels.clear();
   }
 
   render(report: PredictionReport, model: ModelRegistryEntry): void {
     this.clear();
+    this.compareActive = false;
+    this.selectedLabels.clear();
 
     if (report.requiresWarning && report.warningMessage) {
       this.warningEl.textContent = report.warningMessage;
       this.warningEl.style.display = "block";
     }
 
-    this.predictionsEl.innerHTML = report.predictions
+    const toolbar = this.renderCompareToolbar();
+    const predictionsHtml = report.predictions
       .map((item) => this.renderPrediction(item, model))
       .join("");
+    this.predictionsEl.innerHTML = toolbar + predictionsHtml;
 
     const top = report.predictions[0];
     if (top) {
@@ -81,6 +97,21 @@ export class ResultsRenderer {
     }
   }
 
+  private renderCompareToolbar(): string {
+    const activeClass = this.compareActive ? "compare-active" : "";
+    const showBtn = this.compareActive
+      ? `<button type="button" id="compare-show" class="compare-show" disabled>${t("comparison.show")}</button>`
+      : "";
+    return `
+      <div class="compare-toolbar ${activeClass}">
+        <button type="button" id="compare-toggle" class="compare-toggle" aria-pressed="${String(this.compareActive)}">
+          ${t("comparison.toggle")}
+        </button>
+        ${showBtn}
+      </div>
+    `;
+  }
+
   private renderPrediction(
     item: { label: string; probability: number },
     model: ModelRegistryEntry,
@@ -105,9 +136,13 @@ export class ResultsRenderer {
       ? sanitizeText(t("prediction.openDetailsAria", { species: item.label }))
       : "";
     const ariaAttr = ariaLabel ? `aria-label="${ariaLabel}"` : "";
+    const checkbox = this.compareActive
+      ? `<input type="checkbox" class="compare-checkbox" data-label="${sanitizeText(item.label)}" aria-label="${sanitizeText(t("comparison.selectAria", { species: item.label }))}" />`
+      : "";
 
     return `
       <div class="prediction ${clickable}" data-label="${sanitizeText(item.label)}" ${roleAttr} ${tabindexAttr} ${ariaAttr}>
+        ${checkbox}
         <div class="label">
           <div class="prediction-name">${sanitizeText(item.label)}</div>
           <div class="prediction-edibility ${edClass}">${edText}</div>
@@ -123,6 +158,9 @@ export class ResultsRenderer {
   private bindPredictionClicks(): void {
     this.predictionsEl.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
+      if (target.closest(".compare-checkbox") || target.closest(".compare-toggle") || target.closest(".compare-show")) {
+        return;
+      }
       const prediction = target.closest("[data-label]");
       if (prediction && this.onPredictionClick) {
         const label = prediction.getAttribute("data-label");
@@ -151,6 +189,98 @@ export class ResultsRenderer {
         }
       }
     });
+  }
+
+  private bindComparisonControls(): void {
+    this.predictionsEl.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      const toggle = target.closest("#compare-toggle");
+      if (toggle) {
+        this.compareActive = !this.compareActive;
+        this.selectedLabels.clear();
+        this.refreshToolbar();
+        this.emitComparisonChange();
+        return;
+      }
+      const checkbox = target.closest(".compare-checkbox");
+      if (checkbox instanceof HTMLInputElement) {
+        const label = checkbox.getAttribute("data-label");
+        if (!label) return;
+        if (checkbox.checked) {
+          if (this.selectedLabels.size >= this.maxCompare) {
+            checkbox.checked = false;
+            this.showMaxReached();
+            return;
+          }
+          this.selectedLabels.add(label);
+        } else {
+          this.selectedLabels.delete(label);
+        }
+        this.updateShowButton();
+        this.emitComparisonChange();
+        return;
+      }
+      const showBtn = target.closest("#compare-show");
+      if (showBtn) {
+        this.onComparisonShow?.([...this.selectedLabels]);
+      }
+    });
+  }
+
+  private refreshToolbar(): void {
+    const toolbar = this.predictionsEl.querySelector(".compare-toolbar");
+    if (!toolbar) return;
+    toolbar.outerHTML = this.renderCompareToolbar();
+    this.updatePredictionCheckboxes();
+  }
+
+  private updatePredictionCheckboxes(): void {
+    for (const row of this.predictionsEl.querySelectorAll(".prediction")) {
+      const label = row.getAttribute("data-label");
+      const existing = row.querySelector(".compare-checkbox");
+      if (this.compareActive) {
+        if (!existing) {
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.className = "compare-checkbox";
+          checkbox.setAttribute("data-label", label ?? "");
+          checkbox.setAttribute(
+            "aria-label",
+            sanitizeText(t("comparison.selectAria", { species: label ?? "" })),
+          );
+          checkbox.checked = this.selectedLabels.has(label ?? "");
+          row.insertBefore(checkbox, row.firstChild);
+        }
+      } else {
+        existing?.remove();
+      }
+    }
+  }
+
+  private updateShowButton(): void {
+    const showBtn = this.predictionsEl.querySelector("#compare-show");
+    if (!(showBtn instanceof HTMLButtonElement)) return;
+    showBtn.disabled = this.selectedLabels.size < 2;
+    showBtn.textContent = t("comparison.show", { count: String(this.selectedLabels.size) });
+  }
+
+  private emitComparisonChange(): void {
+    this.onComparisonChange?.([...this.selectedLabels]);
+  }
+
+  private showMaxReached(): void {
+    const toolbar = this.predictionsEl.querySelector(".compare-toolbar");
+    if (!toolbar) return;
+    let msg = toolbar.querySelector(".compare-max-msg");
+    if (!msg) {
+      msg = document.createElement("span");
+      msg.className = "compare-max-msg";
+      toolbar.appendChild(msg);
+    }
+    msg.textContent = t("comparison.maxReached", { max: String(this.maxCompare) });
+    window.setTimeout(() => {
+      msg.remove();
+    }, 2000);
   }
 
   private bindModelSelector(): void {

@@ -60,6 +60,14 @@ export const daMessages: Messages = {
   "confidence.reliabilityMedium": "Middel pålidelighed",
   "confidence.reliabilityLow": "Lav pålidelighed",
 
+  // Comparison
+  "comparison.title": "Sammenlign arter",
+  "comparison.closeAria": "Luk sammenligning",
+  "comparison.toggle": "Sammenlign",
+  "comparison.show": "Vis sammenligning",
+  "comparison.selectAria": "Vælg {{species}} til sammenligning",
+  "comparison.maxReached": "Maks {{max}} arter",
+
   // Warnings
   "warning.lowConfidence": "Lav sikkerhed — handle ikke på dette resultat.",
   "warning.toxicLookalike":

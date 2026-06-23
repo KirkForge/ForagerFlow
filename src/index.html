@@ -314,6 +314,30 @@
       </div>
     </dialog>
 
+    <dialog
+      id="comparison-modal"
+      aria-labelledby="comparison-title"
+      aria-describedby="comparison-body"
+    >
+      <div id="comparison-content">
+        <div class="detail-header">
+          <h2 id="comparison-title">Sammenlign arter</h2>
+          <button
+            id="comparison-close"
+            type="button"
+            value="close"
+            aria-label="Luk sammenligning"
+          >
+            ×
+          </button>
+        </div>
+        <div id="comparison-body">
+          <div id="comparison-grid" class="comparison-grid"></div>
+          <p id="comparison-safety" class="detail-safety"></p>
+        </div>
+      </div>
+    </dialog>
+
     <script type="module" src="/main.ts"></script>
   </body>
 </html>

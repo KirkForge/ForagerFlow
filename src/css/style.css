@@ -587,7 +587,8 @@ video {
 #model-confirm-modal,
 #storage-confirm-modal,
 #clear-confirm-modal,
-#species-detail-modal {
+#species-detail-modal,
+#comparison-modal {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 20px;
@@ -601,7 +602,8 @@ video {
 #model-confirm-modal::backdrop,
 #storage-confirm-modal::backdrop,
 #clear-confirm-modal::backdrop,
-#species-detail-modal::backdrop {
+#species-detail-modal::backdrop,
+#comparison-modal::backdrop {
   background: rgba(0, 0, 0, 0.7);
 }
 #safety-modal h2,
@@ -800,6 +802,132 @@ video {
 .detail-calibrated {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* ─── Prediction comparison ───────────────────────── */
+.compare-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+
+.compare-toggle {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.compare-toggle[aria-pressed="true"] {
+  background: var(--accent);
+  color: #0a0a0a;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.compare-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.compare-show {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.compare-show:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.compare-show:not(:disabled) {
+  background: var(--accent);
+  color: #0a0a0a;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.compare-show:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.compare-max-msg {
+  font-size: 10px;
+  color: var(--warn);
+  margin-left: auto;
+}
+
+.compare-checkbox {
+  margin: 0 6px 0 2px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.compare-active .prediction {
+  padding-left: 2px;
+}
+
+#comparison-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 70vh;
+}
+
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.comparison-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comparison-card h3 {
+  margin: 0;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.comparison-card .detail-meta {
+  gap: 4px;
+}
+
+.comparison-card .detail-notes {
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 0;
+  flex: 1;
+}
+
+.comparison-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 /* Last-identification callout above the camera. */

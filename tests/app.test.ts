@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ModelKey } from "@/core/types";
 import type { CaptureResult } from "@/services/camera";
 import { AppController } from "@/app";
+import { ResultsRenderer } from "@/ui";
 import { flushPromises } from "./helpers/promises";
 import { makeHistoryEntry } from "./helpers/fixtures";
 import { setLocale } from "@/i18n";
@@ -47,6 +48,7 @@ const mockInferenceService = vi.hoisted<MockInferenceService>(() => {
     infer: vi.fn(),
     terminate: vi.fn(),
     isReady: vi.fn().mockReturnValue(false),
+    getActiveModelKey: vi.fn().mockReturnValue("bvra"),
   };
 });
 
@@ -67,6 +69,11 @@ const mockSafety = vi.hoisted(() => ({
 }));
 
 const mockDetailPanel = vi.hoisted(() => ({
+  open: vi.fn(),
+  close: vi.fn(),
+}));
+
+const mockComparisonPanel = vi.hoisted(() => ({
   open: vi.fn(),
   close: vi.fn(),
 }));
@@ -111,6 +118,9 @@ vi.mock("@/ui", () => ({
   }),
   SpeciesDetailPanel: vi.fn(function () {
     return mockDetailPanel;
+  }),
+  PredictionComparisonPanel: vi.fn(function () {
+    return mockComparisonPanel;
   }),
 }));
 
@@ -532,6 +542,60 @@ describe("AppController", () => {
     await flushPromises();
     const status = document.querySelector("#status") as HTMLElement;
     expect(status.textContent).toBe("Failed to import history.");
+  });
+
+  it("opens species detail when a prediction is clicked", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+
+    const options = vi.mocked(ResultsRenderer).mock.calls[0]?.[1];
+    expect(options).toBeDefined();
+    expect(options?.onPredictionClick).toBeTypeOf("function");
+    options?.onPredictionClick?.(model.labels[0] ?? "Agaricus bisporus");
+
+    expect(mockDetailPanel.open).toHaveBeenCalled();
+  });
+
+  it("opens comparison panel when two predictions are selected", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+
+    const options = vi.mocked(ResultsRenderer).mock.calls[0]?.[1];
+    expect(options).toBeDefined();
+    options?.onComparisonShow?.([
+      model.labels[0] ?? "Agaricus bisporus",
+      model.labels[1] ?? "Amanita phalloides",
+    ]);
+
+    expect(mockComparisonPanel.open).toHaveBeenCalled();
+  });
+
+  it("closes detail and comparison panels on model switch", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const select = document.querySelector("#model-select") as HTMLSelectElement;
+    select.value = "dima806";
+    select.dispatchEvent(new Event("change"));
+
+    expect(mockDetailPanel.close).toHaveBeenCalled();
+    expect(mockComparisonPanel.close).toHaveBeenCalled();
   });
 });
 
