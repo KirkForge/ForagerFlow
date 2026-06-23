@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ResultsRenderer } from "@/ui/results";
+import { Edibility } from "@/core/types";
 import { makeMockModel, makeReport } from "./helpers/fixtures";
 
 function renderResultsHTML(): HTMLElement {
@@ -179,5 +180,202 @@ describe("ResultsRenderer", () => {
 
     expect(onClick).toHaveBeenCalledTimes(1);
     expect(onClick).toHaveBeenCalledWith("Agaricus bisporus");
+  });
+
+  describe("comparison mode", () => {
+    it("toggles compare mode when compare button is clicked", () => {
+      const renderer = new ResultsRenderer(root);
+      renderer.render(makeReport(), makeMockModel());
+
+      const toggle = root.querySelector("#compare-toggle") as HTMLButtonElement;
+      toggle.click();
+
+      expect(root.querySelectorAll(".compare-checkbox")).toHaveLength(3);
+      expect(
+        root.querySelector("#compare-toggle")!.getAttribute("aria-pressed"),
+      ).toBe("true");
+
+      (root.querySelector("#compare-toggle") as HTMLButtonElement).click();
+      expect(root.querySelectorAll(".compare-checkbox")).toHaveLength(0);
+      expect(
+        root.querySelector("#compare-toggle")!.getAttribute("aria-pressed"),
+      ).toBe("false");
+    });
+
+    it("emits onComparisonChange when selections change", () => {
+      const onChange = vi.fn();
+      const renderer = new ResultsRenderer(root, {
+        onComparisonChange: onChange,
+      });
+      renderer.render(makeReport(), makeMockModel());
+
+      (root.querySelector("#compare-toggle") as HTMLButtonElement).click();
+
+      const boxes = root.querySelectorAll(
+        ".compare-checkbox",
+      ) as NodeListOf<HTMLInputElement>;
+      boxes[0]!.click();
+      expect(onChange).toHaveBeenLastCalledWith(["Agaricus bisporus"]);
+
+      boxes[0]!.click();
+      expect(onChange).toHaveBeenLastCalledWith([]);
+    });
+
+    it("emits onComparisonShow with selected labels", () => {
+      const onShow = vi.fn();
+      const renderer = new ResultsRenderer(root, {
+        onComparisonShow: onShow,
+      });
+      renderer.render(makeReport(), makeMockModel());
+
+      (root.querySelector("#compare-toggle") as HTMLButtonElement).click();
+
+      const boxes = root.querySelectorAll(
+        ".compare-checkbox",
+      ) as NodeListOf<HTMLInputElement>;
+      boxes[0]!.click();
+      boxes[1]!.click();
+
+      const showBtn = root.querySelector("#compare-show") as HTMLButtonElement;
+      expect(showBtn.disabled).toBe(false);
+      showBtn.click();
+
+      expect(onShow).toHaveBeenCalledWith([
+        "Agaricus bisporus",
+        "Amanita phalloides",
+      ]);
+    });
+
+    it("blocks selection beyond max compare and shows a message", () => {
+      vi.useFakeTimers();
+      const renderer = new ResultsRenderer(root);
+      const model = makeMockModel({
+        labels: ["A", "B", "C", "D"],
+        knowledge: {
+          A: { edibility: Edibility.Edible, notes: "A" },
+          B: { edibility: Edibility.Edible, notes: "B" },
+          C: { edibility: Edibility.Edible, notes: "C" },
+          D: { edibility: Edibility.Edible, notes: "D" },
+        },
+      });
+      renderer.render(
+        makeReport({
+          predictions: [
+            { label: "A", probability: 0.5, index: 0 },
+            { label: "B", probability: 0.3, index: 1 },
+            { label: "C", probability: 0.15, index: 2 },
+            { label: "D", probability: 0.05, index: 3 },
+          ],
+        }),
+        model,
+      );
+      (root.querySelector("#compare-toggle") as HTMLButtonElement).click();
+
+      const boxes = root.querySelectorAll(
+        ".compare-checkbox",
+      ) as NodeListOf<HTMLInputElement>;
+      for (const box of boxes) {
+        box.click();
+      }
+
+      const checked = Array.from(boxes).filter((b) => b.checked);
+      expect(checked).toHaveLength(3);
+      const toolbar = root.querySelector(".compare-toolbar");
+      const maxMsg = toolbar?.querySelector(".compare-max-msg");
+      expect(maxMsg).not.toBeNull();
+      expect(maxMsg?.textContent).toBeTruthy();
+
+      vi.advanceTimersByTime(2500);
+      expect(toolbar?.querySelector(".compare-max-msg")).toBeNull();
+      vi.useRealTimers();
+    });
+
+    it("resets selection when toggling compare mode off", () => {
+      const onChange = vi.fn();
+      const renderer = new ResultsRenderer(root, {
+        onComparisonChange: onChange,
+      });
+      renderer.render(makeReport(), makeMockModel());
+      (root.querySelector("#compare-toggle") as HTMLButtonElement).click();
+
+      const boxes = root.querySelectorAll(
+        ".compare-checkbox",
+      ) as NodeListOf<HTMLInputElement>;
+      boxes[0]!.click();
+
+      (root.querySelector("#compare-toggle") as HTMLButtonElement).click();
+      expect(onChange).toHaveBeenLastCalledWith([]);
+    });
+
+    it("keeps show button disabled until two selections", () => {
+      const renderer = new ResultsRenderer(root);
+      renderer.render(makeReport(), makeMockModel());
+      (root.querySelector("#compare-toggle") as HTMLButtonElement).click();
+
+      const showBtn = root.querySelector("#compare-show") as HTMLButtonElement;
+      expect(showBtn.disabled).toBe(true);
+
+      const boxes = root.querySelectorAll(
+        ".compare-checkbox",
+      ) as NodeListOf<HTMLInputElement>;
+      boxes[0]!.click();
+      expect(showBtn.disabled).toBe(true);
+
+      boxes[1]!.click();
+      expect(showBtn.disabled).toBe(false);
+    });
+
+    it("does not invoke onPredictionClick when clicking checkbox or toolbar", () => {
+      const onClick = vi.fn();
+      const renderer = new ResultsRenderer(root, { onPredictionClick: onClick });
+      renderer.render(makeReport(), makeMockModel());
+      (root.querySelector("#compare-toggle") as HTMLButtonElement).click();
+
+      const box = root.querySelector(".compare-checkbox") as HTMLInputElement;
+      box.click();
+      expect(onClick).not.toHaveBeenCalled();
+
+      const showBtn = root.querySelector("#compare-show") as HTMLButtonElement;
+      showBtn.click();
+      expect(onClick).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("warning paths", () => {
+    it("does not show warning when requiresWarning is false", () => {
+      const renderer = new ResultsRenderer(root);
+      renderer.render(makeReport({ requiresWarning: false }), makeMockModel());
+
+      expect(
+        (root.querySelector("#warning") as HTMLElement).style.display,
+      ).toBe("none");
+    });
+
+    it("shows warning when message is present", () => {
+      const renderer = new ResultsRenderer(root);
+      renderer.render(
+        makeReport({
+          requiresWarning: true,
+          warningMessage: "Poisonous result",
+        }),
+        makeMockModel(),
+      );
+
+      const warning = root.querySelector("#warning") as HTMLElement;
+      expect(warning.style.display).toBe("block");
+      expect(warning.textContent).toBe("Poisonous result");
+    });
+
+    it("does not show warning when message is missing", () => {
+      const renderer = new ResultsRenderer(root);
+      renderer.render(
+        makeReport({ requiresWarning: true, warningMessage: null }),
+        makeMockModel(),
+      );
+
+      expect(
+        (root.querySelector("#warning") as HTMLElement).style.display,
+      ).toBe("none");
+    });
   });
 });

@@ -153,6 +153,8 @@ function renderAppHTML(): void {
       <input id="history-import-input" type="file" accept="application/json" />
       <button id="history-clear">Clear</button>
       <button id="camera-retry">Retry</button>
+      <input id="location-toggle" type="checkbox" />
+      <span id="location-status"></span>
     </div>
   `;
 }

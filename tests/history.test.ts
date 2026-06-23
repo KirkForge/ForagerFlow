@@ -335,5 +335,38 @@ describe("history with IndexedDB", () => {
       const entries = await searchHistory("Agaricus", { limit: 2 });
       expect(entries).toHaveLength(2);
     });
+
+    it("falls back to getHistory when query is empty or whitespace", async () => {
+      const empty = await searchHistory("");
+      const whitespace = await searchHistory("   ");
+      expect(empty.length).toBeGreaterThan(0);
+      expect(whitespace.length).toBeGreaterThan(0);
+    });
+
+    it("overwrites duplicate ids when importing", async () => {
+      const entry = makeHistoryEntry({ id: "dup-1", top1Species: "Original" });
+      const backup: HistoryBackup = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        entries: [entry],
+      };
+      await importHistory(JSON.stringify(backup));
+
+      const updated = makeHistoryEntry({
+        id: "dup-1",
+        top1Species: "Updated",
+      });
+      const updatedBackup: HistoryBackup = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        entries: [updated],
+      };
+      await importHistory(JSON.stringify(updatedBackup));
+
+      const entries = await getHistory(10);
+      const imported = entries.find((e) => e.id === "dup-1");
+      expect(imported).toBeDefined();
+      expect(imported!.top1Species).toBe("Updated");
+    });
   });
 });
