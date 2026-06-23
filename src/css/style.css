@@ -448,6 +448,38 @@ video {
   opacity: 1;
   color: var(--warn);
 }
+.history-location {
+  display: block;
+  font-size: 10px;
+  color: var(--accent);
+  text-decoration: none;
+  margin-top: 2px;
+}
+.history-location::before {
+  content: "📍 ";
+}
+
+.location-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding: 0 var(--space-1) var(--space-1);
+  font-size: 12px;
+}
+.location-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.location-status {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-align: right;
+  flex: 1;
+}
 
 /* ─── Phone-first safety ────────────────────────────── */
 

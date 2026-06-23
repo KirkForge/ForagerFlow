@@ -76,6 +76,15 @@ export const enMessages: Messages = {
   "history.confidence": "{{prob}}% confidence",
   "history.deleteEntryAria": "Delete this entry",
   "history.loadError": "Unable to load history.",
+  "history.location": "Location: {{lat}}, {{lng}}",
+
+  // Location toggle
+  "location.enabled": "GPS tagging enabled (local only).",
+  "location.disabled": "GPS tagging disabled.",
+  "location.active": "Location captured: {{lat}}, {{lng}}",
+  "location.denied": "Location denied — check device permissions.",
+  "location.unavailable": "Location unavailable right now.",
+  "location.timeout": "Location took too long.",
 
   // Safety footer
   "safety.footer.text": "Never eat a wild mushroom based on this app.",

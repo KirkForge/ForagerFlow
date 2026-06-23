@@ -127,6 +127,23 @@
           </div>
           <button id="history-clear" aria-label="Ryd al historik">Ryd</button>
         </div>
+        <div class="location-control">
+          <label class="location-toggle">
+            <input
+              type="checkbox"
+              id="location-toggle"
+              role="switch"
+              aria-label="Gem GPS-placering lokalt på enheden"
+            />
+            Gem GPS-placering (kun lokalt)
+          </label>
+          <span
+            id="location-status"
+            class="location-status"
+            role="status"
+            aria-live="polite"
+          ></span>
+        </div>
         <div id="history-list" aria-label="Tidligere identifikationer"></div>
       </div>
     </div>

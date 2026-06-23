@@ -7,6 +7,12 @@ import type {
 import { logger } from "@/core/logger";
 import { openDB, withTransaction, setMeta, STORE_NAME } from "./db";
 
+export interface GeoLocation {
+  lat: number;
+  lng: number;
+  accuracy?: number;
+}
+
 export interface HistoryEntry {
   id: string;
   timestamp: string;
@@ -17,6 +23,7 @@ export interface HistoryEntry {
   predictions: { label: string; probability: number }[];
   thumbnail: string;
   notes: string;
+  location?: GeoLocation;
 }
 
 export interface HistoryBackup {
@@ -29,8 +36,9 @@ function makeEntry(
   report: PredictionReport,
   modelKey: ModelKey,
   thumbnail?: string,
+  location?: GeoLocation,
 ): HistoryEntry {
-  return {
+  const entry: HistoryEntry = {
     id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
     modelKey,
@@ -44,6 +52,10 @@ function makeEntry(
     thumbnail: thumbnail ?? "",
     notes: report.top1Knowledge.notes,
   };
+  if (location) {
+    entry.location = location;
+  }
+  return entry;
 }
 
 function isQuotaExceeded(err: unknown): boolean {
@@ -86,6 +98,34 @@ function isValidPrediction(
     probability >= 0 &&
     probability <= 1
   );
+}
+
+export function isValidLocation(value: unknown): value is GeoLocation {
+  if (!value || typeof value !== "object") return false;
+  const { lat, lng, accuracy } = value as Record<string, unknown>;
+  if (
+    typeof lat !== "number" ||
+    !Number.isFinite(lat) ||
+    lat < -90 ||
+    lat > 90
+  ) {
+    return false;
+  }
+  if (
+    typeof lng !== "number" ||
+    !Number.isFinite(lng) ||
+    lng < -180 ||
+    lng > 180
+  ) {
+    return false;
+  }
+  if (
+    accuracy !== undefined &&
+    (typeof accuracy !== "number" || !Number.isFinite(accuracy) || accuracy < 0)
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function validateHistoryEntry(raw: unknown, index: number): HistoryEntry {
@@ -155,7 +195,15 @@ function validateHistoryEntry(raw: unknown, index: number): HistoryEntry {
   const notes = entry["notes"];
   const notesString = typeof notes === "string" ? notes : "";
 
-  return {
+  const location = entry["location"];
+  const validLocation = isValidLocation(location) ? location : undefined;
+  if (location !== undefined && !validLocation) {
+    logger.warn(
+      `History entry ${String(index + 1)} has invalid location; discarding it`,
+    );
+  }
+
+  const result: HistoryEntry = {
     id,
     timestamp,
     modelKey,
@@ -166,14 +214,19 @@ function validateHistoryEntry(raw: unknown, index: number): HistoryEntry {
     thumbnail,
     notes: notesString,
   };
+  if (validLocation) {
+    result.location = validLocation;
+  }
+  return result;
 }
 
 export async function saveIdentification(
   report: PredictionReport,
   modelKey: ModelKey,
   thumbnail?: string,
+  location?: GeoLocation,
 ): Promise<string> {
-  const entry = makeEntry(report, modelKey, thumbnail);
+  const entry = makeEntry(report, modelKey, thumbnail, location);
 
   try {
     const db = await openDB();

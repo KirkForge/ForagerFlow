@@ -77,6 +77,15 @@ export const daMessages: Messages = {
   "history.confidence": "{{prob}}% sikkerhed",
   "history.deleteEntryAria": "Slet denne post",
   "history.loadError": "Kunne ikke indlæse historikken.",
+  "history.location": "Sted: {{lat}}, {{lng}}",
+
+  // Location toggle
+  "location.enabled": "GPS-tagning aktiveret (kun lokalt).",
+  "location.disabled": "GPS-tagning slået fra.",
+  "location.active": "Placering registreret: {{lat}}, {{lng}}",
+  "location.denied": "Placering afvist — tjek enhedens tilladelser.",
+  "location.unavailable": "Placering ikke tilgængelig lige nu.",
+  "location.timeout": "Placering tog for lang tid.",
 
   // Safety footer
   "safety.footer.text": "Spis aldrig en vild svamp baseret på denne app.",

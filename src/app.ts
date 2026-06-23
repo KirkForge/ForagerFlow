@@ -15,16 +15,19 @@ import {
   clearHistory,
   exportHistory,
   importHistory,
+  isDataUrlThumbnail,
+  isValidLocation,
 } from "@/services/history";
-import type { HistoryEntry } from "@/services/history";
+import type { HistoryEntry, GeoLocation } from "@/services/history";
 import { closeDB } from "@/services/history/db";
 import { initWebVitals } from "@/services/web-vitals";
 import { logger } from "@/core/logger";
 import { sanitizeText } from "@/core/sanitize";
 import { config } from "@/core/config";
 import { getEdibilityClass, createEl } from "@/ui/utils";
-import { isDataUrlThumbnail } from "@/services/history";
 import { t } from "@/i18n";
+
+const LOCATION_ENABLED_KEY = "ff:location-enabled-v1";
 
 export class AppController {
   private camera = new CameraService(config.captureSize);
@@ -37,8 +40,11 @@ export class AppController {
   cameraErrorEl: HTMLElement;
   fileFallbackBtn: HTMLButtonElement | null = null;
   fileInputEl: HTMLInputElement | null = null;
+  locationToggle: HTMLInputElement | null = null;
+  locationStatus: HTMLElement | null = null;
   #historyRenderPending = false;
   #pendingThumbnail: string | null = null;
+  #pendingLocation: GeoLocation | undefined;
 
   constructor() {
     this.statusEl = this.require("#status");
@@ -51,6 +57,10 @@ export class AppController {
     this.fileFallbackBtn =
       document.querySelector<HTMLButtonElement>("#file-fallback-btn");
     this.fileInputEl = document.querySelector<HTMLInputElement>("#file-input");
+    this.locationToggle =
+      document.querySelector<HTMLInputElement>("#location-toggle");
+    this.locationStatus =
+      document.querySelector<HTMLElement>("#location-status");
     this.renderer = new ResultsRenderer(this.require("#app"));
   }
 
@@ -83,12 +93,14 @@ export class AppController {
           report,
           modelKey,
           this.#pendingThumbnail ?? undefined,
+          this.#pendingLocation,
         )
           .catch((_e: unknown) => {
             /* best-effort save */
           })
           .finally(() => {
             this.#pendingThumbnail = null;
+            this.#pendingLocation = undefined;
           });
         void this.renderHistory();
       } catch (err) {
@@ -106,6 +118,7 @@ export class AppController {
     });
 
     await this.safety.init();
+    this.initLocationToggle();
 
     await this.startCamera();
     void this.renderHistory();
@@ -134,6 +147,7 @@ export class AppController {
     this.setCaptureBusy(true);
     this.statusEl.textContent = t("status.identifying");
     this.#pendingThumbnail = result.thumbnail;
+    this.startLocationCapture();
     inferenceService.infer(result.buffer, result.width, result.height);
   }
 
@@ -153,6 +167,7 @@ export class AppController {
       this.setCaptureBusy(true);
       this.statusEl.textContent = t("status.identifying");
       this.#pendingThumbnail = result.thumbnail;
+      this.startLocationCapture();
       inferenceService.infer(result.buffer, result.width, result.height);
     } catch (err) {
       logger.error("File processing failed:", err);
@@ -174,6 +189,95 @@ export class AppController {
 
   handleOfflineChange(): void {
     updateOnlineStatus(this.badgeEl);
+  }
+
+  private initLocationToggle(): void {
+    if (!this.locationToggle || !this.locationStatus) return;
+
+    const enabled = localStorage.getItem(LOCATION_ENABLED_KEY) === "true";
+    const toggle = this.locationToggle;
+    toggle.checked = enabled;
+    this.updateLocationStatus(enabled);
+
+    toggle.addEventListener("change", () => {
+      const now = toggle.checked;
+      localStorage.setItem(LOCATION_ENABLED_KEY, String(now));
+      this.updateLocationStatus(now);
+      if (now) {
+        void this.captureLocation();
+      } else {
+        this.#pendingLocation = undefined;
+      }
+    });
+  }
+
+  private updateLocationStatus(enabled: boolean): void {
+    this.setLocationStatus(
+      enabled ? t("location.enabled") : t("location.disabled"),
+    );
+  }
+
+  private setLocationStatus(text: string): void {
+    if (this.locationStatus) {
+      this.locationStatus.textContent = text;
+    }
+  }
+
+  private async captureLocation(): Promise<void> {
+    if (!this.locationToggle?.checked) return;
+    if (!("geolocation" in navigator)) {
+      this.setLocationStatus(t("location.unavailable"));
+      return;
+    }
+
+    try {
+      const position = await new Promise<GeolocationPosition>(
+        (resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 60000,
+          });
+        },
+      );
+      this.#pendingLocation = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+      };
+      this.setLocationStatus(
+        t("location.active", {
+          lat: this.#pendingLocation.lat.toFixed(4),
+          lng: this.#pendingLocation.lng.toFixed(4),
+        }),
+      );
+    } catch (err) {
+      const error = err as GeolocationPositionError | Error;
+      const code = "code" in error ? error.code : undefined;
+      let key: string;
+      switch (code) {
+        case 1:
+          key = "location.denied";
+          break;
+        case 2:
+          key = "location.unavailable";
+          break;
+        case 3:
+          key = "location.timeout";
+          break;
+        case undefined:
+        default:
+          key = "location.unavailable";
+          break;
+      }
+      this.setLocationStatus(t(key));
+    }
+  }
+
+  private startLocationCapture(): void {
+    if (!this.locationToggle?.checked) return;
+    this.#pendingLocation = undefined;
+    void this.captureLocation();
   }
 
   private async renderLastResult(): Promise<void> {
@@ -243,6 +347,20 @@ export class AppController {
     entryEl.appendChild(
       createEl("div", "history-prob", t("history.confidence", { prob })),
     );
+
+    if (entry.location && isValidLocation(entry.location)) {
+      const { lat, lng } = entry.location;
+      const link = document.createElement("a");
+      link.href = `geo:${String(lat)},${String(lng)}?q=${String(lat)},${String(lng)}`;
+      link.className = "history-location";
+      link.textContent = t("history.location", {
+        lat: lat.toFixed(4),
+        lng: lng.toFixed(4),
+      });
+      link.target = "_blank";
+      link.rel = "noopener";
+      entryEl.appendChild(link);
+    }
 
     const delBtn = createEl(
       "button",
