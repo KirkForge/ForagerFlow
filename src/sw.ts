@@ -1,5 +1,11 @@
 /// <reference lib="webworker" />
 
+import { config } from "@/core/config";
+import {
+  createRangedResponse,
+  hasEnoughStorageToCache,
+} from "@/sw-utils";
+
 declare const self: ServiceWorkerGlobalScope;
 
 // Injected by Vite at build time.
@@ -11,6 +17,7 @@ const CACHE_MODELS = `foragerflow-models-${__APP_VERSION__}`;
 const SHELL_ASSETS: string[] = [
   "/",
   "/index.html",
+  "/offline.html",
   "/manifest.webmanifest",
   "/js/ort.min.js",
   "/js/ort-wasm-simd-threaded.wasm",
@@ -74,6 +81,13 @@ self.addEventListener("fetch", (e: FetchEvent) => {
   e.respondWith(handleStaticRequest(req));
 });
 
+async function handleOfflineFallback(): Promise<Response> {
+  const cache = await caches.open(CACHE_SHELL);
+  const cached = await cache.match("/offline.html");
+  if (cached) return cached;
+  return new Response("Offline — no cached app shell", { status: 503 });
+}
+
 async function handleNavigation(req: Request): Promise<Response> {
   const cache = await caches.open(CACHE_SHELL);
   try {
@@ -85,19 +99,34 @@ async function handleNavigation(req: Request): Promise<Response> {
   } catch {
     const cached = await cache.match("/index.html");
     if (cached) return cached;
-    return new Response("Offline — no cached app shell", { status: 503 });
+    return handleOfflineFallback();
   }
 }
 
 async function handleModelRequest(req: Request): Promise<Response> {
   const cache = await caches.open(CACHE_MODELS);
   const cached = await cache.match(req);
-  if (cached) return cached;
+  const rangeHeader = req.headers.get("range");
+  if (cached) {
+    if (rangeHeader) {
+      return createRangedResponse(cached.clone(), rangeHeader);
+    }
+    return cached;
+  }
 
   try {
     const networkRes = await fetch(req);
     if (networkRes.ok) {
-      await cache.put(req, networkRes.clone());
+      const estimate = await navigator.storage.estimate();
+      const canCache = hasEnoughStorageToCache(
+        networkRes,
+        estimate,
+        config.swModelCacheQuotaFraction,
+        config.swMinFreeBytes,
+      );
+      if (canCache) {
+        await cache.put(req, networkRes.clone());
+      }
     }
     return networkRes;
   } catch {
