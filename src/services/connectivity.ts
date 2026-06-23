@@ -1,4 +1,5 @@
 import { logger } from "@/core/logger";
+import { t } from "@/i18n";
 
 export function registerServiceWorker(): void {
   if ("serviceWorker" in navigator) {
@@ -12,6 +13,6 @@ export function registerServiceWorker(): void {
 
 export function updateOnlineStatus(badge: HTMLElement): void {
   const online = navigator.onLine;
-  badge.textContent = online ? "Online" : "Offline";
+  badge.textContent = online ? t("app.online") : t("app.offline");
   badge.style.color = online ? "var(--accent)" : "var(--warn)";
 }

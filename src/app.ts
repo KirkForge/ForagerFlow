@@ -15,15 +15,19 @@ import {
   clearHistory,
   exportHistory,
   importHistory,
+  isDataUrlThumbnail,
+  isValidLocation,
 } from "@/services/history";
-import type { HistoryEntry } from "@/services/history";
+import type { HistoryEntry, GeoLocation } from "@/services/history";
 import { closeDB } from "@/services/history/db";
 import { initWebVitals } from "@/services/web-vitals";
 import { logger } from "@/core/logger";
 import { sanitizeText } from "@/core/sanitize";
 import { config } from "@/core/config";
 import { getEdibilityClass, createEl } from "@/ui/utils";
-import { isDataUrlThumbnail } from "@/services/history";
+import { t } from "@/i18n";
+
+const LOCATION_ENABLED_KEY = "ff:location-enabled-v1";
 
 export class AppController {
   private camera = new CameraService(config.captureSize);
@@ -36,8 +40,11 @@ export class AppController {
   cameraErrorEl: HTMLElement;
   fileFallbackBtn: HTMLButtonElement | null = null;
   fileInputEl: HTMLInputElement | null = null;
+  locationToggle: HTMLInputElement | null = null;
+  locationStatus: HTMLElement | null = null;
   #historyRenderPending = false;
   #pendingThumbnail: string | null = null;
+  #pendingLocation: GeoLocation | undefined;
 
   constructor() {
     this.statusEl = this.require("#status");
@@ -50,6 +57,10 @@ export class AppController {
     this.fileFallbackBtn =
       document.querySelector<HTMLButtonElement>("#file-fallback-btn");
     this.fileInputEl = document.querySelector<HTMLInputElement>("#file-input");
+    this.locationToggle =
+      document.querySelector<HTMLInputElement>("#location-toggle");
+    this.locationStatus =
+      document.querySelector<HTMLElement>("#location-status");
     this.renderer = new ResultsRenderer(this.require("#app"));
   }
 
@@ -82,12 +93,14 @@ export class AppController {
           report,
           modelKey,
           this.#pendingThumbnail ?? undefined,
+          this.#pendingLocation,
         )
           .catch((_e: unknown) => {
             /* best-effort save */
           })
           .finally(() => {
             this.#pendingThumbnail = null;
+            this.#pendingLocation = undefined;
           });
         void this.renderHistory();
       } catch (err) {
@@ -105,6 +118,7 @@ export class AppController {
     });
 
     await this.safety.init();
+    this.initLocationToggle();
 
     await this.startCamera();
     void this.renderHistory();
@@ -115,10 +129,10 @@ export class AppController {
   private async startCamera(): Promise<void> {
     try {
       await this.camera.start(this.videoEl);
-      this.statusEl.textContent = "Camera active. Tap shutter to identify.";
+      this.statusEl.textContent = t("status.cameraActive");
       this.cameraErrorEl.style.display = "none";
     } catch {
-      this.statusEl.textContent = "Camera error. Try file input.";
+      this.statusEl.textContent = t("status.cameraError");
       this.cameraErrorEl.style.display = "flex";
     }
   }
@@ -127,12 +141,13 @@ export class AppController {
     if (this.captureBtn.dataset["busy"] === "true") return;
     const result = this.camera.capture();
     if (!result) {
-      this.statusEl.textContent = "Camera not ready. Wait a moment.";
+      this.statusEl.textContent = t("status.cameraNotReady");
       return;
     }
     this.setCaptureBusy(true);
-    this.statusEl.textContent = "Identifying…";
+    this.statusEl.textContent = t("status.identifying");
     this.#pendingThumbnail = result.thumbnail;
+    this.startLocationCapture();
     inferenceService.infer(result.buffer, result.width, result.height);
   }
 
@@ -150,12 +165,13 @@ export class AppController {
     try {
       const result = await processFileInput(file);
       this.setCaptureBusy(true);
-      this.statusEl.textContent = "Identifying…";
+      this.statusEl.textContent = t("status.identifying");
       this.#pendingThumbnail = result.thumbnail;
+      this.startLocationCapture();
       inferenceService.infer(result.buffer, result.width, result.height);
     } catch (err) {
       logger.error("File processing failed:", err);
-      this.statusEl.textContent = "Failed to process image.";
+      this.statusEl.textContent = t("status.processImageError");
       this.setCaptureBusy(false);
     }
   }
@@ -175,6 +191,95 @@ export class AppController {
     updateOnlineStatus(this.badgeEl);
   }
 
+  private initLocationToggle(): void {
+    if (!this.locationToggle || !this.locationStatus) return;
+
+    const enabled = localStorage.getItem(LOCATION_ENABLED_KEY) === "true";
+    const toggle = this.locationToggle;
+    toggle.checked = enabled;
+    this.updateLocationStatus(enabled);
+
+    toggle.addEventListener("change", () => {
+      const now = toggle.checked;
+      localStorage.setItem(LOCATION_ENABLED_KEY, String(now));
+      this.updateLocationStatus(now);
+      if (now) {
+        void this.captureLocation();
+      } else {
+        this.#pendingLocation = undefined;
+      }
+    });
+  }
+
+  private updateLocationStatus(enabled: boolean): void {
+    this.setLocationStatus(
+      enabled ? t("location.enabled") : t("location.disabled"),
+    );
+  }
+
+  private setLocationStatus(text: string): void {
+    if (this.locationStatus) {
+      this.locationStatus.textContent = text;
+    }
+  }
+
+  private async captureLocation(): Promise<void> {
+    if (!this.locationToggle?.checked) return;
+    if (!("geolocation" in navigator)) {
+      this.setLocationStatus(t("location.unavailable"));
+      return;
+    }
+
+    try {
+      const position = await new Promise<GeolocationPosition>(
+        (resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 60000,
+          });
+        },
+      );
+      this.#pendingLocation = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+      };
+      this.setLocationStatus(
+        t("location.active", {
+          lat: this.#pendingLocation.lat.toFixed(4),
+          lng: this.#pendingLocation.lng.toFixed(4),
+        }),
+      );
+    } catch (err) {
+      const error = err as GeolocationPositionError | Error;
+      const code = "code" in error ? error.code : undefined;
+      let key: string;
+      switch (code) {
+        case 1:
+          key = "location.denied";
+          break;
+        case 2:
+          key = "location.unavailable";
+          break;
+        case 3:
+          key = "location.timeout";
+          break;
+        case undefined:
+        default:
+          key = "location.unavailable";
+          break;
+      }
+      this.setLocationStatus(t(key));
+    }
+  }
+
+  private startLocationCapture(): void {
+    if (!this.locationToggle?.checked) return;
+    this.#pendingLocation = undefined;
+    void this.captureLocation();
+  }
+
   private async renderLastResult(): Promise<void> {
     const entries = await getHistory(1);
     const last = entries[0];
@@ -192,7 +297,7 @@ export class AppController {
     slot.innerHTML = "";
     const inner = createEl("div", "last-result-inner");
     inner.appendChild(
-      createEl("div", "last-result-label", "Last identification"),
+      createEl("div", "last-result-label", t("history.lastIdentification")),
     );
     inner.appendChild(createEl("div", "last-result-species", species));
 
@@ -222,7 +327,7 @@ export class AppController {
     if (entry.thumbnail && isDataUrlThumbnail(entry.thumbnail)) {
       const thumb = document.createElement("img");
       thumb.src = entry.thumbnail;
-      thumb.alt = `Thumbnail for ${species}`;
+      thumb.alt = t("history.thumbnailAlt", { species });
       thumb.className = "history-thumbnail";
       thumb.loading = "lazy";
       thumb.decoding = "async";
@@ -239,7 +344,23 @@ export class AppController {
     );
     entryEl.appendChild(meta);
     entryEl.appendChild(createEl("div", "history-name", species));
-    entryEl.appendChild(createEl("div", "history-prob", `${prob}% confidence`));
+    entryEl.appendChild(
+      createEl("div", "history-prob", t("history.confidence", { prob })),
+    );
+
+    if (entry.location && isValidLocation(entry.location)) {
+      const { lat, lng } = entry.location;
+      const link = document.createElement("a");
+      link.href = `geo:${String(lat)},${String(lng)}?q=${String(lat)},${String(lng)}`;
+      link.className = "history-location";
+      link.textContent = t("history.location", {
+        lat: lat.toFixed(4),
+        lng: lng.toFixed(4),
+      });
+      link.target = "_blank";
+      link.rel = "noopener";
+      entryEl.appendChild(link);
+    }
 
     const delBtn = createEl(
       "button",
@@ -247,7 +368,7 @@ export class AppController {
       "×",
     ) as HTMLButtonElement;
     delBtn.dataset["id"] = id;
-    delBtn.setAttribute("aria-label", "Delete this entry");
+    delBtn.setAttribute("aria-label", t("history.deleteEntryAria"));
     entryEl.appendChild(delBtn);
 
     return entryEl;
@@ -268,9 +389,7 @@ export class AppController {
 
       if (entries.length === 0) {
         list.innerHTML = "";
-        list.appendChild(
-          createEl("p", "history-empty", "No past identifications yet."),
-        );
+        list.appendChild(createEl("p", "history-empty", t("history.empty")));
         return;
       }
 
@@ -296,7 +415,7 @@ export class AppController {
       list.appendChild(fragment);
     } catch {
       list.innerHTML = "";
-      list.appendChild(createEl("p", undefined, "Unable to load history."));
+      list.appendChild(createEl("p", undefined, t("history.loadError")));
     } finally {
       this.#historyRenderPending = false;
     }
@@ -311,7 +430,7 @@ export class AppController {
       void this.renderLastResult();
     } catch (err) {
       logger.error("Failed to clear history:", err);
-      this.statusEl.textContent = "Failed to clear history.";
+      this.statusEl.textContent = t("status.clearHistoryError");
     }
   }
 
@@ -327,10 +446,10 @@ export class AppController {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      this.statusEl.textContent = "History exported.";
+      this.statusEl.textContent = t("status.historyExported");
     } catch (err) {
       logger.error("Failed to export history:", err);
-      this.statusEl.textContent = "Failed to export history.";
+      this.statusEl.textContent = t("status.exportHistoryError");
     }
   }
 
@@ -344,10 +463,12 @@ export class AppController {
       const count = await importHistory(text);
       void this.renderHistory();
       void this.renderLastResult();
-      this.statusEl.textContent = `Imported ${String(count)} history entries.`;
+      this.statusEl.textContent = t("status.historyImported", {
+        count: String(count),
+      });
     } catch (err) {
       logger.error("Failed to import history:", err);
-      this.statusEl.textContent = "Failed to import history.";
+      this.statusEl.textContent = t("status.importHistoryError");
     } finally {
       input.value = "";
     }

@@ -2,6 +2,7 @@ import type { SpeciesKnowledge, Prediction } from "@/core/types";
 import { Edibility } from "@/core/types";
 import { softmax } from "@/inference/softmax";
 import type { ModelRegistryEntry } from "@/core/types";
+import { t } from "@/i18n";
 
 export interface PredictionReport {
   predictions: Prediction[];
@@ -64,7 +65,7 @@ export function generatePredictionReport(
 function missingKnowledgeFallback(species: string): SpeciesKnowledge {
   return {
     edibility: Edibility.Poisonous,
-    notes: `No edibility data on file for "${species}". Treating as potentially poisonous; do not consume and verify with a certified mycologist.`,
+    notes: t("knowledge.fallbackNotes", { species }),
   };
 }
 
@@ -76,31 +77,28 @@ function computeWarning(
   if (top1Prob < 0.5) {
     return {
       requiresWarning: true,
-      warningMessage: "Low confidence — do not act on this prediction.",
+      warningMessage: t("warning.lowConfidence"),
     };
   }
 
   if (hasRiskInTop3 && top1Prob < 0.85) {
     return {
       requiresWarning: true,
-      warningMessage:
-        "Cannot rule out a toxic lookalike. Do not consume. Always verify with a certified expert.",
+      warningMessage: t("warning.toxicLookalike"),
     };
   }
 
   if (edibility === Edibility.Poisonous && top1Prob >= 0.5) {
     return {
       requiresWarning: true,
-      warningMessage:
-        "This prediction indicates a potentially poisonous species. Do not consume. Always verify with a certified expert.",
+      warningMessage: t("warning.poisonous"),
     };
   }
 
   if (edibility === Edibility.Unknown && top1Prob >= 0.5) {
     return {
       requiresWarning: true,
-      warningMessage:
-        "Edibility unknown or unverified for this species. Do not consume without positive identification by a certified mycologist.",
+      warningMessage: t("warning.unknown"),
     };
   }
 

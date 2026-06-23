@@ -20,9 +20,12 @@ export enum WorkerCommandType {
   Infer = "infer",
 }
 
+import type { Locale } from "@/i18n/types";
+
 export interface SpeciesKnowledge {
   edibility: Edibility;
   notes: string;
+  localizedNotes?: Partial<Record<Locale, string>>;
 }
 
 export interface ModelRegistryEntry extends ModelConfig {

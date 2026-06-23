@@ -2,6 +2,7 @@ import { logger } from "@/core/logger";
 import type { InferenceService } from "@/inference/service";
 import { ModelKey } from "@/core/types";
 import { modelRegistry } from "@/data/model-registry";
+import { t } from "@/i18n";
 
 const SAFETY_ACK_KEY = "ff:safety-ack-v1";
 const DIMA_CONFIRM_KEY = "ff:dima-confirm-v1";
@@ -151,7 +152,10 @@ export class SafetyUI {
         "#storage-confirm-body",
       );
       if (body) {
-        body.textContent = `Your device reports ${String(freeMB)} MB of free storage. The selected model needs ${modelSize}. Continue anyway?`;
+        body.textContent = t("storageConfirm.body", {
+          freeMB: String(freeMB),
+          modelSize,
+        });
       }
       void this.showConfirmModal(this.els.storageConfirm).then((accepted) => {
         if (accepted) {

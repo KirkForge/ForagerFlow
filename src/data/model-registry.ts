@@ -5,6 +5,24 @@ import labelsBvra from "./labels-bvra.json";
 import labelsDima806 from "./labels-dima806.json";
 import knowledgeBvra from "./knowledge-bvra.json";
 import knowledgeDima806 from "./knowledge-dima806.json";
+import knowledgeBvraDa from "./knowledge-bvra-da.json";
+import knowledgeDima806Da from "./knowledge-dima806-da.json";
+
+type LocalizedKnowledge = Partial<Record<string, { notes: string }>>;
+
+function mergeLocalizedNotes(
+  base: Record<string, SpeciesKnowledge>,
+  localized: LocalizedKnowledge,
+): Record<string, SpeciesKnowledge> {
+  const merged: Record<string, SpeciesKnowledge> = {};
+  for (const [label, knowledge] of Object.entries(base)) {
+    const da = localized[label];
+    merged[label] = da
+      ? { ...knowledge, localizedNotes: { da: da.notes } }
+      : knowledge;
+  }
+  return merged;
+}
 
 export const modelRegistry: Record<ModelKey, ModelRegistryEntry> = {
   [ModelKey.BVRA]: {
@@ -21,7 +39,10 @@ export const modelRegistry: Record<ModelKey, ModelRegistryEntry> = {
     mean: [0.485, 0.456, 0.406],
     std: [0.229, 0.224, 0.225],
     expectedLabelCount: labelsBvra.length,
-    knowledge: knowledgeBvra as Record<string, SpeciesKnowledge>,
+    knowledge: mergeLocalizedNotes(
+      knowledgeBvra as Record<string, SpeciesKnowledge>,
+      knowledgeBvraDa,
+    ),
   },
   [ModelKey.Dima806]: {
     key: ModelKey.Dima806,
@@ -32,6 +53,9 @@ export const modelRegistry: Record<ModelKey, ModelRegistryEntry> = {
     mean: [0.5, 0.5, 0.5],
     std: [0.5, 0.5, 0.5],
     expectedLabelCount: labelsDima806.length,
-    knowledge: knowledgeDima806 as Record<string, SpeciesKnowledge>,
+    knowledge: mergeLocalizedNotes(
+      knowledgeDima806 as Record<string, SpeciesKnowledge>,
+      knowledgeDima806Da,
+    ),
   },
 };
