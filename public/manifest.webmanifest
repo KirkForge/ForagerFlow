@@ -6,7 +6,8 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait",
+  "display_override": ["standalone", "fullscreen"],
+  "orientation": "any",
   "lang": "en",
   "dir": "ltr",
   "background_color": "#0f1115",
@@ -24,6 +25,26 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Identify",
+      "short_name": "Identify",
+      "description": "Open the camera and identify a mushroom",
+      "url": "/",
+      "icons": [
+        { "src": "/icons/icon-192.png", "sizes": "192x192" }
+      ]
+    },
+    {
+      "name": "History",
+      "short_name": "History",
+      "description": "View past identifications",
+      "url": "/?history",
+      "icons": [
+        { "src": "/icons/icon-192.png", "sizes": "192x192" }
+      ]
     }
   ]
 }

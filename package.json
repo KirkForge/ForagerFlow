@@ -25,6 +25,8 @@
     "verify:inference": "python3 scripts/test-inference.py smoke pwa/model/fungitastic.onnx pwa/model/fungitastic-classes.json pwa/model/dima806.onnx src/data/labels-dima806.json",
     "analyze:bundle": "ANALYZE=true pnpm build",
     "verify:bundle": "node scripts/verify-bundle.cjs",
+    "generate:assetlinks": "node scripts/generate-assetlinks.cjs",
+    "build:twa": "node scripts/build-twa.cjs",
     "verify": "pnpm typecheck && pnpm lint && pnpm test:ci && pnpm build && pnpm verify:dist && pnpm verify:labels && pnpm verify:bundle"
   },
   "devDependencies": {

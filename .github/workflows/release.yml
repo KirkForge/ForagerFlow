@@ -61,9 +61,30 @@ jobs:
       - name: Smoke-test inference shapes
         run: pnpm verify:inference
 
-      - name: Upload release asset
+      - name: Generate assetlinks for TWA
+        env:
+          TWA_HOST: ${{ vars.TWA_HOST }}
+          TWA_SHA256_FINGERPRINT: ${{ secrets.TWA_SHA256_FINGERPRINT }}
+        run: node scripts/generate-assetlinks.cjs
+
+      - name: Set up JDK for Android build
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build TWA APK
+        env:
+          TWA_HOST: ${{ vars.TWA_HOST }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+        run: node scripts/build-twa.cjs
+
+      - name: Upload release assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           tar -czf "foragerflow-${{ github.ref_name }}.tar.gz" -C dist .
-          gh release upload "${{ github.ref_name }}" "foragerflow-${{ github.ref_name }}.tar.gz" --clobber
+          gh release upload "${{ github.ref_name }}" "foragerflow-${{ github.ref_name }}.tar.gz" "dist/twa/foragerflow-release-unsigned.apk" --clobber
