@@ -202,6 +202,35 @@ video {
   border-bottom: none;
 }
 
+.prediction-clickable {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 8px 6px;
+  transition: background 0.15s ease;
+}
+
+.prediction-clickable:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.prediction-clickable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.knowledge[role="button"] {
+  cursor: pointer;
+}
+
+.knowledge[role="button"]:hover {
+  background: #22262e;
+}
+
+.knowledge[role="button"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .prediction .label {
   width: 140px;
   font-size: 13px;
@@ -327,6 +356,12 @@ video {
   }
 
   .warning {
+    background: rgba(185, 28, 28, 0.08);
+    border-color: rgba(185, 28, 28, 0.2);
+    color: #7f1d1d;
+  }
+
+  .detail-safety {
     background: rgba(185, 28, 28, 0.08);
     border-color: rgba(185, 28, 28, 0.2);
     color: #7f1d1d;
@@ -536,7 +571,8 @@ video {
 #safety-modal,
 #model-confirm-modal,
 #storage-confirm-modal,
-#clear-confirm-modal {
+#clear-confirm-modal,
+#species-detail-modal {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 20px;
@@ -549,7 +585,8 @@ video {
 #safety-modal::backdrop,
 #model-confirm-modal::backdrop,
 #storage-confirm-modal::backdrop,
-#clear-confirm-modal::backdrop {
+#clear-confirm-modal::backdrop,
+#species-detail-modal::backdrop {
   background: rgba(0, 0, 0, 0.7);
 }
 #safety-modal h2,
@@ -642,6 +679,83 @@ video {
 .verify-link:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+#species-detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.detail-header h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+#species-detail-close {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+#species-detail-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.detail-edibility {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.detail-confidence {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.detail-notes {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.detail-safety {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 /* Last-identification callout above the camera. */

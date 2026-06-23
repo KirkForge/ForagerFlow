@@ -5,20 +5,27 @@ import { sanitizeText } from "@/core/sanitize";
 import { t } from "@/i18n";
 import { getLocalizedNotes } from "@/i18n/knowledge";
 
+export interface ResultsRendererOptions {
+  onPredictionClick?: (label: string) => void;
+}
+
 export class ResultsRenderer {
   private container: HTMLElement;
   private predictionsEl: HTMLElement;
   private knowledgeEl: HTMLElement;
   private warningEl: HTMLElement;
   private modelSelect: HTMLSelectElement;
+  private onPredictionClick: ((label: string) => void) | undefined;
 
-  constructor(root: HTMLElement) {
+  constructor(root: HTMLElement, opts: ResultsRendererOptions = {}) {
     this.container = root;
     this.predictionsEl = this.require("#predictions");
     this.knowledgeEl = this.require("#knowledge");
     this.warningEl = this.require("#warning");
     this.modelSelect = this.require("#model-select") as HTMLSelectElement;
+    this.onPredictionClick = opts.onPredictionClick;
     this.bindModelSelector();
+    this.bindPredictionClicks();
   }
 
   clear(): void {
@@ -62,6 +69,15 @@ export class ResultsRenderer {
         );
       }
       this.knowledgeEl.style.display = "block";
+      if (this.onPredictionClick) {
+        this.knowledgeEl.style.cursor = "pointer";
+        this.knowledgeEl.setAttribute("role", "button");
+        this.knowledgeEl.setAttribute("tabindex", "0");
+        this.knowledgeEl.setAttribute(
+          "aria-label",
+          t("prediction.openDetailsAria", { species: top.label }),
+        );
+      }
     }
   }
 
@@ -82,9 +98,16 @@ export class ResultsRenderer {
       : isUnknown
         ? t("prediction.unknown")
         : t("prediction.edible");
+    const clickable = this.onPredictionClick ? "prediction-clickable" : "";
+    const roleAttr = this.onPredictionClick ? 'role="button"' : "";
+    const tabindexAttr = this.onPredictionClick ? 'tabindex="0"' : "";
+    const ariaLabel = this.onPredictionClick
+      ? sanitizeText(t("prediction.openDetailsAria", { species: item.label }))
+      : "";
+    const ariaAttr = ariaLabel ? `aria-label="${ariaLabel}"` : "";
 
     return `
-      <div class="prediction">
+      <div class="prediction ${clickable}" data-label="${sanitizeText(item.label)}" ${roleAttr} ${tabindexAttr} ${ariaAttr}>
         <div class="label">
           <div class="prediction-name">${sanitizeText(item.label)}</div>
           <div class="prediction-edibility ${edClass}">${edText}</div>
@@ -95,6 +118,39 @@ export class ResultsRenderer {
         <div class="pct">${pct}%</div>
       </div>
     `;
+  }
+
+  private bindPredictionClicks(): void {
+    this.predictionsEl.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      const prediction = target.closest("[data-label]");
+      if (prediction && this.onPredictionClick) {
+        const label = prediction.getAttribute("data-label");
+        if (label) this.onPredictionClick(label);
+      }
+    });
+    this.predictionsEl.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const target = e.target as HTMLElement;
+      if (target.hasAttribute("data-label") && this.onPredictionClick) {
+        const label = target.getAttribute("data-label");
+        if (label) this.onPredictionClick(label);
+        e.preventDefault();
+      }
+    });
+    this.knowledgeEl.addEventListener("click", () => {
+      const topLabel = this.knowledgeEl.querySelector("h3")?.textContent;
+      if (topLabel && this.onPredictionClick) this.onPredictionClick(topLabel);
+    });
+    this.knowledgeEl.addEventListener("keydown", (e) => {
+      if ((e.key === "Enter" || e.key === " ") && this.onPredictionClick) {
+        const topLabel = this.knowledgeEl.querySelector("h3")?.textContent;
+        if (topLabel) {
+          this.onPredictionClick(topLabel);
+          e.preventDefault();
+        }
+      }
+    });
   }
 
   private bindModelSelector(): void {

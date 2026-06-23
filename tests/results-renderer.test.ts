@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { ResultsRenderer } from "@/ui/results";
 import { makeMockModel, makeReport } from "./helpers/fixtures";
 
@@ -131,5 +131,53 @@ describe("ResultsRenderer", () => {
     select.dispatchEvent(new Event("change"));
 
     expect(root.querySelectorAll(".prediction")).toHaveLength(0);
+  });
+
+  it("does not make predictions clickable when no callback is provided", () => {
+    const renderer = new ResultsRenderer(root);
+    renderer.render(makeReport(), makeMockModel());
+
+    const prediction = root.querySelector(".prediction") as HTMLElement;
+    expect(prediction.classList.contains("prediction-clickable")).toBe(false);
+    expect(prediction.hasAttribute("role")).toBe(false);
+  });
+
+  it("invokes onPredictionClick when a prediction is clicked", () => {
+    const onClick = vi.fn();
+    const renderer = new ResultsRenderer(root, { onPredictionClick: onClick });
+    renderer.render(makeReport(), makeMockModel());
+
+    const prediction = root.querySelector(".prediction") as HTMLElement;
+    expect(prediction.classList.contains("prediction-clickable")).toBe(true);
+    prediction.click();
+
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(onClick).toHaveBeenCalledWith("Agaricus bisporus");
+  });
+
+  it("invokes onPredictionClick when knowledge box is clicked", () => {
+    const onClick = vi.fn();
+    const renderer = new ResultsRenderer(root, { onPredictionClick: onClick });
+    renderer.render(makeReport(), makeMockModel());
+
+    const knowledge = root.querySelector("#knowledge") as HTMLElement;
+    knowledge.click();
+
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(onClick).toHaveBeenCalledWith("Agaricus bisporus");
+  });
+
+  it("supports keyboard activation on predictions", () => {
+    const onClick = vi.fn();
+    const renderer = new ResultsRenderer(root, { onPredictionClick: onClick });
+    renderer.render(makeReport(), makeMockModel());
+
+    const prediction = root.querySelector(".prediction") as HTMLElement;
+    prediction.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+    );
+
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(onClick).toHaveBeenCalledWith("Agaricus bisporus");
   });
 });

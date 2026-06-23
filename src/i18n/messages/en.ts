@@ -45,6 +45,15 @@ export const enMessages: Messages = {
   "prediction.edible": "Edible",
   "prediction.unknown": "Unknown",
   "prediction.poisonous": "POISONOUS",
+  "prediction.openDetailsAria": "Show details for {{species}}",
+
+  // Detail panel
+  "detail.title": "Species details",
+  "detail.closeAria": "Close species details",
+  "detail.confidence": "{{pct}}% confidence",
+  "detail.edibility": "Edibility",
+  "detail.safetyReminder":
+    "Never eat a wild mushroom based solely on this app. Always verify with a certified mycologist.",
 
   // Warnings
   "warning.lowConfidence": "Low confidence — do not act on this prediction.",

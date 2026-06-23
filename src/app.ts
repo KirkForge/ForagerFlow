@@ -1,4 +1,5 @@
-import { ModelKey } from "@/core/types";
+import { Edibility, ModelKey } from "@/core/types";
+import type { PredictionReport } from "@/inference/results";
 import { inferenceService } from "@/inference/service";
 import { CameraService } from "@/services/camera";
 import { processFileInput } from "@/services/image-input";
@@ -8,7 +9,7 @@ import {
 } from "@/services/connectivity";
 import { generatePredictionReport } from "@/inference/results";
 import { modelRegistry } from "@/data/model-registry";
-import { ResultsRenderer, SafetyUI } from "@/ui";
+import { ResultsRenderer, SafetyUI, SpeciesDetailPanel } from "@/ui";
 import {
   saveIdentification,
   getHistory,
@@ -32,6 +33,7 @@ const LOCATION_ENABLED_KEY = "ff:location-enabled-v1";
 export class AppController {
   private camera = new CameraService(config.captureSize);
   renderer: ResultsRenderer;
+  detailPanel: SpeciesDetailPanel;
   safety!: SafetyUI;
   statusEl: HTMLElement;
   badgeEl: HTMLElement;
@@ -45,6 +47,7 @@ export class AppController {
   #historyRenderPending = false;
   #pendingThumbnail: string | null = null;
   #pendingLocation: GeoLocation | undefined;
+  #lastReport: PredictionReport | undefined;
 
   constructor() {
     this.statusEl = this.require("#status");
@@ -61,7 +64,12 @@ export class AppController {
       document.querySelector<HTMLInputElement>("#location-toggle");
     this.locationStatus =
       document.querySelector<HTMLElement>("#location-status");
-    this.renderer = new ResultsRenderer(this.require("#app"));
+    this.renderer = new ResultsRenderer(this.require("#app"), {
+      onPredictionClick: (label) => {
+        this.openSpeciesDetail(label);
+      },
+    });
+    this.detailPanel = new SpeciesDetailPanel();
   }
 
   async init(): Promise<void> {
@@ -87,6 +95,7 @@ export class AppController {
       try {
         const model = modelRegistry[modelKey];
         const report = generatePredictionReport(logits, model);
+        this.#lastReport = report;
         this.renderer.render(report, model);
         this.setCaptureBusy(false);
         void saveIdentification(
@@ -184,7 +193,26 @@ export class AppController {
     const select = e.target as HTMLSelectElement;
     const key = select.value === "dima806" ? ModelKey.Dima806 : ModelKey.BVRA;
     this.renderer.clear();
+    this.detailPanel.close();
+    this.#lastReport = undefined;
     inferenceService.switchModel(key);
+  }
+
+  private openSpeciesDetail(label: string): void {
+    const modelKey = inferenceService.getActiveModelKey();
+    const model = modelRegistry[modelKey];
+    const prediction = this.#lastReport?.predictions.find(
+      (p) => p.label === label,
+    ) ?? {
+      label,
+      probability: 0,
+      index: -1,
+    };
+    const knowledge = model.knowledge[label] ?? {
+      edibility: Edibility.Unknown,
+      notes: t("knowledge.noData"),
+    };
+    this.detailPanel.open(label, prediction.probability, knowledge);
   }
 
   handleOfflineChange(): void {

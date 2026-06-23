@@ -66,6 +66,11 @@ const mockSafety = vi.hoisted(() => ({
   confirmClearHistory: vi.fn().mockResolvedValue(true),
 }));
 
+const mockDetailPanel = vi.hoisted(() => ({
+  open: vi.fn(),
+  close: vi.fn(),
+}));
+
 vi.mock("@/inference/service", () => ({
   inferenceService: mockInferenceService,
 }));
@@ -103,6 +108,9 @@ vi.mock("@/ui", () => ({
   }),
   SafetyUI: vi.fn(function () {
     return mockSafety;
+  }),
+  SpeciesDetailPanel: vi.fn(function () {
+    return mockDetailPanel;
   }),
 }));
 

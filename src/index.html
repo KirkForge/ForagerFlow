@@ -280,6 +280,40 @@
       </form>
     </dialog>
 
+    <dialog
+      id="species-detail-modal"
+      aria-labelledby="species-detail-title"
+      aria-describedby="species-detail-body"
+    >
+      <div id="species-detail-content">
+        <div class="detail-header">
+          <h2 id="species-detail-title"></h2>
+          <button
+            id="species-detail-close"
+            type="button"
+            value="close"
+            aria-label="Luk artens detaljer"
+          >
+            ×
+          </button>
+        </div>
+        <div id="species-detail-body">
+          <div id="species-detail-meta" class="detail-meta"></div>
+          <p id="species-detail-notes" class="detail-notes"></p>
+          <p id="species-detail-safety" class="detail-safety"></p>
+          <a
+            id="species-detail-verify"
+            class="verify-link"
+            target="_blank"
+            rel="noopener noreferrer"
+            href="#"
+          >
+            Bekræft arten online →
+          </a>
+        </div>
+      </div>
+    </dialog>
+
     <script type="module" src="/main.ts"></script>
   </body>
 </html>
