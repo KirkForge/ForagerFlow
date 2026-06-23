@@ -61,4 +61,8 @@ function main() {
   console.log(`Wrote ${OUT_FILE}`);
 }
 
-main();
+module.exports = { normalizeFingerprint, generateAssetLinks, main };
+
+if (require.main === module) {
+  main();
+}

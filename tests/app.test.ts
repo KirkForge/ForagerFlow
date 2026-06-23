@@ -8,6 +8,7 @@ import { flushPromises } from "./helpers/promises";
 import { makeHistoryEntry } from "./helpers/fixtures";
 import { setLocale } from "@/i18n";
 import { getHistory, searchHistory } from "@/services/history";
+import { logger } from "@/core/logger";
 
 interface MockInferenceService {
   onStatus: (handler: (text: string) => void) => void;
@@ -135,14 +136,18 @@ vi.mock("@/services/image-input", () => ({
   } as CaptureResult),
 }));
 
-vi.mock("@/services/history", () => ({
-  saveIdentification: vi.fn().mockResolvedValue("id-1"),
-  getHistory: vi.fn().mockResolvedValue([]),
-  searchHistory: vi.fn().mockResolvedValue([]),
-  clearHistory: vi.fn().mockResolvedValue(undefined),
-  exportHistory: vi.fn().mockResolvedValue('{"version":1,"entries":[]}'),
-  importHistory: vi.fn().mockResolvedValue(0),
-}));
+vi.mock("@/services/history", async () => {
+  const actual = await vi.importActual("@/services/history") as Record<string, unknown>;
+  return {
+    ...actual,
+    saveIdentification: vi.fn().mockResolvedValue("id-1"),
+    getHistory: vi.fn().mockResolvedValue([]),
+    searchHistory: vi.fn().mockResolvedValue([]),
+    clearHistory: vi.fn().mockResolvedValue(undefined),
+    exportHistory: vi.fn().mockResolvedValue('{"version":1,"entries":[]}'),
+    importHistory: vi.fn().mockResolvedValue(0),
+  };
+});
 
 vi.mock("@/services/history/delete-entry", () => ({
   deleteEntry: vi.fn().mockResolvedValue(undefined),
@@ -967,6 +972,595 @@ describe("AppController", () => {
     expect(mockCamera.focusAt).toHaveBeenCalled();
     const reticle = document.querySelector<HTMLElement>("#focus-reticle")!;
     expect(reticle.classList.contains("active")).toBe(false);
+  });
+});
+
+describe("AppController additional coverage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setLocale("en");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  function renderMinimalAppHTML(): void {
+    document.body.innerHTML = `
+      <div id="app">
+        <div id="status"></div>
+        <div id="badge"></div>
+        <div id="camera-wrap">
+          <video id="video"></video>
+          <button id="capture-btn">Capture</button>
+        </div>
+        <div id="camera-error"></div>
+        <div id="model-progress" role="status" hidden>
+          <div class="model-progress-label">
+            <span id="model-progress-text"></span>
+            <span id="model-progress-pct"></span>
+          </div>
+          <div class="model-progress-track">
+            <div id="model-progress-bar" class="model-progress-bar"></div>
+          </div>
+        </div>
+        <div id="predictions"></div>
+        <div id="knowledge"></div>
+        <div id="warning"></div>
+        <select id="model-select">
+          <option value="bvra">BVRA</option>
+          <option value="dima806">dima806</option>
+        </select>
+      </div>
+    `;
+  }
+
+  it("throws when a required element is missing", () => {
+    document.body.innerHTML = "";
+    expect(() => new AppController()).toThrow("Required element not found");
+  });
+
+  it("initializes when optional elements are missing", async () => {
+    renderMinimalAppHTML();
+    const controller = new AppController();
+    await expect(controller.init()).resolves.toBeUndefined();
+    expect(mockCamera.start).toHaveBeenCalled();
+  });
+
+  it("does not throw when the focus reticle is missing", async () => {
+    renderMinimalAppHTML();
+    vi.mocked(mockCamera.focusAt).mockResolvedValue(true);
+
+    const controller = new AppController();
+    await controller.init();
+
+    const video = document.querySelector<HTMLVideoElement>("#video")!;
+    Object.defineProperty(video, "videoWidth", { value: 640 });
+    Object.defineProperty(video, "videoHeight", { value: 480 });
+    vi.spyOn(video, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 320,
+      height: 320,
+    } as DOMRect);
+
+    video.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        clientX: 160,
+        clientY: 160,
+        bubbles: true,
+      }),
+    );
+    await flushPromises();
+
+    expect(mockCamera.focusAt).toHaveBeenCalled();
+  });
+
+  it("skips tap-to-focus when the normalized point cannot be computed", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const video = document.querySelector<HTMLVideoElement>("#video")!;
+    Object.defineProperty(video, "videoWidth", { value: 0 });
+    Object.defineProperty(video, "videoHeight", { value: 0 });
+
+    video.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        clientX: 160,
+        clientY: 160,
+        bubbles: true,
+      }),
+    );
+    await flushPromises();
+
+    expect(mockCamera.focusAt).not.toHaveBeenCalled();
+  });
+
+  it("updates progress for the compile phase", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    mockInferenceService.emitProgress({
+      modelKey: ModelKey.BVRA,
+      phase: "compile",
+      percent: 33,
+    });
+
+    const progressText = document.querySelector(
+      "#model-progress-text",
+    ) as HTMLElement;
+    expect(progressText.textContent).toContain("compile");
+  });
+
+  it("does nothing when file input change has no files", async () => {
+    const { processFileInput } = await import("@/services/image-input");
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const input = document.querySelector("#file-input") as HTMLInputElement;
+    input.dispatchEvent(new Event("change"));
+    await flushPromises();
+
+    expect(processFileInput).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when import input change has no files", async () => {
+    const { importHistory } = await import("@/services/history");
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const input = document.querySelector(
+      "#history-import-input",
+    ) as HTMLInputElement;
+    input.dispatchEvent(new Event("change"));
+    await flushPromises();
+
+    expect(importHistory).not.toHaveBeenCalled();
+  });
+
+  it("renders species detail with fallback data when there is no result", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const options = vi.mocked(ResultsRenderer).mock.calls[0]?.[1];
+    options?.onPredictionClick?.("Agaricus bisporus");
+
+    expect(mockDetailPanel.open).toHaveBeenCalledWith(
+      "Agaricus bisporus",
+      expect.objectContaining({ label: "Agaricus bisporus", probability: 0 }),
+      expect.anything(),
+      expect.objectContaining({ score: 0, reliability: "low" }),
+    );
+  });
+
+  it("uses fallback prediction when the clicked label is not in the report", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+
+    const options = vi.mocked(ResultsRenderer).mock.calls[0]?.[1];
+    options?.onPredictionClick?.("Missing species");
+
+    expect(mockDetailPanel.open).toHaveBeenCalledWith(
+      "Missing species",
+      expect.objectContaining({ label: "Missing species", probability: 0 }),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it("does not open comparison with fewer than two labels", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const options = vi.mocked(ResultsRenderer).mock.calls[0]?.[1];
+    options?.onComparisonShow?.(["Agaricus bisporus"]);
+    expect(mockComparisonPanel.open).not.toHaveBeenCalled();
+  });
+
+  it("does not open comparison when there is no last report", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const options = vi.mocked(ResultsRenderer).mock.calls[0]?.[1];
+    options?.onComparisonShow?.([
+      "Agaricus bisporus",
+      "Amanita phalloides",
+    ]);
+    expect(mockComparisonPanel.open).not.toHaveBeenCalled();
+  });
+
+  it("does not open comparison when fewer than two predictions match", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+
+    const options = vi.mocked(ResultsRenderer).mock.calls[0]?.[1];
+    options?.onComparisonShow?.(["Agaricus bisporus", "Missing species"]);
+    expect(mockComparisonPanel.open).not.toHaveBeenCalled();
+  });
+
+  it("shows an error when rendering the result throws", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    mockInferenceService.emitResult({
+      logits: new Float32Array(0),
+      modelKey: ModelKey.BVRA,
+    });
+
+    const status = document.querySelector("#status") as HTMLElement;
+    expect(status.textContent).toBe("Error displaying result.");
+  });
+
+  it("resets capture state when saving history fails", async () => {
+    const { saveIdentification } = await import("@/services/history");
+    vi.mocked(saveIdentification).mockRejectedValueOnce(new Error("db full"));
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+    await flushPromises();
+
+    const recaptureBtn = document.querySelector(
+      "#recapture-btn",
+    ) as HTMLButtonElement;
+    expect(recaptureBtn.hidden).toBe(false);
+  });
+
+  it("renders a data URL thumbnail and location link in history", async () => {
+    const { getHistory } = await import("@/services/history");
+    vi.mocked(getHistory).mockResolvedValue([
+      makeHistoryEntry({
+        id: "h-thumb",
+        thumbnail: "data:image/jpeg;base64,/9j/4AAQSkZJRg==",
+        location: { lat: 55.6761, lng: 12.5683 },
+      }),
+    ]);
+
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+    await flushPromises();
+
+    const list = document.querySelector("#history-list") as HTMLElement;
+    expect(list.querySelector("img")).not.toBeNull();
+    expect(list.querySelector(".history-location")?.getAttribute("href")).toMatch(
+      /^geo:/,
+    );
+  });
+
+  it("logs a warning for invalid history thumbnails", async () => {
+    const { getHistory } = await import("@/services/history");
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    vi.mocked(getHistory).mockResolvedValue([
+      makeHistoryEntry({
+        id: "h-bad-thumb",
+        thumbnail: "https://example.com/image.jpg",
+      }),
+    ]);
+
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+    await flushPromises();
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Ignoring non-data URL thumbnail"),
+      "h-bad-thumb",
+    );
+    warnSpy.mockRestore();
+  });
+
+  it("shows a load error when history rendering fails", async () => {
+    const { getHistory } = await import("@/services/history");
+    vi.mocked(getHistory).mockRejectedValueOnce(new Error("idb failed"));
+
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+    await flushPromises();
+
+    const list = document.querySelector("#history-list") as HTMLElement;
+    expect(list.textContent).toContain("Unable to load history");
+  });
+
+  it("returns early when the history list element is missing", async () => {
+    renderMinimalAppHTML();
+    const controller = new AppController();
+    await expect(controller.init()).resolves.toBeUndefined();
+  });
+
+  it("does not open history detail for an empty id", async () => {
+    const { getHistory } = await import("@/services/history");
+    vi.mocked(getHistory).mockResolvedValue([]);
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+    await flushPromises();
+
+    const list = document.querySelector("#history-list") as HTMLElement;
+    const entry = document.createElement("div");
+    entry.className = "history-entry";
+    list.appendChild(entry);
+    entry.click();
+    await flushPromises();
+
+    expect(mockHistoryDetailPanel.open).not.toHaveBeenCalled();
+  });
+
+  it("does not open history detail when the entry is not found", async () => {
+    const { getHistory } = await import("@/services/history");
+    vi.mocked(getHistory).mockResolvedValue([makeHistoryEntry({ id: "h-real" })]);
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+    await flushPromises();
+
+    const list = document.querySelector("#history-list") as HTMLElement;
+    const entryEl = list.querySelector(".history-entry") as HTMLElement;
+    entryEl.dataset["id"] = "missing";
+    entryEl.click();
+    await flushPromises();
+
+    expect(mockHistoryDetailPanel.open).not.toHaveBeenCalled();
+  });
+
+  it("logs an error when opening history detail fails", async () => {
+    const { getHistory } = await import("@/services/history");
+    const errorSpy = vi
+      .spyOn(logger, "error")
+      .mockImplementation(() => undefined);
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+    await flushPromises();
+
+    vi.mocked(getHistory).mockRejectedValueOnce(new Error("idb failed"));
+
+    const list = document.querySelector("#history-list") as HTMLElement;
+    const entry = document.createElement("div");
+    entry.className = "history-entry";
+    entry.dataset["id"] = "any";
+    list.appendChild(entry);
+    entry.click();
+    await flushPromises();
+
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("shows an error when exporting history fails", async () => {
+    const { exportHistory } = await import("@/services/history");
+    vi.mocked(exportHistory).mockRejectedValueOnce(new Error("export failed"));
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const exportBtn = document.querySelector("#history-export") as HTMLElement;
+    exportBtn.click();
+    await flushPromises();
+
+    const status = document.querySelector("#status") as HTMLElement;
+    expect(status.textContent).toBe("Failed to export history.");
+  });
+
+  it("shows an error when clearing history fails", async () => {
+    const { clearHistory } = await import("@/services/history");
+    vi.mocked(clearHistory).mockRejectedValueOnce(new Error("clear failed"));
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const clearBtn = document.querySelector("#history-clear") as HTMLElement;
+    clearBtn.click();
+    await flushPromises();
+
+    const status = document.querySelector("#status") as HTMLElement;
+    expect(status.textContent).toBe("Failed to clear history.");
+  });
+
+  it("does not terminate on a persisted pagehide event", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    window.dispatchEvent(
+      new PageTransitionEvent("pagehide", { persisted: true }),
+    );
+    expect(mockCamera.stop).not.toHaveBeenCalled();
+    expect(mockInferenceService.terminate).not.toHaveBeenCalled();
+  });
+
+  it("does not reinitialize on a non-persisted pageshow event", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const initCalls = mockInferenceService.initialize.mock.calls.length;
+    window.dispatchEvent(
+      new PageTransitionEvent("pageshow", { persisted: false }),
+    );
+    await flushPromises();
+
+    expect(mockInferenceService.initialize.mock.calls.length).toBe(initCalls);
+  });
+
+  it("captures location when the toggle is enabled and capture is pressed", async () => {
+    renderAppHTML();
+    const getCurrentPosition = vi.fn(
+      (success: (position: { coords: { latitude: number; longitude: number; accuracy: number } }) => void) => {
+        success({
+          coords: { latitude: 55.6761, longitude: 12.5683, accuracy: 5 },
+        });
+      },
+    );
+    Object.defineProperty(navigator, "geolocation", {
+      value: { getCurrentPosition },
+      configurable: true,
+      writable: true,
+    });
+    localStorage.setItem("ff:location-enabled-v1", "true");
+
+    const controller = new AppController();
+    await controller.init();
+
+    mockCamera.capture.mockReturnValue({
+      buffer: new ArrayBuffer(224 * 224 * 4),
+      width: 224,
+      height: 224,
+      thumbnail: "thumb",
+    } as CaptureResult);
+
+    const captureBtn = document.querySelector("#capture-btn") as HTMLElement;
+    captureBtn.click();
+    await flushPromises();
+
+    const locationStatus = document.querySelector(
+      "#location-status",
+    ) as HTMLElement;
+    expect(locationStatus.textContent).toContain("55.6761");
+    expect(locationStatus.textContent).toContain("12.5683");
+  });
+
+  it("shows location denied when geolocation permission is denied", async () => {
+    renderAppHTML();
+    const getCurrentPosition = vi.fn(
+      (_success: unknown, error: (err: { code: number }) => void) => {
+        error({ code: 1 });
+      },
+    );
+    Object.defineProperty(navigator, "geolocation", {
+      value: { getCurrentPosition },
+      configurable: true,
+      writable: true,
+    });
+    localStorage.setItem("ff:location-enabled-v1", "true");
+
+    const controller = new AppController();
+    await controller.init();
+
+    const toggle = document.querySelector("#location-toggle") as HTMLInputElement;
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    await flushPromises();
+
+    const locationStatus = document.querySelector(
+      "#location-status",
+    ) as HTMLElement;
+    expect(locationStatus.textContent).toBe(
+      "Location denied — check device permissions.",
+    );
+  });
+
+  it("shows location unavailable when geolocation is not supported", async () => {
+    renderAppHTML();
+    Object.defineProperty(navigator, "geolocation", {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
+    localStorage.setItem("ff:location-enabled-v1", "true");
+
+    const controller = new AppController();
+    await controller.init();
+
+    const toggle = document.querySelector("#location-toggle") as HTMLInputElement;
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    await flushPromises();
+
+    const locationStatus = document.querySelector(
+      "#location-status",
+    ) as HTMLElement;
+    expect(locationStatus.textContent).toBe("Location unavailable right now.");
+  });
+
+  it("shows location timeout when geolocation times out", async () => {
+    renderAppHTML();
+    const getCurrentPosition = vi.fn(
+      (_success: unknown, error: (err: { code: number }) => void) => {
+        error({ code: 3 });
+      },
+    );
+    Object.defineProperty(navigator, "geolocation", {
+      value: { getCurrentPosition },
+      configurable: true,
+      writable: true,
+    });
+    localStorage.setItem("ff:location-enabled-v1", "true");
+
+    const controller = new AppController();
+    await controller.init();
+
+    const toggle = document.querySelector("#location-toggle") as HTMLInputElement;
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    await flushPromises();
+
+    const locationStatus = document.querySelector(
+      "#location-status",
+    ) as HTMLElement;
+    expect(locationStatus.textContent).toBe("Location took too long.");
+  });
+
+  it("keeps location disabled when the toggle is unchecked during capture", async () => {
+    renderAppHTML();
+    localStorage.setItem("ff:location-enabled-v1", "false");
+
+    const controller = new AppController();
+    await controller.init();
+
+    mockCamera.capture.mockReturnValue({
+      buffer: new ArrayBuffer(224 * 224 * 4),
+      width: 224,
+      height: 224,
+      thumbnail: "thumb",
+    } as CaptureResult);
+
+    const captureBtn = document.querySelector("#capture-btn") as HTMLElement;
+    captureBtn.click();
+    await flushPromises();
+
+    const locationStatus = document.querySelector(
+      "#location-status",
+    ) as HTMLElement;
+    expect(locationStatus.textContent).toBe("GPS tagging disabled.");
   });
 });
 

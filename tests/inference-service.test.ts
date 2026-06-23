@@ -7,6 +7,7 @@ import {
 } from "@/core/types";
 import { modelRegistry } from "@/data/model-registry";
 import { config } from "@/core/config";
+import { logger } from "@/core/logger";
 import {
   installMockWorker,
   sendWorkerMessage,
@@ -509,5 +510,46 @@ describe("InferenceService", () => {
     expect(secondService.isReady()).toBe(true);
     expect(preloadedStatuses).toContain("Ready");
     secondService.terminate();
+  });
+
+  it("throws ModelLoadError when the worker cannot be created", () => {
+    const originalWorker = globalThis.Worker;
+    globalThis.Worker = vi.fn(() => {
+      throw new Error("worker blocked");
+    }) as unknown as typeof Worker;
+
+    const service = new InferenceService();
+    expect(() => {
+      service.initialize();
+    }).toThrow("worker blocked");
+
+    globalThis.Worker = originalWorker;
+  });
+
+  it("continues model switch when storage estimate throws", async () => {
+    const estimate = vi.fn().mockRejectedValue(new Error("storage broken"));
+    installStorageEstimate(estimate);
+
+    service.initialize();
+    service.switchModel(ModelKey.Dima806);
+    await flushPromises();
+
+    expect(estimate).toHaveBeenCalled();
+    expect(worker.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: WorkerCommandType.Switch,
+        modelKey: ModelKey.Dima806,
+      }),
+    );
+  });
+
+  it("warns when resuming storage confirmation with none pending", () => {
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    service.initialize();
+    service.resumeStorageConfirm();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("no pending storage confirmation"),
+    );
+    warnSpy.mockRestore();
   });
 });

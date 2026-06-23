@@ -45,6 +45,7 @@ Copy `.env.example` to `.env` to set optional runtime values such as `VITE_TELEM
 - [Accessibility statement](docs/accessibility-statement.md)
 - [Model card](docs/model-card.md)
 - [TWA packaging](docs/twa-packaging.md)
+- [Engineering guide](docs/engineering.md)
 
 ## Trusted Web Activity (Android APK)
 

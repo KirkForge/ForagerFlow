@@ -369,4 +369,116 @@ describe("history with IndexedDB", () => {
       expect(imported!.top1Species).toBe("Updated");
     });
   });
+
+  it("rejects imports with unsupported version", async () => {
+    const backup: HistoryBackup = {
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      entries: [],
+    };
+    await expect(importHistory(JSON.stringify(backup))).rejects.toThrow(
+      "unsupported",
+    );
+  });
+
+  it("rejects imports when the transaction errors", async () => {
+    const openDBSpy = vi.spyOn(historyDb, "openDB").mockResolvedValue({
+      transaction: vi.fn().mockReturnValue({
+        objectStore: vi.fn().mockReturnValue({
+          put: vi.fn(),
+        }),
+        set onerror(handler: () => void) {
+          handler();
+        },
+        set onabort(_: () => void) {},
+        set oncomplete(_: () => void) {},
+      }),
+      close: vi.fn(),
+    } as unknown as IDBDatabase);
+
+    const backup: HistoryBackup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries: [makeHistoryEntry({ id: "tx-err" })],
+    };
+
+    await expect(importHistory(JSON.stringify(backup))).rejects.toThrow(
+      "IDB import failed",
+    );
+    openDBSpy.mockRestore();
+  });
+
+  it("rejects imports when the transaction aborts", async () => {
+    const openDBSpy = vi.spyOn(historyDb, "openDB").mockResolvedValue({
+      transaction: vi.fn().mockReturnValue({
+        objectStore: vi.fn().mockReturnValue({
+          put: vi.fn(),
+        }),
+        set onerror(_: () => void) {},
+        set onabort(handler: () => void) {
+          handler();
+        },
+        set oncomplete(_: () => void) {},
+      }),
+      close: vi.fn(),
+    } as unknown as IDBDatabase);
+
+    const backup: HistoryBackup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries: [makeHistoryEntry({ id: "tx-abort" })],
+    };
+
+    await expect(importHistory(JSON.stringify(backup))).rejects.toThrow(
+      "IDB import aborted",
+    );
+    openDBSpy.mockRestore();
+  });
+
+  it("imports entries with non-string notes as empty notes", async () => {
+    const backup: HistoryBackup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries: [makeHistoryEntry({ id: "notes-empty", notes: 123 as unknown as string })],
+    };
+
+    const count = await importHistory(JSON.stringify(backup));
+    expect(count).toBe(1);
+
+    const entries = await getHistory(10);
+    const imported = entries.find((e) => e.id === "notes-empty");
+    expect(imported).toBeDefined();
+    expect(imported!.notes).toBe("");
+  });
+
+  it("imports entries with invalid location as no location", async () => {
+    const backup: HistoryBackup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries: [
+        makeHistoryEntry({
+          id: "bad-loc",
+          location: { lat: 55, lng: 12, accuracy: -1 },
+        }),
+      ],
+    };
+
+    await importHistory(JSON.stringify(backup));
+    const entries = await getHistory(10);
+    const imported = entries.find((e) => e.id === "bad-loc");
+    expect(imported).toBeDefined();
+    expect(imported!.location).toBeUndefined();
+  });
+
+  it("rejects imports with invalid thumbnails", async () => {
+    const backup: HistoryBackup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries: [makeHistoryEntry({ id: "bad-thumb", thumbnail: "https://example.com/x.jpg" })],
+    };
+
+    await expect(importHistory(JSON.stringify(backup))).rejects.toThrow(
+      "invalid thumbnail",
+    );
+  });
 });

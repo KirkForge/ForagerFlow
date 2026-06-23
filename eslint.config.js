@@ -2,6 +2,10 @@ import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import prettier from "eslint-config-prettier";
 import globals from "globals";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const noRawUiStrings = require("./eslint-rules/no-raw-ui-strings.cjs");
 
 export default tseslint.config(
   eslint.configs.recommended,
@@ -59,6 +63,18 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ["dist/", "node_modules/", "pwa/", "*.js"],
+    plugins: {
+      local: {
+        rules: {
+          "no-raw-ui-strings": noRawUiStrings,
+        },
+      },
+    },
+    rules: {
+      "local/no-raw-ui-strings": "warn",
+    },
+  },
+  {
+    ignores: ["dist/", "node_modules/", "pwa/", "*.js", "eslint-rules/"],
   },
 );

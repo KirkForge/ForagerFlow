@@ -63,4 +63,40 @@ describe("telemetry", () => {
     (config as { telemetryEndpoint: string }).telemetryEndpoint =
       originalEndpoint;
   });
+
+  it("does not send a beacon when no endpoint is configured", () => {
+    const sendBeacon = vi.fn().mockReturnValue(true);
+    Object.defineProperty(globalThis.navigator, "sendBeacon", {
+      value: sendBeacon,
+      configurable: true,
+      writable: true,
+    });
+
+    const originalEndpoint = config.telemetryEndpoint;
+    (config as { telemetryEndpoint: string }).telemetryEndpoint = "";
+    recordTelemetry("no.endpoint");
+    (config as { telemetryEndpoint: string }).telemetryEndpoint = originalEndpoint;
+
+    expect(sendBeacon).not.toHaveBeenCalled();
+  });
+
+  it("does not throw when sendBeacon throws", () => {
+    Object.defineProperty(globalThis.navigator, "sendBeacon", {
+      value: () => {
+        throw new Error("beacon blocked");
+      },
+      configurable: true,
+      writable: true,
+    });
+
+    const originalEndpoint = config.telemetryEndpoint;
+    (config as { telemetryEndpoint: string }).telemetryEndpoint =
+      "/api/telemetry";
+
+    expect(() => {
+      recordTelemetry("beacon.throws");
+    }).not.toThrow();
+
+    (config as { telemetryEndpoint: string }).telemetryEndpoint = originalEndpoint;
+  });
 });

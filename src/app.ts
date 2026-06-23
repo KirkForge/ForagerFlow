@@ -175,7 +175,7 @@ export class AppController {
         void this.renderHistory();
       } catch (err) {
         logger.error("Failed to render result:", err);
-        this.statusEl.textContent = "Error displaying result.";
+        this.statusEl.textContent = t("status.displayError");
         this.setCaptureBusy(false);
         this.#pendingThumbnail = null;
       }
