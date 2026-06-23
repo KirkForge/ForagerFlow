@@ -6,6 +6,7 @@ import { ResultsRenderer } from "@/ui";
 import { flushPromises } from "./helpers/promises";
 import { makeHistoryEntry } from "./helpers/fixtures";
 import { setLocale } from "@/i18n";
+import { getHistory, searchHistory } from "@/services/history";
 
 interface MockInferenceService {
   onStatus: (handler: (text: string) => void) => void;
@@ -100,6 +101,7 @@ vi.mock("@/services/image-input", () => ({
 vi.mock("@/services/history", () => ({
   saveIdentification: vi.fn().mockResolvedValue("id-1"),
   getHistory: vi.fn().mockResolvedValue([]),
+  searchHistory: vi.fn().mockResolvedValue([]),
   clearHistory: vi.fn().mockResolvedValue(undefined),
   exportHistory: vi.fn().mockResolvedValue('{"version":1,"entries":[]}'),
   importHistory: vi.fn().mockResolvedValue(0),
@@ -144,6 +146,8 @@ function renderAppHTML(): void {
       <div id="low-confidence"></div>
       <div id="last-result"></div>
       <div id="history-list"></div>
+      <input id="history-search" type="search" />
+      <button id="history-search-clear">×</button>
       <button id="history-export">Export</button>
       <button id="history-import">Import</button>
       <input id="history-import-input" type="file" accept="application/json" />
@@ -596,6 +600,47 @@ describe("AppController", () => {
 
     expect(mockDetailPanel.close).toHaveBeenCalled();
     expect(mockComparisonPanel.close).toHaveBeenCalled();
+  });
+
+  it("filters history when search input changes", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const entry = makeHistoryEntry({ top1Species: "Amanita muscaria" });
+    vi.mocked(searchHistory).mockResolvedValueOnce([entry]);
+
+    const input = document.querySelector<HTMLInputElement>("#history-search")!;
+    input.value = "amanita";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    await flushPromises();
+
+    expect(searchHistory).toHaveBeenCalledWith("amanita", { limit: 20 });
+    const list = document.getElementById("history-list")!;
+    expect(list.textContent).toContain("Amanita muscaria");
+  });
+
+  it("clears history search and reloads all entries", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const input = document.querySelector<HTMLInputElement>("#history-search")!;
+    input.value = "amanita";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await flushPromises();
+
+    vi.mocked(searchHistory).mockClear();
+    vi.mocked(getHistory).mockClear();
+
+    const clearBtn = document.querySelector<HTMLButtonElement>(
+      "#history-search-clear",
+    )!;
+    clearBtn.click();
+    await flushPromises();
+
+    expect(input.value).toBe("");
+    expect(searchHistory).not.toHaveBeenCalled();
+    expect(getHistory).toHaveBeenCalledWith(20);
   });
 });
 

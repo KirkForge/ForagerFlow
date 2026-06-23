@@ -19,6 +19,7 @@ import type { ComparisonItem } from "@/ui/comparison";
 import {
   saveIdentification,
   getHistory,
+  searchHistory,
   clearHistory,
   exportHistory,
   importHistory,
@@ -51,7 +52,10 @@ export class AppController {
   fileInputEl: HTMLInputElement | null = null;
   locationToggle: HTMLInputElement | null = null;
   locationStatus: HTMLElement | null = null;
+  historySearchEl: HTMLInputElement | null = null;
+  historySearchClearEl: HTMLButtonElement | null = null;
   #historyRenderPending = false;
+  #historySearchQuery = "";
   #pendingThumbnail: string | null = null;
   #pendingLocation: GeoLocation | undefined;
   #lastReport: PredictionReport | undefined;
@@ -71,6 +75,22 @@ export class AppController {
       document.querySelector<HTMLInputElement>("#location-toggle");
     this.locationStatus =
       document.querySelector<HTMLElement>("#location-status");
+    this.historySearchEl =
+      document.querySelector<HTMLInputElement>("#history-search");
+    this.historySearchClearEl =
+      document.querySelector<HTMLButtonElement>("#history-search-clear");
+    this.historySearchEl?.setAttribute(
+      "placeholder",
+      t("history.searchPlaceholder"),
+    );
+    this.historySearchEl?.setAttribute(
+      "aria-label",
+      t("history.searchAria"),
+    );
+    this.historySearchClearEl?.setAttribute(
+      "aria-label",
+      t("history.searchClearAria"),
+    );
     this.renderer = new ResultsRenderer(this.require("#app"), {
       onPredictionClick: (label) => {
         this.openSpeciesDetail(label);
@@ -198,6 +218,28 @@ export class AppController {
 
   private handleRetryCamera(): void {
     void this.startCamera();
+  }
+
+  private handleSearchInput(e: Event): void {
+    const input = e.target as HTMLInputElement;
+    this.#historySearchQuery = input.value;
+    this.updateSearchClearVisibility();
+    void this.renderHistory();
+  }
+
+  private handleSearchClear(): void {
+    if (this.historySearchEl) {
+      this.historySearchEl.value = "";
+    }
+    this.#historySearchQuery = "";
+    this.updateSearchClearVisibility();
+    void this.renderHistory();
+  }
+
+  private updateSearchClearVisibility(): void {
+    if (!this.historySearchClearEl) return;
+    this.historySearchClearEl.hidden =
+      this.#historySearchQuery.trim().length === 0;
   }
 
   private handleModelSwitch(e: Event): void {
@@ -459,11 +501,20 @@ export class AppController {
     }
 
     try {
-      const entries = await getHistory(20);
+      const query = this.#historySearchQuery.trim();
+      const entries = query
+        ? await searchHistory(query, { limit: 20 })
+        : await getHistory(20);
 
       if (entries.length === 0) {
         list.innerHTML = "";
-        list.appendChild(createEl("p", "history-empty", t("history.empty")));
+        list.appendChild(
+          createEl(
+            "p",
+            "history-empty",
+            query ? t("history.noSearchResults") : t("history.empty"),
+          ),
+        );
         return;
       }
 
@@ -585,6 +636,18 @@ export class AppController {
     const retryBtn = document.getElementById("camera-retry");
     retryBtn?.addEventListener("click", () => {
       this.handleRetryCamera();
+    });
+
+    this.historySearchEl?.addEventListener("input", (e) => {
+      this.handleSearchInput(e);
+    });
+    this.historySearchEl?.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        this.handleSearchClear();
+      }
+    });
+    this.historySearchClearEl?.addEventListener("click", () => {
+      this.handleSearchClear();
     });
 
     const modelSelect = document.getElementById("model-select");

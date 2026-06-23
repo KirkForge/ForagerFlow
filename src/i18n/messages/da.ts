@@ -99,6 +99,10 @@ export const daMessages: Messages = {
   "history.deleteEntryAria": "Slet denne post",
   "history.loadError": "Kunne ikke indlæse historikken.",
   "history.location": "Sted: {{lat}}, {{lng}}",
+  "history.searchPlaceholder": "Søg i historik...",
+  "history.searchAria": "Søg i identifikationshistorik",
+  "history.searchClearAria": "Ryd søgning",
+  "history.noSearchResults": "Ingen historikposter matcher søgningen.",
 
   // Location toggle
   "location.enabled": "GPS-tagning aktiveret (kun lokalt).",

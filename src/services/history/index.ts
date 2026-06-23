@@ -254,6 +254,61 @@ export async function saveIdentification(
   }
 }
 
+export interface SearchHistoryOptions {
+  limit?: number;
+}
+
+function normalizeSearchText(value: string): string[] {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function buildSearchHaystack(entry: HistoryEntry): string {
+  const dateText = new Date(entry.timestamp).toLocaleDateString();
+  const parts = [
+    entry.top1Species,
+    entry.top1Edibility,
+    entry.modelKey,
+    entry.notes,
+    dateText,
+    ...entry.predictions.map((p) => p.label),
+  ];
+  return parts
+    .join(" ")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+export async function searchHistory(
+  query: string,
+  options: SearchHistoryOptions = {},
+): Promise<HistoryEntry[]> {
+  const { limit = 50 } = options;
+  const tokens = normalizeSearchText(query);
+  if (tokens.length === 0) {
+    return getHistory(limit);
+  }
+
+  const entries = await getHistory(10_000);
+  const results: HistoryEntry[] = [];
+  for (const entry of entries) {
+    const haystack = buildSearchHaystack(entry);
+    if (tokens.every((token) => haystack.includes(token))) {
+      results.push(entry);
+      if (results.length >= limit) {
+        break;
+      }
+    }
+  }
+  return results;
+}
+
 export async function getHistory(limit = 50): Promise<HistoryEntry[]> {
   try {
     const db = await openDB();

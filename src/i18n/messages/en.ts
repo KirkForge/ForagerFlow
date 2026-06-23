@@ -98,6 +98,10 @@ export const enMessages: Messages = {
   "history.deleteEntryAria": "Delete this entry",
   "history.loadError": "Unable to load history.",
   "history.location": "Location: {{lat}}, {{lng}}",
+  "history.searchPlaceholder": "Search history...",
+  "history.searchAria": "Search identification history",
+  "history.searchClearAria": "Clear search",
+  "history.noSearchResults": "No history entries match your search.",
 
   // Location toggle
   "location.enabled": "GPS tagging enabled (local only).",

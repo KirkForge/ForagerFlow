@@ -3,6 +3,7 @@ import "fake-indexeddb/auto";
 import {
   saveIdentification,
   getHistory,
+  searchHistory,
   clearHistory,
   exportHistory,
   importHistory,
@@ -263,5 +264,76 @@ describe("history with IndexedDB", () => {
 
   it("throws when importing a backup with no entries", async () => {
     await expect(importHistory('{"version":1}')).rejects.toThrow("no entries");
+  });
+
+  describe("searchHistory", () => {
+    beforeEach(async () => {
+      await saveIdentification(
+        makeReport({
+          top1Species: "Agaricus bisporus",
+          top1Knowledge: { edibility: Edibility.Edible, notes: "Button." },
+          predictions: [
+            { label: "Agaricus bisporus", probability: 0.95, index: 0 },
+            { label: "Amanita phalloides", probability: 0.03, index: 1 },
+          ],
+        }),
+        ModelKey.BVRA,
+      );
+      await sleep(10);
+      await saveIdentification(
+        makeReport({
+          top1Species: "Amanita muscaria",
+          top1Knowledge: { edibility: Edibility.Poisonous, notes: "Fly agaric." },
+          predictions: [
+            { label: "Amanita muscaria", probability: 0.91, index: 0 },
+            { label: "Russula emetica", probability: 0.05, index: 1 },
+          ],
+        }),
+        ModelKey.Dima806,
+      );
+    });
+
+    it("returns all entries when query is empty", async () => {
+      const entries = await searchHistory("");
+      expect(entries).toHaveLength(2);
+    });
+
+    it("filters by species case-insensitively", async () => {
+      const entries = await searchHistory("BISPORUS");
+      expect(entries).toHaveLength(1);
+      expect(entries[0]!.top1Species).toBe("Agaricus bisporus");
+    });
+
+    it("filters by edibility", async () => {
+      const entries = await searchHistory("poisonous");
+      expect(entries).toHaveLength(1);
+      expect(entries[0]!.top1Species).toBe("Amanita muscaria");
+    });
+
+    it("matches prediction labels that are not top-1", async () => {
+      const entries = await searchHistory("phalloides");
+      expect(entries).toHaveLength(1);
+      expect(entries[0]!.top1Species).toBe("Agaricus bisporus");
+    });
+
+    it("requires every token to match", async () => {
+      const entries = await searchHistory("agaricus edible");
+      expect(entries).toHaveLength(1);
+      expect(entries[0]!.top1Species).toBe("Agaricus bisporus");
+    });
+
+    it("returns empty array when nothing matches", async () => {
+      const entries = await searchHistory("boletus");
+      expect(entries).toEqual([]);
+    });
+
+    it("respects the limit", async () => {
+      await saveIdentification(
+        makeReport({ top1Species: "Agaricus augustus" }),
+        ModelKey.BVRA,
+      );
+      const entries = await searchHistory("Agaricus", { limit: 2 });
+      expect(entries).toHaveLength(2);
+    });
   });
 });

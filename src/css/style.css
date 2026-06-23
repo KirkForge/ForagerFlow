@@ -418,6 +418,39 @@ video {
   font-size: 11px;
   cursor: pointer;
 }
+.history-search {
+  position: relative;
+  margin-bottom: var(--space-1);
+}
+.history-search input[type="search"] {
+  width: 100%;
+  background: var(--surface-1);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 28px 6px 8px;
+  font-size: 13px;
+}
+.history-search input[type="search"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.history-search-clear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.history-search-clear[hidden] {
+  display: none;
+}
 .history-empty {
   color: var(--text-muted);
   font-size: 12px;
