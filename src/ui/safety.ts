@@ -12,6 +12,13 @@ interface SafetyUIOptions {
   onAcknowledged: () => void;
 }
 
+interface ConfirmModalElements {
+  modal: HTMLDialogElement;
+  accept: HTMLButtonElement;
+  cancel: HTMLButtonElement;
+  defaultFocus: HTMLButtonElement;
+}
+
 export class SafetyUI {
   private readonly opts: SafetyUIOptions;
   private readonly els: {
@@ -19,16 +26,9 @@ export class SafetyUI {
     safetyForm: HTMLFormElement;
     safetyAck: HTMLInputElement;
     safetyContinue: HTMLButtonElement;
-    modelConfirmModal: HTMLDialogElement;
-    modelConfirmAccept: HTMLButtonElement;
-    modelConfirmCancel: HTMLButtonElement;
-    storageConfirmModal: HTMLDialogElement;
-    storageConfirmBody: HTMLElement;
-    storageConfirmAccept: HTMLButtonElement;
-    storageConfirmCancel: HTMLButtonElement;
-    clearConfirmModal: HTMLDialogElement;
-    clearConfirmAccept: HTMLButtonElement;
-    clearConfirmCancel: HTMLButtonElement;
+    modelConfirm: ConfirmModalElements;
+    storageConfirm: ConfirmModalElements;
+    clearConfirm: ConfirmModalElements;
     modelSelect: HTMLSelectElement;
   };
 
@@ -39,20 +39,9 @@ export class SafetyUI {
       safetyForm: this.req<HTMLFormElement>("#safety-form"),
       safetyAck: this.req<HTMLInputElement>("#safety-modal-ack"),
       safetyContinue: this.req<HTMLButtonElement>("#safety-modal-continue"),
-      modelConfirmModal: this.req("#model-confirm-modal"),
-      modelConfirmAccept: this.req<HTMLButtonElement>("#model-confirm-accept"),
-      modelConfirmCancel: this.req<HTMLButtonElement>("#model-confirm-cancel"),
-      storageConfirmModal: this.req("#storage-confirm-modal"),
-      storageConfirmBody: this.req("#storage-confirm-body"),
-      storageConfirmAccept: this.req<HTMLButtonElement>(
-        "#storage-confirm-accept",
-      ),
-      storageConfirmCancel: this.req<HTMLButtonElement>(
-        "#storage-confirm-cancel",
-      ),
-      clearConfirmModal: this.req("#clear-confirm-modal"),
-      clearConfirmAccept: this.req<HTMLButtonElement>("#clear-confirm-accept"),
-      clearConfirmCancel: this.req<HTMLButtonElement>("#clear-confirm-cancel"),
+      modelConfirm: this.confirmEls("#model-confirm-modal"),
+      storageConfirm: this.confirmEls("#storage-confirm-modal"),
+      clearConfirm: this.confirmEls("#clear-confirm-modal"),
       modelSelect: this.req<HTMLSelectElement>("#model-select"),
     };
   }
@@ -95,40 +84,7 @@ export class SafetyUI {
   }
 
   confirmClearHistory(): Promise<boolean> {
-    return new Promise<boolean>((resolve) => {
-      const onAccept = () => {
-        cleanup();
-        resolve(true);
-      };
-      const onCancel = () => {
-        cleanup();
-        resolve(false);
-      };
-      const onDialogCancel = (e: Event) => {
-        e.preventDefault();
-        onCancel();
-      };
-      const cleanup = () => {
-        this.els.clearConfirmAccept.removeEventListener("click", onAccept);
-        this.els.clearConfirmCancel.removeEventListener("click", onCancel);
-        this.els.clearConfirmModal.removeEventListener(
-          "cancel",
-          onDialogCancel,
-        );
-        this.els.clearConfirmModal.close();
-      };
-      this.els.clearConfirmAccept.addEventListener("click", onAccept, {
-        once: true,
-      });
-      this.els.clearConfirmCancel.addEventListener("click", onCancel, {
-        once: true,
-      });
-      this.els.clearConfirmModal.addEventListener("cancel", onDialogCancel, {
-        once: true,
-      });
-      this.els.clearConfirmModal.showModal();
-      this.els.clearConfirmCancel.focus();
-    });
+    return this.showConfirmModal(this.els.clearConfirm);
   }
 
   private hasAcknowledged(): boolean {
@@ -177,13 +133,49 @@ export class SafetyUI {
     });
   }
 
-  private openModelConfirm(): Promise<boolean> {
+  private async openModelConfirm(): Promise<boolean> {
+    const accepted = await this.showConfirmModal(this.els.modelConfirm);
+    if (accepted) {
+      this.markDima806Confirmed();
+      this.els.modelSelect.value = ModelKey.Dima806;
+      this.els.modelSelect.dispatchEvent(new Event("change"));
+    }
+    return accepted;
+  }
+
+  private bindStorageConfirmFromService(): void {
+    this.opts.inferenceService.onStorageConfirm((payload) => {
+      const freeMB = Math.round(payload.freeBytes / 1024 / 1024);
+      const modelSize = modelRegistry[payload.modelKey].size;
+      const body = this.els.storageConfirm.modal.querySelector(
+        "#storage-confirm-body",
+      );
+      if (body) {
+        body.textContent = `Your device reports ${String(freeMB)} MB of free storage. The selected model needs ${modelSize}. Continue anyway?`;
+      }
+      void this.showConfirmModal(this.els.storageConfirm).then((accepted) => {
+        if (accepted) {
+          this.opts.inferenceService.resumeStorageConfirm();
+        }
+      });
+    });
+  }
+
+  private showConfirmModal({
+    modal,
+    accept,
+    cancel,
+    defaultFocus,
+  }: ConfirmModalElements): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
+      const cleanup = () => {
+        accept.removeEventListener("click", onAccept);
+        cancel.removeEventListener("click", onCancel);
+        modal.removeEventListener("cancel", onDialogCancel);
+        modal.close();
+      };
       const onAccept = () => {
         cleanup();
-        this.markDima806Confirmed();
-        this.els.modelSelect.value = ModelKey.Dima806;
-        this.els.modelSelect.dispatchEvent(new Event("change"));
         resolve(true);
       };
       const onCancel = () => {
@@ -194,71 +186,34 @@ export class SafetyUI {
         e.preventDefault();
         onCancel();
       };
-      const cleanup = () => {
-        this.els.modelConfirmAccept.removeEventListener("click", onAccept);
-        this.els.modelConfirmCancel.removeEventListener("click", onCancel);
-        this.els.modelConfirmModal.removeEventListener(
-          "cancel",
-          onDialogCancel,
-        );
-        this.els.modelConfirmModal.close();
-      };
-      this.els.modelConfirmAccept.addEventListener("click", onAccept, {
-        once: true,
-      });
-      this.els.modelConfirmCancel.addEventListener("click", onCancel, {
-        once: true,
-      });
-      this.els.modelConfirmModal.addEventListener("cancel", onDialogCancel, {
-        once: true,
-      });
-      this.els.modelConfirmModal.showModal();
-      this.els.modelConfirmAccept.focus();
+
+      accept.addEventListener("click", onAccept, { once: true });
+      cancel.addEventListener("click", onCancel, { once: true });
+      modal.addEventListener("cancel", onDialogCancel, { once: true });
+      modal.showModal();
+      defaultFocus.focus();
     });
   }
 
-  private bindStorageConfirmFromService(): void {
-    this.opts.inferenceService.onStorageConfirm((payload) => {
-      const freeMB = Math.round(payload.freeBytes / 1024 / 1024);
-      const modelSize = modelRegistry[payload.modelKey].size;
-      this.els.storageConfirmBody.textContent = `Your device reports ${String(freeMB)} MB of free storage. The selected model needs ${modelSize}. Continue anyway?`;
-      const onAccept = () => {
-        cleanup();
-        this.opts.inferenceService.resumeStorageConfirm();
-      };
-      const onCancel = () => {
-        cleanup();
-      };
-      const onDialogCancel = (e: Event) => {
-        e.preventDefault();
-        onCancel();
-      };
-      const cleanup = () => {
-        this.els.storageConfirmAccept.removeEventListener("click", onAccept);
-        this.els.storageConfirmCancel.removeEventListener("click", onCancel);
-        this.els.storageConfirmModal.removeEventListener(
-          "cancel",
-          onDialogCancel,
-        );
-        this.els.storageConfirmModal.close();
-      };
-      this.els.storageConfirmAccept.addEventListener("click", onAccept, {
-        once: true,
-      });
-      this.els.storageConfirmCancel.addEventListener("click", onCancel, {
-        once: true,
-      });
-      this.els.storageConfirmModal.addEventListener("cancel", onDialogCancel, {
-        once: true,
-      });
-      this.els.storageConfirmModal.showModal();
-      this.els.storageConfirmCancel.focus();
-    });
+  private confirmEls(rootSelector: string): ConfirmModalElements {
+    const root = this.req<HTMLDialogElement>(rootSelector);
+    return {
+      modal: root,
+      accept: this.req<HTMLButtonElement>("[value='accept']", root),
+      cancel: this.req<HTMLButtonElement>(
+        "[value='cancel'], button:not([value='accept'])",
+        root,
+      ),
+      defaultFocus: this.req<HTMLButtonElement>(
+        "[value='cancel'], button:not([value='accept'])",
+        root,
+      ),
+    };
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
-  private req<T extends HTMLElement>(sel: string): T {
-    const el = document.querySelector(sel);
+  private req<T extends HTMLElement>(sel: string, root?: HTMLElement): T {
+    const el = (root ?? document).querySelector(sel);
     if (!el) throw new Error(`SafetyUI: required element not found: ${sel}`);
     return el as T;
   }

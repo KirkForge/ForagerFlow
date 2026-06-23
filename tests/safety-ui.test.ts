@@ -41,13 +41,13 @@ function renderSafetyHTML(): void {
 
     <dialog id="storage-confirm-modal">
       <p id="storage-confirm-body"></p>
-      <button id="storage-confirm-accept">Continue</button>
-      <button id="storage-confirm-cancel">Cancel</button>
+      <button id="storage-confirm-accept" value="accept">Continue</button>
+      <button id="storage-confirm-cancel" value="cancel">Cancel</button>
     </dialog>
 
     <dialog id="clear-confirm-modal">
-      <button id="clear-confirm-accept">Clear</button>
-      <button id="clear-confirm-cancel">Cancel</button>
+      <button id="clear-confirm-accept" value="accept">Clear</button>
+      <button id="clear-confirm-cancel" value="cancel">Cancel</button>
     </dialog>
   `;
 
@@ -170,7 +170,9 @@ describe("SafetyUI", () => {
     select.dispatchEvent(new Event("change"));
     acceptBtn.click();
 
-    expect(select.value).toBe(ModelKey.Dima806);
+    await vi.waitFor(() => {
+      expect(select.value).toBe(ModelKey.Dima806);
+    });
   });
 
   it("shows storage confirmation when the service emits storageConfirm", async () => {
@@ -193,6 +195,8 @@ describe("SafetyUI", () => {
     ) as HTMLButtonElement;
     acceptBtn.click();
 
-    expect(inferenceService.resumeStorageConfirm).toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(inferenceService.resumeStorageConfirm).toHaveBeenCalled();
+    });
   });
 });

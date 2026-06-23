@@ -9,6 +9,9 @@ import knowledgeDima806 from "./knowledge-dima806.json";
 export const modelRegistry: Record<ModelKey, ModelRegistryEntry> = {
   [ModelKey.BVRA]: {
     key: ModelKey.BVRA,
+    // The label list has 215 entries but only 214 unique species names:
+    // "Clitocybe nebularis" appears twice. This is an intentional quirk of
+    // the BVRA training labels; the model still outputs 215 logits.
     name: "Specialist (215 classes)",
     size: "90 MB",
     // Absolute path so the worker (loaded from /assets/inference-worker-*.js)

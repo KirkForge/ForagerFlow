@@ -1,5 +1,9 @@
 import type { PredictionReport } from "@/inference/results";
-import type { ModelKey, Edibility } from "@/core/types";
+import { ModelKey, Edibility } from "@/core/types";
+import type {
+  ModelKey as ModelKeyType,
+  Edibility as EdibilityType,
+} from "@/core/types";
 import { logger } from "@/core/logger";
 import { openDB, withTransaction, setMeta, STORE_NAME } from "./db";
 
@@ -47,6 +51,121 @@ function isQuotaExceeded(err: unknown): boolean {
     err instanceof DOMException &&
     (err.name === "QuotaExceededError" || err.name === "QuotaExceeded")
   );
+}
+
+const DATA_URL_RE = /^data:image\/[a-z0-9+]+;base64,/i;
+
+export function isDataUrlThumbnail(value: unknown): value is string {
+  return typeof value === "string" && (value === "" || DATA_URL_RE.test(value));
+}
+
+function isValidEdibility(value: unknown): value is EdibilityType {
+  return (
+    typeof value === "string" &&
+    Object.values(Edibility).includes(value as EdibilityType)
+  );
+}
+
+function isValidModelKey(value: unknown): value is ModelKeyType {
+  return (
+    typeof value === "string" &&
+    Object.values(ModelKey).includes(value as ModelKeyType)
+  );
+}
+
+function isValidPrediction(
+  value: unknown,
+): value is { label: string; probability: number } {
+  if (!value || typeof value !== "object") return false;
+  const { label, probability } = value as Record<string, unknown>;
+  return (
+    typeof label === "string" &&
+    label.length > 0 &&
+    typeof probability === "number" &&
+    Number.isFinite(probability) &&
+    probability >= 0 &&
+    probability <= 1
+  );
+}
+
+function validateHistoryEntry(raw: unknown, index: number): HistoryEntry {
+  if (!raw || typeof raw !== "object") {
+    throw new Error(`History entry ${String(index + 1)} is not an object`);
+  }
+
+  const entry = raw as Record<string, unknown>;
+
+  const id = entry["id"];
+  if (typeof id !== "string" || id.length === 0) {
+    throw new Error(`History entry ${String(index + 1)} has invalid id`);
+  }
+
+  const timestamp = entry["timestamp"];
+  if (typeof timestamp !== "string" || Number.isNaN(Date.parse(timestamp))) {
+    throw new Error(`History entry ${String(index + 1)} has invalid timestamp`);
+  }
+
+  const modelKey = entry["modelKey"];
+  if (!isValidModelKey(modelKey)) {
+    throw new Error(
+      `History entry ${String(index + 1)} has invalid modelKey: ${String(modelKey)}`,
+    );
+  }
+
+  const top1Species = entry["top1Species"];
+  if (typeof top1Species !== "string" || top1Species.length === 0) {
+    throw new Error(
+      `History entry ${String(index + 1)} has invalid top1Species`,
+    );
+  }
+
+  const top1Probability = entry["top1Probability"];
+  if (
+    typeof top1Probability !== "number" ||
+    !Number.isFinite(top1Probability) ||
+    top1Probability < 0 ||
+    top1Probability > 1
+  ) {
+    throw new Error(
+      `History entry ${String(index + 1)} has invalid top1Probability`,
+    );
+  }
+
+  const top1Edibility = entry["top1Edibility"];
+  if (!isValidEdibility(top1Edibility)) {
+    throw new Error(
+      `History entry ${String(index + 1)} has invalid top1Edibility: ${String(top1Edibility)}`,
+    );
+  }
+
+  const predictions = entry["predictions"];
+  if (!Array.isArray(predictions) || !predictions.every(isValidPrediction)) {
+    throw new Error(
+      `History entry ${String(index + 1)} has invalid predictions`,
+    );
+  }
+
+  const thumbnail = entry["thumbnail"];
+  if (!isDataUrlThumbnail(thumbnail)) {
+    throw new Error(
+      `History entry ${String(index + 1)} has invalid thumbnail (must be empty or a data:image/ base64 URL)`,
+    );
+  }
+
+  const notes = entry["notes"];
+  const notesString = typeof notes === "string" ? notes : "";
+
+  return {
+    id,
+    timestamp,
+    modelKey,
+    top1Species,
+    top1Probability,
+    top1Edibility,
+    predictions,
+    thumbnail,
+    notes: notesString,
+  };
 }
 
 export async function saveIdentification(
@@ -160,12 +279,16 @@ export async function importHistory(json: string): Promise<number> {
     throw new Error("Backup entries are not an array");
   }
 
+  if ((parsed as { version?: unknown }).version !== 1) {
+    throw new Error("Backup version is unsupported");
+  }
+
   const db = await openDB();
   const tx = db.transaction(STORE_NAME, "readwrite");
   const store = tx.objectStore(STORE_NAME);
   let imported = 0;
-  for (const raw of entries) {
-    const entry = raw as HistoryEntry;
+  for (const [index, raw] of entries.entries()) {
+    const entry = validateHistoryEntry(raw, index);
     store.put(entry);
     imported++;
   }
