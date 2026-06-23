@@ -1,8 +1,10 @@
 import { AppController } from "@/app";
 import { logger } from "@/core/logger";
 import { initLocale, t } from "@/i18n";
+import { applySafetyLinks } from "@/i18n/safety";
 
 initLocale();
+applySafetyLinks();
 
 const controller = new AppController();
 controller.init().catch((err: unknown) => {
