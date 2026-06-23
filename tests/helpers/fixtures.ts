@@ -33,6 +33,7 @@ export function makeReport(
     top1Species: "Agaricus bisporus",
     top1Probability: 0.95,
     top1Knowledge: { edibility: Edibility.Edible, notes: "Button mushroom." },
+    confidence: { score: 0.95, reliability: "high", gap: 0.9 },
     predictions: [
       { label: "Agaricus bisporus", probability: 0.95, index: 0 },
       { label: "Amanita phalloides", probability: 0.03, index: 1 },

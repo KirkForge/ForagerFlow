@@ -1,7 +1,8 @@
-import { Edibility, type SpeciesKnowledge } from "@/core/types";
+import { Edibility, type SpeciesKnowledge, type Prediction } from "@/core/types";
 import { sanitizeText } from "@/core/sanitize";
 import { t } from "@/i18n";
 import { getLocalizedNotes } from "@/i18n/knowledge";
+import type { CalibrationResult } from "@/inference/confidence";
 
 export class SpeciesDetailPanel {
   private readonly modal: HTMLDialogElement;
@@ -24,20 +25,30 @@ export class SpeciesDetailPanel {
     this.closeBtn.setAttribute("aria-label", t("detail.closeAria"));
   }
 
-  open(label: string, probability: number, knowledge: SpeciesKnowledge): void {
+  open(
+    label: string,
+    prediction: Prediction,
+    knowledge: SpeciesKnowledge,
+    confidence: CalibrationResult,
+  ): void {
     this.title.textContent = sanitizeText(label);
     this.notes.textContent = sanitizeText(
       getLocalizedNotes(knowledge) || t("knowledge.noData"),
     );
     this.safety.textContent = t("detail.safetyReminder");
 
-    const pct = (probability * 100).toFixed(1);
+    const rawPct = (prediction.probability * 100).toFixed(1);
+    const calPct = (confidence.score * 100).toFixed(1);
     const edibilityClass = this.edibilityClass(knowledge.edibility);
     const edibilityText = this.edibilityText(knowledge.edibility);
+    const reliabilityClass = `reliability-${confidence.reliability}`;
+    const reliabilityText = t(`confidence.reliability${this.capitalize(confidence.reliability)}`);
 
     this.meta.innerHTML = `
       <span class="detail-edibility ${edibilityClass}">${edibilityText}</span>
-      <span class="detail-confidence">${t("detail.confidence", { pct })}</span>
+      <span class="detail-reliability ${reliabilityClass}">${reliabilityText}</span>
+      <span class="detail-confidence">${t("detail.confidence", { pct: rawPct })}</span>
+      <span class="detail-calibrated">${t("detail.calibratedScore", { pct: calPct })}</span>
     `;
 
     const verifyUrl = new URL("https://www.google.com/search");
@@ -106,6 +117,10 @@ export class SpeciesDetailPanel {
       case Edibility.Edible:
         return t("prediction.edible");
     }
+  }
+
+  private capitalize(value: string): string {
+    return value.charAt(0).toUpperCase() + value.slice(1);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters

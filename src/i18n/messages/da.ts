@@ -51,10 +51,14 @@ export const daMessages: Messages = {
   // Detail panel
   "detail.title": "Artens detaljer",
   "detail.closeAria": "Luk artens detaljer",
-  "detail.confidence": "{{pct}}% sikkerhed",
+  "detail.confidence": "{{pct}}% rå sikkerhed",
+  "detail.calibratedScore": "{{pct}}% kalibreret",
   "detail.edibility": "Spiselighed",
   "detail.safetyReminder":
     "Spis aldrig en vild svamp baseret udelukkende på denne app. Få altid bekræftet af en autoriseret svampekyndig.",
+  "confidence.reliabilityHigh": "Høj pålidelighed",
+  "confidence.reliabilityMedium": "Middel pålidelighed",
+  "confidence.reliabilityLow": "Lav pålidelighed",
 
   // Warnings
   "warning.lowConfidence": "Lav sikkerhed — handle ikke på dette resultat.",

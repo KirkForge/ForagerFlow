@@ -208,11 +208,17 @@ export class AppController {
       probability: 0,
       index: -1,
     };
+    const confidence =
+      this.#lastReport?.confidence ?? {
+        score: prediction.probability,
+        reliability: "low",
+        gap: 0,
+      };
     const knowledge = model.knowledge[label] ?? {
       edibility: Edibility.Unknown,
       notes: t("knowledge.noData"),
     };
-    this.detailPanel.open(label, prediction.probability, knowledge);
+    this.detailPanel.open(label, prediction, knowledge, confidence);
   }
 
   handleOfflineChange(): void {

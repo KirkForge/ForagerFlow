@@ -38,7 +38,7 @@ describe("generatePredictionReport", () => {
     expect(report.warningMessage).toBeTruthy();
   });
 
-  it("sets warning for low confidence", () => {
+  it("sets warning for low calibrated confidence", () => {
     const logits = new Float32Array([1.0, 1.0, 1.0]);
     const report = generatePredictionReport(logits, makeMockModel());
     expect(report.requiresWarning).toBe(true);
@@ -47,10 +47,24 @@ describe("generatePredictionReport", () => {
     );
   });
 
+  it("calibrated score penalizes a narrow margin", () => {
+    // Top-1 raw 0.6, top-2 raw 0.3, gap 0.3 -> calibrated ~0.39 (low).
+    const logits = new Float32Array([
+      Math.log(0.6),
+      Math.log(0.3),
+      Math.log(0.1),
+    ]);
+    const report = generatePredictionReport(logits, makeMockModel());
+    expect(report.top1Probability).toBeGreaterThan(0.55);
+    expect(report.confidence.score).toBeLessThan(0.5);
+    expect(report.confidence.reliability).toBe("low");
+  });
+
   it("sets no warning for high confidence edible prediction", () => {
     const logits = new Float32Array([10.0, 1.0, 0.5]);
     const report = generatePredictionReport(logits, makeMockModel());
     expect(report.requiresWarning).toBe(false);
+    expect(report.confidence.reliability).toBe("high");
   });
 
   it("treats unknown species in top 3 as a risk when confidence is low", () => {

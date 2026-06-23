@@ -3,6 +3,14 @@ import { SpeciesDetailPanel } from "@/ui/species-detail";
 import { Edibility } from "@/core/types";
 import { setLocale } from "@/i18n";
 
+function makeConfidence(
+  score: number,
+  reliability: "high" | "medium" | "low",
+  gap: number,
+) {
+  return { score, reliability, gap };
+}
+
 function renderDetailHTML(): void {
   document.body.innerHTML = `
     <dialog id="species-detail-modal" aria-labelledby="species-detail-title">
@@ -46,10 +54,12 @@ describe("SpeciesDetailPanel", () => {
 
   it("opens with species title, notes, edibility, and confidence", () => {
     const panel = new SpeciesDetailPanel();
-    panel.open("Agaricus bisporus", 0.87, {
-      edibility: Edibility.Edible,
-      notes: "Safe button mushroom.",
-    });
+    panel.open(
+      "Agaricus bisporus",
+      { label: "Agaricus bisporus", probability: 0.87, index: 0 },
+      { edibility: Edibility.Edible, notes: "Safe button mushroom." },
+      makeConfidence(0.91, "high", 0.85),
+    );
 
     const modal = document.querySelector(
       "#species-detail-modal",
@@ -62,20 +72,25 @@ describe("SpeciesDetailPanel", () => {
     expect(document.querySelector("#species-detail-notes")?.textContent).toBe(
       "Safe button mushroom.",
     );
-    expect(document.querySelector("#species-detail-meta")?.textContent).toContain(
-      "Edible",
-    );
-    expect(document.querySelector("#species-detail-meta")?.textContent).toContain(
-      "87.0%",
-    );
+    expect(
+      document.querySelector("#species-detail-meta")?.textContent,
+    ).toContain("Edible");
+    expect(
+      document.querySelector("#species-detail-meta")?.textContent,
+    ).toContain("87.0%");
+    expect(
+      document.querySelector("#species-detail-meta")?.textContent,
+    ).toContain("High reliability");
   });
 
   it("renders a verify link with a search URL", () => {
     const panel = new SpeciesDetailPanel();
-    panel.open("Amanita phalloides", 0.45, {
-      edibility: Edibility.Poisonous,
-      notes: "Death cap — fatal.",
-    });
+    panel.open(
+      "Amanita phalloides",
+      { label: "Amanita phalloides", probability: 0.45, index: 1 },
+      { edibility: Edibility.Poisonous, notes: "Death cap — fatal." },
+      makeConfidence(0.42, "low", 0.2),
+    );
 
     const link = document.querySelector(
       "#species-detail-verify",
@@ -87,10 +102,12 @@ describe("SpeciesDetailPanel", () => {
 
   it("closes when the close button is clicked", () => {
     const panel = new SpeciesDetailPanel();
-    panel.open("Russula emetica", 0.2, {
-      edibility: Edibility.Poisonous,
-      notes: "Sickener.",
-    });
+    panel.open(
+      "Russula emetica",
+      { label: "Russula emetica", probability: 0.2, index: 2 },
+      { edibility: Edibility.Poisonous, notes: "Sickener." },
+      makeConfidence(0.18, "low", 0.05),
+    );
 
     const closeBtn = document.querySelector(
       "#species-detail-close",
@@ -105,10 +122,12 @@ describe("SpeciesDetailPanel", () => {
 
   it("closes when clicking the backdrop", () => {
     const panel = new SpeciesDetailPanel();
-    panel.open("Agaricus bisporus", 0.9, {
-      edibility: Edibility.Edible,
-      notes: "Safe.",
-    });
+    panel.open(
+      "Agaricus bisporus",
+      { label: "Agaricus bisporus", probability: 0.9, index: 0 },
+      { edibility: Edibility.Edible, notes: "Safe." },
+      makeConfidence(0.88, "high", 0.8),
+    );
 
     const modal = document.querySelector(
       "#species-detail-modal",
@@ -129,27 +148,35 @@ describe("SpeciesDetailPanel", () => {
 
   it("falls back to no-data notes when knowledge is empty", () => {
     const panel = new SpeciesDetailPanel();
-    panel.open("Unknown species", 0.5, {
-      edibility: Edibility.Unknown,
-      notes: "",
-    });
+    panel.open(
+      "Unknown species",
+      { label: "Unknown species", probability: 0.5, index: -1 },
+      { edibility: Edibility.Unknown, notes: "" },
+      makeConfidence(0.5, "medium", 0),
+    );
 
     expect(document.querySelector("#species-detail-notes")?.textContent).toBe(
       "No data available.",
     );
   });
 
-  it("renders poisonous edibility in Danish when locale is da", () => {
+  it("renders poisonous edibility and low reliability in Danish", () => {
     setLocale("da");
     const panel = new SpeciesDetailPanel();
-    panel.open("Amanita phalloides", 0.6, {
-      edibility: Edibility.Poisonous,
-      notes: "Hvid fluesvamp — dødelig.",
-      localizedNotes: { da: "Dødeligt giftig." },
-    });
+    panel.open(
+      "Amanita phalloides",
+      { label: "Amanita phalloides", probability: 0.6, index: 1 },
+      {
+        edibility: Edibility.Poisonous,
+        notes: "Hvid fluesvamp — dødelig.",
+        localizedNotes: { da: "Dødeligt giftig." },
+      },
+      makeConfidence(0.42, "low", 0.2),
+    );
 
     const meta = document.querySelector("#species-detail-meta") as HTMLElement;
     expect(meta.textContent).toContain("GIFTIG");
+    expect(meta.textContent).toContain("Lav pålidelighed");
     expect(document.querySelector("#species-detail-notes")?.textContent).toBe(
       "Dødeligt giftig.",
     );

@@ -50,10 +50,14 @@ export const enMessages: Messages = {
   // Detail panel
   "detail.title": "Species details",
   "detail.closeAria": "Close species details",
-  "detail.confidence": "{{pct}}% confidence",
+  "detail.confidence": "{{pct}}% raw confidence",
+  "detail.calibratedScore": "{{pct}}% calibrated",
   "detail.edibility": "Edibility",
   "detail.safetyReminder":
     "Never eat a wild mushroom based solely on this app. Always verify with a certified mycologist.",
+  "confidence.reliabilityHigh": "High reliability",
+  "confidence.reliabilityMedium": "Medium reliability",
+  "confidence.reliabilityLow": "Low reliability",
 
   // Warnings
   "warning.lowConfidence": "Low confidence — do not act on this prediction.",
