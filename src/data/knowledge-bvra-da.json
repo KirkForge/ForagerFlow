@@ -1,0 +1,62 @@
+{
+  "Agaricus arvensis": {
+    "notes": "Hestechampignon. Hvid til bleggul hat, anisagtig lugt, ring på stok. Spiselig efter grundig tilberedning."
+  },
+  "Agaricus bisporus": {
+    "notes": "Almindelig champignon / portobello. Hvid-til-brun hat, lyserøde-senere brune lameller. Dyrket og almindeligvis spiselig."
+  },
+  "Agaricus campestris": {
+    "notes": "Markchampignon. Lyserøde-senere brune lameller, hvid hat med små skæl. Klassisk spiselig svamp."
+  },
+  "Amanita muscaria": {
+    "notes": "Rød fluesvamp. Rød hat med hvide pletter, hvid stok med ring. Giftig; må ikke spises rå."
+  },
+  "Amanita phalloides": {
+    "notes": "Grøn fluesvamp. Grønlig til gulgrøn hat, hvid stok med skørt. Dødeligt giftig."
+  },
+  "Boletus edulis": {
+    "notes": "Karl Johan. Brun, nøddeagtig hat, tyk hvid stok med hvidt netmønster. Værdsat spiselig rørhat."
+  },
+  "Cantharellus cibarius": {
+    "notes": "Kantarel. Gul, tragtformet hat med nedløbende 'lameller', hvidligt kød. Populær spiselig svamp."
+  },
+  "Craterellus cornucopioides": {
+    "notes": "Tragtkantarel / dødninge-trompet. Mørkegrå til sort, tragtformet, hul stok. Spiselig og velsmagende."
+  },
+  "Russula emetica": {
+    "notes": "Spyfluesvamp. Rød skørhat, meget skør, hvidt kød. Giftig; giver typisk opkastning."
+  },
+  "Russula virescens": {
+    "notes": "Grøn skørhat. Grønlig, skællet hat, skør tekstur. Spiselig efter tilberedning."
+  },
+  "Suillus luteus": {
+    "notes": "Smørsvamp / grå slimhætte. Brun, slimet hat, ring på stok. Spiselig efter skrælning og tilberedning."
+  },
+  "Imleria badia": {
+    "notes": "Skrubtudse-rørhat. Mørkebrun hat, porer der blåner. Spiselig rørhat."
+  },
+  "Lactarius deliciosus": {
+    "notes": "Velsmagende mælkehat. Appelsinfarvet mælkesaft, grønlig skær på lameller. Spiselig."
+  },
+  "Macrolepiota procera": {
+    "notes": "Parasolhat. Meget stor, skællet hat med karakteristisk knop, slangeagtig stok. Spiselig."
+  },
+  "Morchella esculenta": {
+    "notes": "Spiselig morkel. Honningformet, hul, sammenrullet hat på hvid stok. Spiselig efter grundig varmebehandling."
+  },
+  "Coprinus comatus": {
+    "notes": "Have-mælkehat / blækhat. Hvid, langstrakt hat, opløses med alderen til sort væske. Spiselig ung."
+  },
+  "Pleurotus ostreatus": {
+    "notes": "Østershat. Bølgende, østersformet hat i gråhvide toner, vokser på træ. Spiselig."
+  },
+  "Hydnum repandum": {
+    "notes": "Piggsvamp / gul piggsvamp. Gul-orange ujævn hat med små pigge nedenunder. Spiselig."
+  },
+  "Gyromitra esculenta": {
+    "notes": "Stenbider-æselhoved. Hjerneformet, rødbrun hat. Giftig; skal ikke spises."
+  },
+  "Lepista nuda": {
+    "notes": "Violet ametysthat. Violet hat og lameller, svagt kødfuld stok. Spiselig efter tilberedning."
+  }
+}

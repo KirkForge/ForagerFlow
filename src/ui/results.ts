@@ -3,6 +3,7 @@ import { Edibility } from "@/core/types";
 import type { ModelRegistryEntry } from "@/core/types";
 import { sanitizeText } from "@/core/sanitize";
 import { t } from "@/i18n";
+import { getLocalizedNotes } from "@/i18n/knowledge";
 
 export class ResultsRenderer {
   private container: HTMLElement;
@@ -50,7 +51,7 @@ export class ResultsRenderer {
 
       this.knowledgeEl.innerHTML = `
         <h3>${sanitizeText(top.label)}</h3>
-        <p>${sanitizeText(k.notes)}</p>
+        <p>${sanitizeText(getLocalizedNotes(k))}</p>
         <a class="verify-link" target="_blank" rel="noopener noreferrer" href="${verifyUrl.toString()}">${t("prediction.verifyOnline")}</a>
       `;
       const verify = this.knowledgeEl.querySelector(".verify-link");
