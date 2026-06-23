@@ -16,6 +16,8 @@ export const daMessages: Messages = {
   // Camera
   "camera.ariaLabel": "Live kameravisning",
   "capture.ariaLabel": "Tag billede og identificér svamp",
+  "camera.torchOn": "Sluk lommelygte",
+  "camera.torchOff": "Tænd lommelygte",
   "camera.error": "Kameraet er ikke tilgængeligt.",
   "camera.retry": "Prøv kamera igen",
   "camera.choosePhoto": "Vælg et foto",

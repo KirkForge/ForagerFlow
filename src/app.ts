@@ -47,6 +47,7 @@ export class AppController {
   badgeEl: HTMLElement;
   videoEl: HTMLVideoElement;
   captureBtn: HTMLButtonElement;
+  torchBtn: HTMLButtonElement | null = null;
   cameraErrorEl: HTMLElement;
   fileFallbackBtn: HTMLButtonElement | null = null;
   fileInputEl: HTMLInputElement | null = null;
@@ -67,6 +68,8 @@ export class AppController {
     this.captureBtn = this.require(
       "#capture-btn",
     ) as unknown as HTMLButtonElement;
+    this.torchBtn = document.querySelector<HTMLButtonElement>("#torch-btn");
+    this.updateTorchButton(false);
     this.cameraErrorEl = this.require("#camera-error");
     this.fileFallbackBtn =
       document.querySelector<HTMLButtonElement>("#file-fallback-btn");
@@ -171,9 +174,36 @@ export class AppController {
       await this.camera.start(this.videoEl);
       this.statusEl.textContent = t("status.cameraActive");
       this.cameraErrorEl.style.display = "none";
+      this.updateTorchVisibility();
     } catch {
       this.statusEl.textContent = t("status.cameraError");
       this.cameraErrorEl.style.display = "flex";
+      this.updateTorchVisibility();
+    }
+  }
+
+  private updateTorchVisibility(): void {
+    if (!this.torchBtn) return;
+    this.torchBtn.hidden = !this.camera.torchSupported();
+  }
+
+  private updateTorchButton(on: boolean): void {
+    if (!this.torchBtn) return;
+    this.torchBtn.setAttribute(
+      "aria-label",
+      on ? t("camera.torchOn") : t("camera.torchOff"),
+    );
+    this.torchBtn.classList.toggle("torch-on", on);
+  }
+
+  private async handleTorchToggle(): Promise<void> {
+    const next = !this.camera.isTorchOn();
+    const ok = await this.camera.setTorch(next);
+    if (ok) {
+      this.updateTorchButton(next);
+      if ("vibrate" in navigator) {
+        navigator.vibrate(20);
+      }
     }
   }
 
@@ -602,6 +632,10 @@ export class AppController {
   private bindEvents(): void {
     this.captureBtn.addEventListener("click", () => {
       this.handleCapture();
+    });
+
+    this.torchBtn?.addEventListener("click", () => {
+      void this.handleTorchToggle();
     });
 
     this.fileInputEl?.addEventListener("change", (e) => {

@@ -3,12 +3,23 @@ import { CameraService } from "@/services/camera";
 import { installMockCanvas } from "./helpers/canvas";
 import { sleep } from "./helpers/promises";
 
-function createMockStream(): MediaStream {
-  const track = {
-    stop: vi.fn(),
-  } as unknown as MediaStreamTrack;
+function createMockTrack(
+  torchCapable = false,
+): MediaStreamTrack {
   return {
-    getTracks: vi.fn(() => [track]),
+    stop: vi.fn(),
+    getCapabilities: vi.fn(() =>
+      torchCapable ? { torch: true } : {},
+    ),
+    applyConstraints: vi.fn().mockResolvedValue(undefined),
+  } as unknown as MediaStreamTrack;
+}
+
+function createMockStream(track?: MediaStreamTrack): MediaStream {
+  const t = track ?? createMockTrack();
+  return {
+    getTracks: vi.fn(() => [t]),
+    getVideoTracks: vi.fn(() => [t]),
   } as unknown as MediaStream;
 }
 
@@ -122,5 +133,79 @@ describe("CameraService", () => {
     ]);
 
     expect(callCount).toBe(1);
+  });
+
+  it("detects torch support from video track capabilities", async () => {
+    const track = createMockTrack(true);
+    installMediaDevices(createMockStream(track));
+
+    const video = createMockVideoElement();
+    await camera.start(video);
+
+    expect(camera.torchSupported()).toBe(true);
+  });
+
+  it("reports torch unsupported when no video track has torch", async () => {
+    installMediaDevices(createMockStream());
+
+    const video = createMockVideoElement();
+    await camera.start(video);
+
+    expect(camera.torchSupported()).toBe(false);
+  });
+
+  it("toggles torch on and off", async () => {
+    const track = createMockTrack(true);
+    installMediaDevices(createMockStream(track));
+
+    const video = createMockVideoElement();
+    await camera.start(video);
+
+    expect(camera.isTorchOn()).toBe(false);
+    expect(await camera.setTorch(true)).toBe(true);
+    expect(camera.isTorchOn()).toBe(true);
+    expect(track.applyConstraints).toHaveBeenCalledWith({
+      advanced: [{ torch: true }],
+    });
+
+    expect(await camera.setTorch(false)).toBe(true);
+    expect(camera.isTorchOn()).toBe(false);
+    expect(track.applyConstraints).toHaveBeenLastCalledWith({
+      advanced: [{ torch: false }],
+    });
+  });
+
+  it("returns false when torch is not supported", async () => {
+    installMediaDevices(createMockStream());
+
+    const video = createMockVideoElement();
+    await camera.start(video);
+
+    expect(await camera.setTorch(true)).toBe(false);
+    expect(camera.isTorchOn()).toBe(false);
+  });
+
+  it("returns false when applyConstraints fails", async () => {
+    const track = createMockTrack(true);
+    track.applyConstraints = vi.fn().mockRejectedValue(new Error("denied"));
+    installMediaDevices(createMockStream(track));
+
+    const video = createMockVideoElement();
+    await camera.start(video);
+
+    expect(await camera.setTorch(true)).toBe(false);
+    expect(camera.isTorchOn()).toBe(false);
+  });
+
+  it("resets torch state when stopped", async () => {
+    const track = createMockTrack(true);
+    installMediaDevices(createMockStream(track));
+
+    const video = createMockVideoElement();
+    await camera.start(video);
+    await camera.setTorch(true);
+    camera.stop();
+
+    expect(camera.isTorchOn()).toBe(false);
   });
 });

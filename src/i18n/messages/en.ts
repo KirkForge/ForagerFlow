@@ -16,6 +16,8 @@ export const enMessages: Messages = {
   // Camera
   "camera.ariaLabel": "Live camera preview",
   "capture.ariaLabel": "Capture and identify mushroom",
+  "camera.torchOn": "Turn flashlight off",
+  "camera.torchOff": "Turn flashlight on",
   "camera.error": "Camera unavailable.",
   "camera.retry": "Retry camera",
   "camera.choosePhoto": "Choose a photo",

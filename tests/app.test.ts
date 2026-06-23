@@ -57,6 +57,9 @@ const mockCamera = vi.hoisted(() => ({
   start: vi.fn().mockResolvedValue(undefined),
   stop: vi.fn(),
   capture: vi.fn(),
+  torchSupported: vi.fn().mockReturnValue(false),
+  isTorchOn: vi.fn().mockReturnValue(false),
+  setTorch: vi.fn().mockResolvedValue(false),
 }));
 
 const mockRenderer = vi.hoisted(() => ({
@@ -133,6 +136,7 @@ function renderAppHTML(): void {
       <div id="badge"></div>
       <video id="video"></video>
       <button id="capture-btn">Capture</button>
+      <button id="torch-btn" hidden>🔦</button>
       <div id="camera-error"></div>
       <button id="file-fallback-btn">Upload</button>
       <input id="file-input" type="file" />
@@ -643,6 +647,35 @@ describe("AppController", () => {
     expect(input.value).toBe("");
     expect(searchHistory).not.toHaveBeenCalled();
     expect(getHistory).toHaveBeenCalledWith(20);
+  });
+
+  it("shows torch button when supported and toggles it", async () => {
+    vi.mocked(mockCamera.torchSupported).mockReturnValue(true);
+    vi.mocked(mockCamera.setTorch).mockResolvedValue(true);
+
+    const controller = new AppController();
+    await controller.init();
+
+    const torchBtn = document.querySelector<HTMLButtonElement>("#torch-btn")!;
+    expect(torchBtn.hidden).toBe(false);
+    expect(torchBtn.getAttribute("aria-label")).toBe("Turn flashlight on");
+
+    torchBtn.click();
+    await flushPromises();
+
+    expect(mockCamera.setTorch).toHaveBeenCalledWith(true);
+    expect(torchBtn.classList.contains("torch-on")).toBe(true);
+    expect(torchBtn.getAttribute("aria-label")).toBe("Turn flashlight off");
+  });
+
+  it("hides torch button when not supported", async () => {
+    vi.mocked(mockCamera.torchSupported).mockReturnValue(false);
+
+    const controller = new AppController();
+    await controller.init();
+
+    const torchBtn = document.querySelector<HTMLButtonElement>("#torch-btn")!;
+    expect(torchBtn.hidden).toBe(true);
   });
 });
 

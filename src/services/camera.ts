@@ -14,6 +14,7 @@ export class CameraService {
   private videoElement: HTMLVideoElement | null = null;
   private captureSize: number;
   private starting: Promise<void> | null = null;
+  private torchOn = false;
 
   constructor(captureSize = 224) {
     this.captureSize = captureSize;
@@ -89,11 +90,54 @@ export class CameraService {
     };
   }
 
+  /* eslint-disable @typescript-eslint/no-unnecessary-condition */
+  torchSupported(): boolean {
+    if (!this.stream) return false;
+    for (const track of this.stream.getVideoTracks()) {
+      try {
+        const caps = track.getCapabilities?.();
+        if (caps && "torch" in caps && caps.torch) {
+          return true;
+        }
+      } catch {
+        /* ignore capability read failures */
+      }
+    }
+    return false;
+  }
+  /* eslint-enable @typescript-eslint/no-unnecessary-condition */
+
+  isTorchOn(): boolean {
+    return this.torchOn;
+  }
+
+  /* eslint-disable @typescript-eslint/no-unnecessary-condition */
+  async setTorch(on: boolean): Promise<boolean> {
+    if (!this.stream) return false;
+    for (const track of this.stream.getVideoTracks()) {
+      try {
+        const caps = track.getCapabilities?.();
+        if (!caps || !("torch" in caps) || !caps.torch) continue;
+        const constraints: MediaTrackConstraints = {
+          advanced: [{ torch: on } as MediaTrackConstraintSet],
+        };
+        await track.applyConstraints(constraints);
+        this.torchOn = on;
+        return true;
+      } catch (err) {
+        logger.warn("Torch toggle failed:", err);
+      }
+    }
+    return false;
+  }
+  /* eslint-enable @typescript-eslint/no-unnecessary-condition */
+
   stop(): void {
     if (this.stream) {
       this.stream.getTracks().forEach((track) => {
         track.stop();
       });
+      this.torchOn = false;
       this.stream = null;
     }
     if (this.videoElement) {
