@@ -19,6 +19,7 @@ export const daMessages: Messages = {
   "camera.torchOn": "Sluk lommelygte",
   "camera.torchOff": "Tænd lommelygte",
   "camera.focusAria": "Fokuspunkt",
+  "camera.recapture": "Tag nyt billede",
   "camera.error": "Kameraet er ikke tilgængeligt.",
   "camera.retry": "Prøv kamera igen",
   "camera.choosePhoto": "Vælg et foto",

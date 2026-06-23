@@ -158,6 +158,7 @@ function renderAppHTML(): void {
         <option value="dima806">dima806</option>
       </select>
       <div id="predictions"></div>
+      <button id="recapture-btn" type="button" hidden>Recapture</button>
       <div id="knowledge"></div>
       <div id="warning"></div>
       <div id="low-confidence"></div>
@@ -619,6 +620,120 @@ describe("AppController", () => {
 
     expect(mockDetailPanel.close).toHaveBeenCalled();
     expect(mockComparisonPanel.close).toHaveBeenCalled();
+  });
+
+  it("shows re-capture button after inference result", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+
+    const recaptureBtn = document.querySelector(
+      "#recapture-btn",
+    ) as HTMLButtonElement;
+    expect(recaptureBtn.hidden).toBe(false);
+  });
+
+  it("hides re-capture button when a new capture starts", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+
+    mockCamera.capture.mockReturnValue({
+      buffer: new ArrayBuffer(224 * 224 * 4),
+      width: 224,
+      height: 224,
+      thumbnail: "thumb",
+    } as CaptureResult);
+
+    const captureBtn = document.querySelector("#capture-btn") as HTMLElement;
+    captureBtn.click();
+
+    const recaptureBtn = document.querySelector(
+      "#recapture-btn",
+    ) as HTMLButtonElement;
+    expect(recaptureBtn.hidden).toBe(true);
+  });
+
+  it("hides re-capture button on inference error", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+
+    mockInferenceService.emitError(new Error("model failed"));
+
+    const recaptureBtn = document.querySelector(
+      "#recapture-btn",
+    ) as HTMLButtonElement;
+    expect(recaptureBtn.hidden).toBe(true);
+  });
+
+  it("hides re-capture button on model switch", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+
+    const select = document.querySelector("#model-select") as HTMLSelectElement;
+    select.value = "dima806";
+    select.dispatchEvent(new Event("change"));
+
+    const recaptureBtn = document.querySelector(
+      "#recapture-btn",
+    ) as HTMLButtonElement;
+    expect(recaptureBtn.hidden).toBe(true);
+  });
+
+  it("handles re-capture button click", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+
+    const cameraWrap = document.querySelector("#camera-wrap") as HTMLElement;
+    const scrollMock = vi.fn();
+    cameraWrap.scrollIntoView = scrollMock;
+
+    const recaptureBtn = document.querySelector(
+      "#recapture-btn",
+    ) as HTMLButtonElement;
+    recaptureBtn.click();
+
+    expect(mockRenderer.clear).toHaveBeenCalled();
+    expect(mockDetailPanel.close).toHaveBeenCalled();
+    expect(mockComparisonPanel.close).toHaveBeenCalled();
+    const status = document.querySelector("#status") as HTMLElement;
+    expect(status.textContent).toBe("Camera active. Tap shutter to identify.");
+    expect(recaptureBtn.hidden).toBe(true);
+    expect(scrollMock).toHaveBeenCalled();
   });
 
   it("filters history when search input changes", async () => {

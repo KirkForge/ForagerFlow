@@ -50,6 +50,7 @@ export class AppController {
   torchBtn: HTMLButtonElement | null = null;
   cameraWrap: HTMLElement;
   focusReticle: HTMLElement | null = null;
+  recaptureBtn: HTMLButtonElement | null = null;
   cameraErrorEl: HTMLElement;
   fileFallbackBtn: HTMLButtonElement | null = null;
   fileInputEl: HTMLInputElement | null = null;
@@ -76,6 +77,8 @@ export class AppController {
     this.cameraWrap = this.require("#camera-wrap");
     this.focusReticle =
       document.querySelector<HTMLElement>("#focus-reticle");
+    this.recaptureBtn =
+      document.querySelector<HTMLButtonElement>("#recapture-btn");
     this.cameraErrorEl = this.require("#camera-error");
     this.fileFallbackBtn =
       document.querySelector<HTMLButtonElement>("#file-fallback-btn");
@@ -138,6 +141,7 @@ export class AppController {
         this.#lastReport = report;
         this.renderer.render(report, model);
         this.setCaptureBusy(false);
+        this.setRecaptureVisible(true);
         void saveIdentification(
           report,
           modelKey,
@@ -163,6 +167,7 @@ export class AppController {
     inferenceService.onError((error) => {
       this.statusEl.textContent = `Error: ${error.message}`;
       this.setCaptureBusy(false);
+      this.setRecaptureVisible(false);
       this.#pendingThumbnail = null;
     });
 
@@ -252,6 +257,7 @@ export class AppController {
       return;
     }
     this.setCaptureBusy(true);
+    this.setRecaptureVisible(false);
     this.statusEl.textContent = t("status.identifying");
     this.#pendingThumbnail = result.thumbnail;
     this.startLocationCapture();
@@ -262,6 +268,24 @@ export class AppController {
     this.captureBtn.dataset["busy"] = busy ? "true" : "false";
     this.captureBtn.disabled = busy;
     this.captureBtn.setAttribute("aria-busy", busy ? "true" : "false");
+  }
+
+  private setRecaptureVisible(visible: boolean): void {
+    if (!this.recaptureBtn) return;
+    this.recaptureBtn.hidden = !visible;
+  }
+
+  private handleRecapture(): void {
+    this.renderer.clear();
+    this.detailPanel.close();
+    this.comparisonPanel.close();
+    this.#lastReport = undefined;
+    this.statusEl.textContent = t("status.cameraActive");
+    this.setRecaptureVisible(false);
+    if ("vibrate" in navigator) {
+      navigator.vibrate(10);
+    }
+    this.cameraWrap.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   private async handleFileSelect(e: Event): Promise<void> {
@@ -316,6 +340,7 @@ export class AppController {
     this.detailPanel.close();
     this.comparisonPanel.close();
     this.#lastReport = undefined;
+    this.setRecaptureVisible(false);
     inferenceService.switchModel(key);
   }
 
@@ -669,6 +694,10 @@ export class AppController {
   private bindEvents(): void {
     this.captureBtn.addEventListener("click", () => {
       this.handleCapture();
+    });
+
+    this.recaptureBtn?.addEventListener("click", () => {
+      this.handleRecapture();
     });
 
     this.torchBtn?.addEventListener("click", () => {
