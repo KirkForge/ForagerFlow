@@ -48,6 +48,7 @@ CACHEDIR.TAG
 llm/
 state.md
 AGENTS.md
+CLAUDE.md
 .claude/
 
 # --- Model snapshots from HuggingFace (generated) ---
