@@ -259,36 +259,6 @@ describe("CameraService", () => {
     expect(CameraService.mapDomPointToNormalized(video, 100, 100)).toBeNull();
   });
 
-  it("detects focus support from video track capabilities", async () => {
-    const track = createMockTrack(false, ["continuous", "manual"]);
-    installMediaDevices(createMockStream(track));
-
-    const video = createMockVideoElement();
-    await camera.start(video);
-
-    expect(camera.focusSupported()).toBe(true);
-  });
-
-  it("detects exposure support as focus support", async () => {
-    const track = createMockTrack(false, [], ["auto", "manual"]);
-    installMediaDevices(createMockStream(track));
-
-    const video = createMockVideoElement();
-    await camera.start(video);
-
-    expect(camera.focusSupported()).toBe(true);
-  });
-
-  it("reports focus unsupported when no manual modes are available", async () => {
-    const track = createMockTrack(false, ["continuous"], ["auto"]);
-    installMediaDevices(createMockStream(track));
-
-    const video = createMockVideoElement();
-    await camera.start(video);
-
-    expect(camera.focusSupported()).toBe(false);
-  });
-
   it("applies focus and exposure constraints on tap", async () => {
     const track = createMockTrack(false, ["manual"], ["manual"]);
     installMediaDevices(createMockStream(track));

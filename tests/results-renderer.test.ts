@@ -29,7 +29,7 @@ describe("ResultsRenderer", () => {
   it("throws when required elements are missing", () => {
     document.body.innerHTML = `<div id="app"></div>`;
     expect(() => new ResultsRenderer(document.querySelector("#app")!)).toThrow(
-      /Required element not found/,
+      /required element not found/,
     );
   });
 
@@ -204,25 +204,6 @@ describe("ResultsRenderer", () => {
       ).toBe("false");
     });
 
-    it("emits onComparisonChange when selections change", () => {
-      const onChange = vi.fn();
-      const renderer = new ResultsRenderer(root, {
-        onComparisonChange: onChange,
-      });
-      renderer.render(makeReport(), makeMockModel());
-
-      (root.querySelector("#compare-toggle") as HTMLButtonElement).click();
-
-      const boxes = root.querySelectorAll(
-        ".compare-checkbox",
-      ) as NodeListOf<HTMLInputElement>;
-      boxes[0]!.click();
-      expect(onChange).toHaveBeenLastCalledWith(["Agaricus bisporus"]);
-
-      boxes[0]!.click();
-      expect(onChange).toHaveBeenLastCalledWith([]);
-    });
-
     it("emits onComparisonShow with selected labels", () => {
       const onShow = vi.fn();
       const renderer = new ResultsRenderer(root, {
@@ -292,11 +273,8 @@ describe("ResultsRenderer", () => {
       vi.useRealTimers();
     });
 
-    it("resets selection when toggling compare mode off", () => {
-      const onChange = vi.fn();
-      const renderer = new ResultsRenderer(root, {
-        onComparisonChange: onChange,
-      });
+    it("clears selection when toggling compare mode off", () => {
+      const renderer = new ResultsRenderer(root);
       renderer.render(makeReport(), makeMockModel());
       (root.querySelector("#compare-toggle") as HTMLButtonElement).click();
 
@@ -306,7 +284,7 @@ describe("ResultsRenderer", () => {
       boxes[0]!.click();
 
       (root.querySelector("#compare-toggle") as HTMLButtonElement).click();
-      expect(onChange).toHaveBeenLastCalledWith([]);
+      expect(root.querySelectorAll(".compare-checkbox")).toHaveLength(0);
     });
 
     it("keeps show button disabled until two selections", () => {

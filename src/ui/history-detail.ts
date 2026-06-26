@@ -2,7 +2,7 @@ import { Edibility } from "@/core/types";
 import { t } from "@/i18n";
 import { isDataUrlThumbnail, isValidLocation } from "@/services/history";
 import type { HistoryEntry } from "@/services/history";
-import { createEl } from "@/ui/utils";
+import { createEl, requireElement } from "@/ui/utils";
 
 export class HistoryDetailPanel {
   private readonly modal: HTMLDialogElement;
@@ -15,14 +15,14 @@ export class HistoryDetailPanel {
   private readonly closeBtn: HTMLButtonElement;
 
   constructor(root: HTMLElement | Document = document) {
-    this.modal = this.require("#history-detail-modal", root);
-    this.title = this.require("#history-detail-title", root);
-    this.thumbnail = this.require("#history-detail-thumbnail", root);
-    this.meta = this.require("#history-detail-meta", root);
-    this.notes = this.require("#history-detail-notes", root);
-    this.safety = this.require("#history-detail-safety", root);
-    this.verify = this.require("#history-detail-verify", root);
-    this.closeBtn = this.require("#history-detail-close", root);
+    this.modal = requireElement("#history-detail-modal", root, "HistoryDetailPanel");
+    this.title = requireElement("#history-detail-title", root, "HistoryDetailPanel");
+    this.thumbnail = requireElement("#history-detail-thumbnail", root, "HistoryDetailPanel");
+    this.meta = requireElement("#history-detail-meta", root, "HistoryDetailPanel");
+    this.notes = requireElement("#history-detail-notes", root, "HistoryDetailPanel");
+    this.safety = requireElement("#history-detail-safety", root, "HistoryDetailPanel");
+    this.verify = requireElement("#history-detail-verify", root, "HistoryDetailPanel");
+    this.closeBtn = requireElement("#history-detail-close", root, "HistoryDetailPanel");
     this.bindClose();
     this.closeBtn.setAttribute("aria-label", t("history.detail.closeAria"));
   }
@@ -159,15 +159,4 @@ export class HistoryDetailPanel {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
-  private require<T extends HTMLElement>(
-    sel: string,
-    root: HTMLElement | Document,
-  ): T {
-    const el = root.querySelector(sel);
-    if (!el) {
-      throw new Error(`HistoryDetailPanel: required element not found: ${sel}`);
-    }
-    return el as T;
-  }
 }

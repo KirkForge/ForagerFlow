@@ -181,31 +181,6 @@ export class CameraService {
   }
 
   /* eslint-disable @typescript-eslint/no-unnecessary-condition */
-  focusSupported(): boolean {
-    if (!this.stream) return false;
-    for (const track of this.stream.getVideoTracks()) {
-      try {
-        const caps = track.getCapabilities?.() as
-          | CameraCapabilities
-          | undefined;
-        if (!caps) continue;
-        const focusModes = caps.focusMode;
-        const exposureModes = caps.exposureMode;
-        if (
-          (Array.isArray(focusModes) && focusModes.includes("manual")) ||
-          (Array.isArray(exposureModes) && exposureModes.includes("manual"))
-        ) {
-          return true;
-        }
-      } catch {
-        /* ignore capability read failures */
-      }
-    }
-    return false;
-  }
-  /* eslint-enable @typescript-eslint/no-unnecessary-condition */
-
-  /* eslint-disable @typescript-eslint/no-unnecessary-condition */
   async focusAt(x: number, y: number): Promise<boolean> {
     if (!this.stream) return false;
     const point = { x, y };

@@ -3,7 +3,7 @@ import { Edibility } from "@/core/types";
 import { t } from "@/i18n";
 import { getLocalizedNotes } from "@/i18n/knowledge";
 import type { CalibrationResult } from "@/inference/confidence";
-import { createEl } from "@/ui/utils";
+import { createEl, requireElement } from "@/ui/utils";
 
 export interface ComparisonItem {
   prediction: Prediction;
@@ -19,11 +19,11 @@ export class PredictionComparisonPanel {
   private readonly closeBtn: HTMLButtonElement;
 
   constructor(root: HTMLElement | Document = document) {
-    this.modal = this.require("#comparison-modal", root);
-    this.title = this.require("#comparison-title", root);
-    this.grid = this.require("#comparison-grid", root);
-    this.safety = this.require("#comparison-safety", root);
-    this.closeBtn = this.require("#comparison-close", root);
+    this.modal = requireElement("#comparison-modal", root, "PredictionComparisonPanel");
+    this.title = requireElement("#comparison-title", root, "PredictionComparisonPanel");
+    this.grid = requireElement("#comparison-grid", root, "PredictionComparisonPanel");
+    this.safety = requireElement("#comparison-safety", root, "PredictionComparisonPanel");
+    this.closeBtn = requireElement("#comparison-close", root, "PredictionComparisonPanel");
     this.bindClose();
     this.title.textContent = t("comparison.title");
     this.closeBtn.setAttribute("aria-label", t("comparison.closeAria"));
@@ -170,16 +170,4 @@ export class PredictionComparisonPanel {
     return value.charAt(0).toUpperCase() + value.slice(1);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
-  private require<T extends HTMLElement>(
-    sel: string,
-    root: HTMLElement | Document,
-  ): T {
-    const el = root.querySelector(sel);
-    if (!el)
-      throw new Error(
-        `PredictionComparisonPanel: required element not found: ${sel}`,
-      );
-    return el as T;
-  }
 }

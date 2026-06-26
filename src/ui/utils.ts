@@ -16,6 +16,25 @@ export function isHidden(el: HTMLElement): boolean {
   return el.classList.contains("hidden");
 }
 
+// Generic typed DOM query helper. The type parameter only appears in the
+// return type because we cannot instantiate the concrete subclass at runtime;
+// the cast is safe after the HTMLElement guard above.
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
+export function requireElement<T extends HTMLElement>(
+  sel: string,
+  root: HTMLElement | Document = document,
+  label = "UI",
+): T {
+  const el = root.querySelector(sel);
+  if (!el) {
+    throw new Error(`${label}: required element not found: ${sel}`);
+  }
+  if (!(el instanceof HTMLElement)) {
+    throw new Error(`${label}: required element is not an HTMLElement: ${sel}`);
+  }
+  return el as T;
+}
+
 export function createEl(
   tag: string,
   className?: string,

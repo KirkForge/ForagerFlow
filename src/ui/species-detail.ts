@@ -6,7 +6,7 @@ import {
 import { t } from "@/i18n";
 import { getLocalizedNotes } from "@/i18n/knowledge";
 import type { CalibrationResult } from "@/inference/confidence";
-import { createEl } from "@/ui/utils";
+import { createEl, requireElement } from "@/ui/utils";
 
 export class SpeciesDetailPanel {
   private readonly modal: HTMLDialogElement;
@@ -18,13 +18,13 @@ export class SpeciesDetailPanel {
   private readonly closeBtn: HTMLButtonElement;
 
   constructor(root: HTMLElement | Document = document) {
-    this.modal = this.require("#species-detail-modal", root);
-    this.title = this.require("#species-detail-title", root);
-    this.meta = this.require("#species-detail-meta", root);
-    this.notes = this.require("#species-detail-notes", root);
-    this.safety = this.require("#species-detail-safety", root);
-    this.verify = this.require("#species-detail-verify", root);
-    this.closeBtn = this.require("#species-detail-close", root);
+    this.modal = requireElement("#species-detail-modal", root, "SpeciesDetailPanel");
+    this.title = requireElement("#species-detail-title", root, "SpeciesDetailPanel");
+    this.meta = requireElement("#species-detail-meta", root, "SpeciesDetailPanel");
+    this.notes = requireElement("#species-detail-notes", root, "SpeciesDetailPanel");
+    this.safety = requireElement("#species-detail-safety", root, "SpeciesDetailPanel");
+    this.verify = requireElement("#species-detail-verify", root, "SpeciesDetailPanel");
+    this.closeBtn = requireElement("#species-detail-close", root, "SpeciesDetailPanel");
     this.bindClose();
     this.closeBtn.setAttribute("aria-label", t("detail.closeAria"));
   }
@@ -147,14 +147,4 @@ export class SpeciesDetailPanel {
     return value.charAt(0).toUpperCase() + value.slice(1);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
-  private require<T extends HTMLElement>(
-    sel: string,
-    root: HTMLElement | Document,
-  ): T {
-    const el = root.querySelector(sel);
-    if (!el)
-      throw new Error(`SpeciesDetailPanel: required element not found: ${sel}`);
-    return el as T;
-  }
 }

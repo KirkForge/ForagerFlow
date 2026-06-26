@@ -4,11 +4,10 @@ import type { ModelRegistryEntry } from "@/core/types";
 import { sanitizeText } from "@/core/sanitize";
 import { t } from "@/i18n";
 import { getLocalizedNotes } from "@/i18n/knowledge";
-import { createEl, hide, show } from "@/ui/utils";
+import { createEl, hide, requireElement, show } from "@/ui/utils";
 
 export interface ResultsRendererOptions {
   onPredictionClick?: (label: string) => void;
-  onComparisonChange?: (labels: string[]) => void;
   onComparisonShow?: (labels: string[]) => void;
 }
 
@@ -19,7 +18,6 @@ export class ResultsRenderer {
   private warningEl: HTMLElement;
   private modelSelect: HTMLSelectElement;
   private onPredictionClick: ((label: string) => void) | undefined;
-  private onComparisonChange: ((labels: string[]) => void) | undefined;
   private onComparisonShow: ((labels: string[]) => void) | undefined;
   private compareActive = false;
   private selectedLabels = new Set<string>();
@@ -27,12 +25,14 @@ export class ResultsRenderer {
 
   constructor(root: HTMLElement, opts: ResultsRendererOptions = {}) {
     this.container = root;
-    this.predictionsEl = this.require("#predictions");
-    this.knowledgeEl = this.require("#knowledge");
-    this.warningEl = this.require("#warning");
-    this.modelSelect = this.require("#model-select") as HTMLSelectElement;
+    this.predictionsEl = requireElement("#predictions", this.container);
+    this.knowledgeEl = requireElement("#knowledge", this.container);
+    this.warningEl = requireElement("#warning", this.container);
+    this.modelSelect = requireElement<HTMLSelectElement>(
+      "#model-select",
+      this.container,
+    );
     this.onPredictionClick = opts.onPredictionClick;
-    this.onComparisonChange = opts.onComparisonChange;
     this.onComparisonShow = opts.onComparisonShow;
     this.bindModelSelector();
     this.bindPredictionClicks();
@@ -248,7 +248,6 @@ export class ResultsRenderer {
         this.compareActive = !this.compareActive;
         this.selectedLabels.clear();
         this.refreshToolbar();
-        this.emitComparisonChange();
         return;
       }
       const checkbox = target.closest(".compare-checkbox");
@@ -266,7 +265,6 @@ export class ResultsRenderer {
           this.selectedLabels.delete(label);
         }
         this.updateShowButton();
-        this.emitComparisonChange();
         return;
       }
       const showBtn = target.closest("#compare-show");
@@ -315,9 +313,6 @@ export class ResultsRenderer {
     });
   }
 
-  private emitComparisonChange(): void {
-    this.onComparisonChange?.([...this.selectedLabels]);
-  }
 
   private showMaxReached(): void {
     const toolbar = this.predictionsEl.querySelector(".compare-toolbar");
@@ -345,9 +340,4 @@ export class ResultsRenderer {
     });
   }
 
-  private require(selector: string): HTMLElement {
-    const el = this.container.querySelector(selector);
-    if (!el) throw new Error(`Required element not found: ${selector}`);
-    return el as HTMLElement;
-  }
 }
