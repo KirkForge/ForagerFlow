@@ -1061,7 +1061,7 @@ describe("AppController additional coverage", () => {
 
   it("throws when a required element is missing", () => {
     document.body.innerHTML = "";
-    expect(() => new AppController()).toThrow("Required element not found");
+    expect(() => new AppController()).toThrow(/required element not found/);
   });
 
   it("initializes when optional elements are missing", async () => {

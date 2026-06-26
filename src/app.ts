@@ -34,7 +34,13 @@ import { initWebVitals } from "@/services/web-vitals";
 import type { AppError } from "@/core/errors";
 import { logger } from "@/core/logger";
 import { config } from "@/core/config";
-import { getEdibilityClass, createEl, hide, show } from "@/ui/utils";
+import {
+  getEdibilityClass,
+  createEl,
+  hide,
+  requireElement,
+  show,
+} from "@/ui/utils";
 import { t } from "@/i18n";
 
 const LOCATION_ENABLED_KEY = "ff:location-enabled-v1";
@@ -73,21 +79,45 @@ export class AppController {
   #focusReticleTimeout: number | undefined;
 
   constructor() {
-    this.statusEl = this.require("#status");
-    this.badgeEl = this.require("#badge");
-    this.videoEl = this.require("#video") as HTMLVideoElement;
-    this.captureBtn = this.require("#capture-btn") as HTMLButtonElement;
+    this.statusEl = requireElement("#status", document, "AppController");
+    this.badgeEl = requireElement("#badge", document, "AppController");
+    this.videoEl = requireElement<HTMLVideoElement>(
+      "#video",
+      document,
+      "AppController",
+    );
+    this.captureBtn = requireElement<HTMLButtonElement>(
+      "#capture-btn",
+      document,
+      "AppController",
+    );
     this.torchBtn = document.querySelector<HTMLButtonElement>("#torch-btn");
     this.updateTorchButton(false);
-    this.cameraWrap = this.require("#camera-wrap");
+    this.cameraWrap = requireElement("#camera-wrap", document, "AppController");
     this.focusReticle = document.querySelector<HTMLElement>("#focus-reticle");
     this.recaptureBtn =
       document.querySelector<HTMLButtonElement>("#recapture-btn");
-    this.progressEl = this.require("#model-progress");
-    this.progressTextEl = this.require("#model-progress-text");
-    this.progressPctEl = this.require("#model-progress-pct");
-    this.progressBarEl = this.require("#model-progress-bar");
-    this.cameraErrorEl = this.require("#camera-error");
+    this.progressEl = requireElement("#model-progress", document, "AppController");
+    this.progressTextEl = requireElement(
+      "#model-progress-text",
+      document,
+      "AppController",
+    );
+    this.progressPctEl = requireElement(
+      "#model-progress-pct",
+      document,
+      "AppController",
+    );
+    this.progressBarEl = requireElement(
+      "#model-progress-bar",
+      document,
+      "AppController",
+    );
+    this.cameraErrorEl = requireElement(
+      "#camera-error",
+      document,
+      "AppController",
+    );
     this.fileFallbackBtn =
       document.querySelector<HTMLButtonElement>("#file-fallback-btn");
     this.fileInputEl = document.querySelector<HTMLInputElement>("#file-input");
@@ -109,14 +139,17 @@ export class AppController {
       "aria-label",
       t("history.searchClearAria"),
     );
-    this.renderer = new ResultsRenderer(this.require("#app"), {
-      onPredictionClick: (label) => {
-        this.openSpeciesDetail(label);
+    this.renderer = new ResultsRenderer(
+      requireElement("#app", document, "AppController"),
+      {
+        onPredictionClick: (label) => {
+          this.openSpeciesDetail(label);
+        },
+        onComparisonShow: (labels) => {
+          this.openComparison(labels);
+        },
       },
-      onComparisonShow: (labels) => {
-        this.openComparison(labels);
-      },
-    });
+    );
     this.detailPanel = new SpeciesDetailPanel();
     this.comparisonPanel = new PredictionComparisonPanel();
     this.historyDetailPanel = new HistoryDetailPanel();
@@ -865,9 +898,4 @@ export class AppController {
     });
   }
 
-  private require(selector: string): HTMLElement {
-    const el = document.querySelector(selector);
-    if (!el) throw new Error(`Required element not found: ${selector}`);
-    return el as HTMLElement;
-  }
 }
