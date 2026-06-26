@@ -41,8 +41,10 @@ describe("ResultsRenderer", () => {
     renderer.clear();
     expect(predictions.children).toHaveLength(0);
     expect(
-      (root.querySelector("#knowledge") as HTMLElement).style.display,
-    ).toBe("none");
+      (root.querySelector("#knowledge") as HTMLElement).classList.contains(
+        "hidden",
+      ),
+    ).toBe(true);
   });
 
   it("renders predictions with bars and percentages", () => {
@@ -52,7 +54,7 @@ describe("ResultsRenderer", () => {
     const predictions = root.querySelectorAll(".prediction");
     expect(predictions).toHaveLength(3);
     expect(root.querySelector(".bar")?.getAttribute("style")).toContain(
-      "width: 95.0%",
+      "width: 95%",
     );
     expect(root.querySelector(".pct")?.textContent).toBe("95.0%");
   });
@@ -69,7 +71,7 @@ describe("ResultsRenderer", () => {
     );
 
     const warning = root.querySelector("#warning") as HTMLElement;
-    expect(warning.style.display).toBe("block");
+    expect(warning.classList.contains("hidden")).toBe(false);
     expect(warning.textContent).toContain("Low confidence");
   });
 
@@ -87,7 +89,7 @@ describe("ResultsRenderer", () => {
     );
 
     const warning = root.querySelector("#warning") as HTMLElement;
-    expect(warning.style.display).toBe("block");
+    expect(warning.classList.contains("hidden")).toBe(false);
     expect(warning.textContent).toContain("toxic lookalike");
   });
 
@@ -96,7 +98,7 @@ describe("ResultsRenderer", () => {
     renderer.render(makeReport(), makeMockModel());
 
     const knowledge = root.querySelector("#knowledge") as HTMLElement;
-    expect(knowledge.style.display).toBe("block");
+    expect(knowledge.classList.contains("hidden")).toBe(false);
     expect(knowledge.querySelector("h3")?.textContent).toBe(
       "Agaricus bisporus",
     );
@@ -327,7 +329,9 @@ describe("ResultsRenderer", () => {
 
     it("does not invoke onPredictionClick when clicking checkbox or toolbar", () => {
       const onClick = vi.fn();
-      const renderer = new ResultsRenderer(root, { onPredictionClick: onClick });
+      const renderer = new ResultsRenderer(root, {
+        onPredictionClick: onClick,
+      });
       renderer.render(makeReport(), makeMockModel());
       (root.querySelector("#compare-toggle") as HTMLButtonElement).click();
 
@@ -347,8 +351,10 @@ describe("ResultsRenderer", () => {
       renderer.render(makeReport({ requiresWarning: false }), makeMockModel());
 
       expect(
-        (root.querySelector("#warning") as HTMLElement).style.display,
-      ).toBe("none");
+        (root.querySelector("#warning") as HTMLElement).classList.contains(
+          "hidden",
+        ),
+      ).toBe(true);
     });
 
     it("shows warning when message is present", () => {
@@ -362,7 +368,7 @@ describe("ResultsRenderer", () => {
       );
 
       const warning = root.querySelector("#warning") as HTMLElement;
-      expect(warning.style.display).toBe("block");
+      expect(warning.classList.contains("hidden")).toBe(false);
       expect(warning.textContent).toBe("Poisonous result");
     });
 
@@ -374,8 +380,10 @@ describe("ResultsRenderer", () => {
       );
 
       expect(
-        (root.querySelector("#warning") as HTMLElement).style.display,
-      ).toBe("none");
+        (root.querySelector("#warning") as HTMLElement).classList.contains(
+          "hidden",
+        ),
+      ).toBe(true);
     });
   });
 });

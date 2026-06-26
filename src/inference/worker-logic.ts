@@ -1,5 +1,9 @@
 import type { InferCommand, WorkerCommand } from "@/core/types";
-import { InferenceWorkerMessageType } from "@/core/types";
+import {
+  InferenceWorkerMessageType,
+  ModelKey,
+  WorkerCommandType,
+} from "@/core/types";
 
 export interface OrtTensor {
   data: Float32Array;
@@ -42,6 +46,111 @@ export interface WorkerContext {
   removeEventListener(type: "message", listener: EventListener): void;
 }
 
+function isValidModelKey(value: unknown): value is ModelKey {
+  return Object.values(ModelKey).includes(value as ModelKey);
+}
+
+function isValidRgbTuple(value: unknown): value is [number, number, number] {
+  return (
+    Array.isArray(value) &&
+    value.length === 3 &&
+    value.every((v) => typeof v === "number" && Number.isFinite(v))
+  );
+}
+
+function validateSwitchCommand(data: unknown):
+  | {
+      valid: true;
+      cmd: {
+        modelPath: string;
+        modelKey: ModelKey;
+        mean: [number, number, number];
+        std: [number, number, number];
+      };
+    }
+  | { valid: false; reason: string } {
+  const record =
+    typeof data === "object" && data !== null
+      ? (data as Record<string, unknown>)
+      : {};
+  const modelPath = record["modelPath"];
+  const modelKey = record["modelKey"];
+  const mean = record["mean"];
+  const std = record["std"];
+
+  if (typeof modelPath !== "string" || modelPath.length === 0) {
+    return { valid: false, reason: "switch command requires a modelPath" };
+  }
+  if (!isValidModelKey(modelKey)) {
+    return { valid: false, reason: "switch command requires a valid modelKey" };
+  }
+  if (mean !== undefined && !isValidRgbTuple(mean)) {
+    return {
+      valid: false,
+      reason: "switch command mean must be a [R,G,B] tuple",
+    };
+  }
+  if (std !== undefined && !isValidRgbTuple(std)) {
+    return {
+      valid: false,
+      reason: "switch command std must be a [R,G,B] tuple",
+    };
+  }
+
+  return {
+    valid: true,
+    cmd: {
+      modelPath,
+      modelKey,
+      mean: isValidRgbTuple(mean) ? mean : [0.485, 0.456, 0.406],
+      std: isValidRgbTuple(std) ? std : [0.229, 0.224, 0.225],
+    },
+  };
+}
+
+function validateInferCommand(data: unknown):
+  | {
+      valid: true;
+      cmd: InferCommand;
+    }
+  | { valid: false; reason: string } {
+  const record =
+    typeof data === "object" && data !== null
+      ? (data as Record<string, unknown>)
+      : {};
+  const pixels = record["pixels"];
+  const width = record["width"];
+  const height = record["height"];
+  const modelKey = record["modelKey"];
+
+  if (!(pixels instanceof ArrayBuffer)) {
+    return {
+      valid: false,
+      reason: "infer command requires an ArrayBuffer pixels",
+    };
+  }
+  if (typeof width !== "number" || !Number.isFinite(width) || width <= 0) {
+    return { valid: false, reason: "infer command requires a positive width" };
+  }
+  if (typeof height !== "number" || !Number.isFinite(height) || height <= 0) {
+    return { valid: false, reason: "infer command requires a positive height" };
+  }
+  if (!isValidModelKey(modelKey)) {
+    return { valid: false, reason: "infer command requires a valid modelKey" };
+  }
+
+  return {
+    valid: true,
+    cmd: {
+      type: WorkerCommandType.Infer,
+      pixels,
+      width,
+      height,
+      modelKey,
+    },
+  };
+}
+
 export function createWorker(
   self: WorkerContext,
   ort: OrtStatic,
@@ -75,10 +184,7 @@ export function createWorker(
     return createTensor("float32", tensorData, [1, 3, height, width]);
   }
 
-  function postProgress(
-    phase: "download" | "compile",
-    percent: number,
-  ): void {
+  function postProgress(phase: "download" | "compile", percent: number): void {
     self.postMessage({
       type: InferenceWorkerMessageType.Progress,
       phase,
@@ -103,7 +209,7 @@ export function createWorker(
       }
 
       let buf: Uint8Array;
-      const contentLength = Number(resp.headers.get("content-length") ?? NaN);
+      const contentLength = Number(resp.headers.get("content-length") ?? "0");
       const reader = resp.body?.getReader();
       if (reader && Number.isFinite(contentLength) && contentLength > 0) {
         let received = 0;
@@ -165,20 +271,29 @@ export function createWorker(
     const { type } = e.data;
 
     if (type === "switch") {
-      const cmd = e.data as {
-        mean?: [number, number, number];
-        std?: [number, number, number];
-        modelPath: string;
-        modelKey: string;
-      };
-      const mean = cmd.mean ?? [0.485, 0.456, 0.406];
-      const std = cmd.std ?? [0.229, 0.224, 0.225];
-      await loadModel(cmd.modelPath, cmd.modelKey, mean, std);
+      const validated = validateSwitchCommand(e.data);
+      if (!validated.valid) {
+        self.postMessage({
+          type: InferenceWorkerMessageType.Error,
+          message: validated.reason,
+        });
+        return;
+      }
+      const { cmd } = validated;
+      await loadModel(cmd.modelPath, cmd.modelKey, cmd.mean, cmd.std);
       return;
     }
 
     if (type === "infer") {
-      const { pixels, width, height, modelKey } = e.data as InferCommand;
+      const validated = validateInferCommand(e.data);
+      if (!validated.valid) {
+        self.postMessage({
+          type: InferenceWorkerMessageType.Error,
+          message: validated.reason,
+        });
+        return;
+      }
+      const { pixels, width, height, modelKey } = validated.cmd;
       try {
         if (state?.modelKey !== modelKey) {
           self.postMessage({
@@ -194,7 +309,14 @@ export function createWorker(
         const input = preprocess(pixels, width, height, state.mean, state.std);
         const outputs = await state.session.run({ pixel_values: input });
         const logitsData = outputs["logits"];
-        const logits = logitsData?.data ?? new Float32Array();
+        if (!logitsData?.data || logitsData.data.length === 0) {
+          self.postMessage({
+            type: InferenceWorkerMessageType.Error,
+            message: "Model output missing logits",
+          });
+          return;
+        }
+        const logits = logitsData.data;
 
         // Dispose output tensors if the runtime supports it.
         for (const tensor of Object.values(outputs)) {
@@ -230,7 +352,14 @@ export function createWorker(
   const listener = (
     e: MessageEvent<WorkerCommand | { type: string }>,
   ): void => {
-    void handleWorkerMessage(e);
+    handleWorkerMessage(e).catch((err: unknown) => {
+      console.error("[FORAGERFLOW] Worker handler failed:", err);
+      self.postMessage({
+        type: InferenceWorkerMessageType.Error,
+        message:
+          err instanceof Error ? err.message : "Unknown worker handler error",
+      });
+    });
   };
 
   self.addEventListener("message", listener);

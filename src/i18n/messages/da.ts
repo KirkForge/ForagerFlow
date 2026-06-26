@@ -40,6 +40,10 @@ export const daMessages: Messages = {
   "status.exportHistoryError": "Kunne ikke eksportere historikken.",
   "status.historyImported": "Importerede {{count}} historikposter.",
   "status.importHistoryError": "Kunne ikke importere historikken.",
+  "status.inferenceError": "Identifikation mislykkedes. Prøv igen.",
+  "status.modelLoadError": "Kunne ikke indlæse modellen. Tjek din forbindelse.",
+  "status.labelMismatchError":
+    "Modeloutput matcher ikke labels. Genindlæs venligst.",
 
   // Results
   "results.region": "Identifikationsresultater",

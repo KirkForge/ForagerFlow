@@ -45,25 +45,39 @@ export async function createRangedResponse(
   source: Response,
   rangeHeader: string,
 ): Promise<Response> {
-  const contentLength = Number(source.headers.get("content-length") ?? NaN);
-  if (!Number.isFinite(contentLength) || contentLength <= 0) {
-    // Without a known size we cannot satisfy the range; fall back to 200.
-    return source;
-  }
-
-  const range = parseByteRange(rangeHeader, contentLength);
-  if (range === null) {
-    // Invalid or unsupported range syntax: ignore range per RFC 7233.
-    return source;
-  }
-
+  // Read the body once. If the cached response omitted content-length we can
+  // still satisfy the range by using the actual buffer size as the full size.
   const arrayBuffer = await source.arrayBuffer();
+  const headerLength = Number(source.headers.get("content-length") ?? NaN);
+  const fullSize =
+    Number.isFinite(headerLength) && headerLength > 0
+      ? headerLength
+      : arrayBuffer.byteLength;
+
+  if (fullSize <= 0) {
+    return new Response(arrayBuffer, {
+      status: source.status,
+      statusText: source.statusText,
+      headers: source.headers,
+    });
+  }
+
+  const range = parseByteRange(rangeHeader, fullSize);
+  if (range === null) {
+    // Invalid or unsupported range syntax: return the full body as a 200.
+    return new Response(arrayBuffer, {
+      status: 200,
+      statusText: "OK",
+      headers: source.headers,
+    });
+  }
+
   const sliced = arrayBuffer.slice(range.start, range.end + 1);
   const headers = new Headers(source.headers);
   headers.set("Content-Length", String(sliced.byteLength));
   headers.set(
     "Content-Range",
-    `bytes ${String(range.start)}-${String(range.end)}/${String(contentLength)}`,
+    `bytes ${String(range.start)}-${String(range.end)}/${String(fullSize)}`,
   );
   headers.set("Accept-Ranges", "bytes");
   return new Response(sliced, {

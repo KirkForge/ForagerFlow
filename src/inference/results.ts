@@ -76,36 +76,44 @@ function missingKnowledgeFallback(species: string): SpeciesKnowledge {
   };
 }
 
+const LOW_CONFIDENCE_THRESHOLD = 0.5;
+
 function computeWarning(
   calibratedScore: number,
   edibility: Edibility,
   hasRiskInTop3: boolean,
 ): { requiresWarning: boolean; warningMessage: string | null } {
-  if (calibratedScore < 0.5) {
-    return {
-      requiresWarning: true,
-      warningMessage: t("warning.lowConfidence"),
-    };
-  }
-
-  if (hasRiskInTop3 && calibratedScore < 0.75) {
-    return {
-      requiresWarning: true,
-      warningMessage: t("warning.toxicLookalike"),
-    };
-  }
-
-  if (edibility === Edibility.Poisonous && calibratedScore >= 0.5) {
+  // Top-1 is a known poisonous species: warn regardless of model confidence.
+  if (edibility === Edibility.Poisonous) {
     return {
       requiresWarning: true,
       warningMessage: t("warning.poisonous"),
     };
   }
 
-  if (edibility === Edibility.Unknown && calibratedScore >= 0.5) {
+  // Top-1 edibility is unknown: fail-closed and treat as potentially poisonous.
+  if (edibility === Edibility.Unknown) {
     return {
       requiresWarning: true,
       warningMessage: t("warning.unknown"),
+    };
+  }
+
+  // A poisonous or unknown species appears in the top-k. This is a toxic-
+  // lookalike scenario and must be surfaced even when top-1 is a confident
+  // edible prediction, because confidence in the edible class is not evidence
+  // against the dangerous neighbor.
+  if (hasRiskInTop3) {
+    return {
+      requiresWarning: true,
+      warningMessage: t("warning.toxicLookalike"),
+    };
+  }
+
+  if (calibratedScore < LOW_CONFIDENCE_THRESHOLD) {
+    return {
+      requiresWarning: true,
+      warningMessage: t("warning.lowConfidence"),
     };
   }
 

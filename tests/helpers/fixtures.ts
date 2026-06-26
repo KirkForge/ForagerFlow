@@ -56,7 +56,11 @@ export function makeHistoryEntry(
     top1Species: "Agaricus bisporus",
     top1Probability: 0.95,
     top1Edibility: Edibility.Edible,
-    predictions: [],
+    predictions: [
+      { label: "Agaricus bisporus", probability: 0.95 },
+      { label: "Amanita phalloides", probability: 0.03 },
+      { label: "Russula emetica", probability: 0.02 },
+    ],
     thumbnail: "",
     notes: "Safe.",
     ...overrides,

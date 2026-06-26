@@ -7,9 +7,8 @@ interface AssetLinksModule {
 }
 
 const require = createRequire(import.meta.url);
-const { normalizeFingerprint, generateAssetLinks } = require(
-  "../scripts/generate-assetlinks.cjs",
-) as AssetLinksModule;
+const { normalizeFingerprint, generateAssetLinks } =
+  require("../scripts/generate-assetlinks.cjs") as AssetLinksModule;
 
 describe("generate-assetlinks", () => {
   afterEach(() => {

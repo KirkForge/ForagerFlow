@@ -67,12 +67,16 @@ describe("createRangedResponse", () => {
     );
   });
 
-  it("ignores the range when no content-length is known", async () => {
+  it("satisfies a range using the actual buffer size when content-length is missing", async () => {
     const source = new Response(new Uint8Array([0, 1, 2, 3]), {
       headers: { "Content-Type": "application/octet-stream" },
     });
     const response = await createRangedResponse(source, "bytes=0-1");
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(206);
+    expect(response.headers.get("content-range")).toBe("bytes 0-1/4");
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(
+      new Uint8Array([0, 1]),
+    );
   });
 
   it("ignores invalid range syntax and returns the full response", async () => {
@@ -100,27 +104,19 @@ describe("estimateResponseSize", () => {
 
 describe("shouldCacheLargeAsset", () => {
   it("returns true when within quota fraction and free-space budget", () => {
-    expect(
-      shouldCacheLargeAsset(50, 100, 1000, 0.85, 50),
-    ).toBe(true);
+    expect(shouldCacheLargeAsset(50, 100, 1000, 0.85, 50)).toBe(true);
   });
 
   it("returns false when projected usage exceeds quota fraction", () => {
-    expect(
-      shouldCacheLargeAsset(100, 760, 1000, 0.85, 0),
-    ).toBe(false);
+    expect(shouldCacheLargeAsset(100, 760, 1000, 0.85, 0)).toBe(false);
   });
 
   it("returns false when projected free space is below minimum", () => {
-    expect(
-      shouldCacheLargeAsset(100, 800, 1000, 1.0, 200),
-    ).toBe(false);
+    expect(shouldCacheLargeAsset(100, 800, 1000, 1.0, 200)).toBe(false);
   });
 
   it("returns true when quota is unavailable", () => {
-    expect(
-      shouldCacheLargeAsset(100, 0, 0, 0.85, 0),
-    ).toBe(true);
+    expect(shouldCacheLargeAsset(100, 0, 0, 0.85, 0)).toBe(true);
   });
 });
 

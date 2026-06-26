@@ -1,8 +1,12 @@
-import { Edibility, type SpeciesKnowledge, type Prediction } from "@/core/types";
-import { sanitizeText } from "@/core/sanitize";
+import {
+  Edibility,
+  type SpeciesKnowledge,
+  type Prediction,
+} from "@/core/types";
 import { t } from "@/i18n";
 import { getLocalizedNotes } from "@/i18n/knowledge";
 import type { CalibrationResult } from "@/inference/confidence";
+import { createEl } from "@/ui/utils";
 
 export class SpeciesDetailPanel {
   private readonly modal: HTMLDialogElement;
@@ -31,10 +35,9 @@ export class SpeciesDetailPanel {
     knowledge: SpeciesKnowledge,
     confidence: CalibrationResult,
   ): void {
-    this.title.textContent = sanitizeText(label);
-    this.notes.textContent = sanitizeText(
-      getLocalizedNotes(knowledge) || t("knowledge.noData"),
-    );
+    this.title.textContent = label;
+    this.notes.textContent =
+      getLocalizedNotes(knowledge) || t("knowledge.noData");
     this.safety.textContent = t("detail.safetyReminder");
 
     const rawPct = (prediction.probability * 100).toFixed(1);
@@ -42,14 +45,35 @@ export class SpeciesDetailPanel {
     const edibilityClass = this.edibilityClass(knowledge.edibility);
     const edibilityText = this.edibilityText(knowledge.edibility);
     const reliabilityClass = `reliability-${confidence.reliability}`;
-    const reliabilityText = t(`confidence.reliability${this.capitalize(confidence.reliability)}`);
+    const reliabilityText = t(
+      `confidence.reliability${this.capitalize(confidence.reliability)}`,
+    );
 
-    this.meta.innerHTML = `
-      <span class="detail-edibility ${edibilityClass}">${edibilityText}</span>
-      <span class="detail-reliability ${reliabilityClass}">${reliabilityText}</span>
-      <span class="detail-confidence">${t("detail.confidence", { pct: rawPct })}</span>
-      <span class="detail-calibrated">${t("detail.calibratedScore", { pct: calPct })}</span>
-    `;
+    this.meta.innerHTML = "";
+    this.meta.appendChild(
+      createEl("span", `detail-edibility ${edibilityClass}`, edibilityText),
+    );
+    this.meta.appendChild(
+      createEl(
+        "span",
+        `detail-reliability ${reliabilityClass}`,
+        reliabilityText,
+      ),
+    );
+    this.meta.appendChild(
+      createEl(
+        "span",
+        "detail-confidence",
+        t("detail.confidence", { pct: rawPct }),
+      ),
+    );
+    this.meta.appendChild(
+      createEl(
+        "span",
+        "detail-calibrated",
+        t("detail.calibratedScore", { pct: calPct }),
+      ),
+    );
 
     const verifyUrl = new URL("https://www.google.com/search");
     verifyUrl.searchParams.set("q", `${label} mushroom identification`);
@@ -124,7 +148,10 @@ export class SpeciesDetailPanel {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
-  private require<T extends HTMLElement>(sel: string, root: HTMLElement | Document): T {
+  private require<T extends HTMLElement>(
+    sel: string,
+    root: HTMLElement | Document,
+  ): T {
     const el = root.querySelector(sel);
     if (!el)
       throw new Error(`SpeciesDetailPanel: required element not found: ${sel}`);

@@ -31,10 +31,10 @@ import {
 import type { HistoryEntry, GeoLocation } from "@/services/history";
 import { closeDB } from "@/services/history/db";
 import { initWebVitals } from "@/services/web-vitals";
+import type { AppError } from "@/core/errors";
 import { logger } from "@/core/logger";
-import { sanitizeText } from "@/core/sanitize";
 import { config } from "@/core/config";
-import { getEdibilityClass, createEl } from "@/ui/utils";
+import { getEdibilityClass, createEl, hide, show } from "@/ui/utils";
 import { t } from "@/i18n";
 
 const LOCATION_ENABLED_KEY = "ff:location-enabled-v1";
@@ -75,15 +75,12 @@ export class AppController {
   constructor() {
     this.statusEl = this.require("#status");
     this.badgeEl = this.require("#badge");
-    this.videoEl = this.require("#video") as unknown as HTMLVideoElement;
-    this.captureBtn = this.require(
-      "#capture-btn",
-    ) as unknown as HTMLButtonElement;
+    this.videoEl = this.require("#video") as HTMLVideoElement;
+    this.captureBtn = this.require("#capture-btn") as HTMLButtonElement;
     this.torchBtn = document.querySelector<HTMLButtonElement>("#torch-btn");
     this.updateTorchButton(false);
     this.cameraWrap = this.require("#camera-wrap");
-    this.focusReticle =
-      document.querySelector<HTMLElement>("#focus-reticle");
+    this.focusReticle = document.querySelector<HTMLElement>("#focus-reticle");
     this.recaptureBtn =
       document.querySelector<HTMLButtonElement>("#recapture-btn");
     this.progressEl = this.require("#model-progress");
@@ -100,16 +97,14 @@ export class AppController {
       document.querySelector<HTMLElement>("#location-status");
     this.historySearchEl =
       document.querySelector<HTMLInputElement>("#history-search");
-    this.historySearchClearEl =
-      document.querySelector<HTMLButtonElement>("#history-search-clear");
+    this.historySearchClearEl = document.querySelector<HTMLButtonElement>(
+      "#history-search-clear",
+    );
     this.historySearchEl?.setAttribute(
       "placeholder",
       t("history.searchPlaceholder"),
     );
-    this.historySearchEl?.setAttribute(
-      "aria-label",
-      t("history.searchAria"),
-    );
+    this.historySearchEl?.setAttribute("aria-label", t("history.searchAria"));
     this.historySearchClearEl?.setAttribute(
       "aria-label",
       t("history.searchClearAria"),
@@ -125,6 +120,18 @@ export class AppController {
     this.detailPanel = new SpeciesDetailPanel();
     this.comparisonPanel = new PredictionComparisonPanel();
     this.historyDetailPanel = new HistoryDetailPanel();
+  }
+
+  #localizedErrorMessage(error: AppError): string {
+    switch (error.code) {
+      case "MODEL_LOAD_FAILED":
+        return t("status.modelLoadError");
+      case "LABEL_LOGIT_MISMATCH":
+        return t("status.labelMismatchError");
+      case "INFERENCE_FAILED":
+      default:
+        return t("status.inferenceError");
+    }
   }
 
   async init(): Promise<void> {
@@ -182,7 +189,8 @@ export class AppController {
     });
 
     inferenceService.onError((error) => {
-      this.statusEl.textContent = `Error: ${error.message}`;
+      logger.error("Inference error:", error);
+      this.statusEl.textContent = this.#localizedErrorMessage(error);
       this.setCaptureBusy(false);
       this.setRecaptureVisible(false);
       this.#pendingThumbnail = null;
@@ -201,11 +209,11 @@ export class AppController {
     try {
       await this.camera.start(this.videoEl);
       this.statusEl.textContent = t("status.cameraActive");
-      this.cameraErrorEl.style.display = "none";
+      hide(this.cameraErrorEl);
       this.updateTorchVisibility();
     } catch {
       this.statusEl.textContent = t("status.cameraError");
-      this.cameraErrorEl.style.display = "flex";
+      show(this.cameraErrorEl);
       this.updateTorchVisibility();
     }
   }
@@ -395,12 +403,11 @@ export class AppController {
       probability: 0,
       index: -1,
     };
-    const confidence =
-      this.#lastReport?.confidence ?? {
-        score: prediction.probability,
-        reliability: "low",
-        gap: 0,
-      };
+    const confidence = this.#lastReport?.confidence ?? {
+      score: prediction.probability,
+      reliability: "low",
+      gap: 0,
+    };
     const knowledge = model.knowledge[label] ?? {
       edibility: Edibility.Unknown,
       notes: t("knowledge.noData"),
@@ -550,9 +557,9 @@ export class AppController {
     const slot = document.getElementById("last-result");
     if (!slot) return;
 
-    const date = sanitizeText(new Date(last.timestamp).toLocaleString());
-    const species = sanitizeText(last.top1Species);
-    const edibility = sanitizeText(last.top1Edibility);
+    const date = new Date(last.timestamp).toLocaleString();
+    const species = last.top1Species;
+    const edibility = last.top1Edibility;
     const prob = (last.top1Probability * 100).toFixed(1);
     const edClass = getEdibilityClass(last.top1Edibility);
 
@@ -571,16 +578,16 @@ export class AppController {
     inner.appendChild(meta);
 
     slot.appendChild(inner);
-    slot.style.display = "block";
+    show(slot);
   }
 
   private renderHistoryItem(entry: HistoryEntry): HTMLElement {
-    const date = sanitizeText(new Date(entry.timestamp).toLocaleDateString());
-    const model = sanitizeText(entry.modelKey);
-    const species = sanitizeText(entry.top1Species);
-    const edibility = sanitizeText(entry.top1Edibility);
+    const date = new Date(entry.timestamp).toLocaleDateString();
+    const model = entry.modelKey;
+    const species = entry.top1Species;
+    const edibility = entry.top1Edibility;
     const prob = (entry.top1Probability * 100).toFixed(1);
-    const id = sanitizeText(entry.id);
+    const id = entry.id;
     const edClass = getEdibilityClass(entry.top1Edibility);
 
     const entryEl = createEl("div", "history-entry");

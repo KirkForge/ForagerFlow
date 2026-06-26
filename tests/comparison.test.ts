@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { PredictionComparisonPanel, type ComparisonItem } from "@/ui/comparison";
+import {
+  PredictionComparisonPanel,
+  type ComparisonItem,
+} from "@/ui/comparison";
 import { Edibility } from "@/core/types";
 import { setLocale } from "@/i18n";
 

@@ -141,7 +141,9 @@ describe("createWorker", () => {
         .map(([m]) => m as Record<string, unknown>)
         .filter((m) => m["type"] === InferenceWorkerMessageType.Progress);
       expect(progressMessages.length).toBeGreaterThanOrEqual(2);
-      expect(progressMessages.some((m) => m["phase"] === "download")).toBe(true);
+      expect(progressMessages.some((m) => m["phase"] === "download")).toBe(
+        true,
+      );
       expect(progressMessages.some((m) => m["phase"] === "compile")).toBe(true);
     });
 
@@ -313,6 +315,69 @@ describe("createWorker", () => {
       const msg = lastMessage();
       expect(msg?.["type"]).toBe(InferenceWorkerMessageType.Error);
       expect(msg?.["message"]).toContain("Unknown worker command");
+    });
+  });
+
+  it("rejects a switch command with an invalid modelKey", async () => {
+    ctx.dispatch({
+      type: "switch",
+      modelPath: "/model/test.onnx",
+      modelKey: "invalid",
+      mean: [0, 0, 0],
+      std: [1, 1, 1],
+    });
+
+    await vi.waitFor(() => {
+      const msg = lastMessage();
+      expect(msg?.["type"]).toBe(InferenceWorkerMessageType.Error);
+      expect(msg?.["message"]).toContain("valid modelKey");
+    });
+  });
+
+  it("rejects a switch command with a non-finite mean tuple", async () => {
+    ctx.dispatch({
+      type: "switch",
+      modelPath: "/model/test.onnx",
+      modelKey: ModelKey.BVRA,
+      mean: ["not", "a", "number"],
+      std: [1, 1, 1],
+    });
+
+    await vi.waitFor(() => {
+      const msg = lastMessage();
+      expect(msg?.["type"]).toBe(InferenceWorkerMessageType.Error);
+      expect(msg?.["message"]).toContain("mean must be a [R,G,B] tuple");
+    });
+  });
+
+  it("rejects an infer command with missing pixels", async () => {
+    ctx.dispatch({
+      type: "infer",
+      width: 1,
+      height: 1,
+      modelKey: ModelKey.BVRA,
+    });
+
+    await vi.waitFor(() => {
+      const msg = lastMessage();
+      expect(msg?.["type"]).toBe(InferenceWorkerMessageType.Error);
+      expect(msg?.["message"]).toContain("ArrayBuffer pixels");
+    });
+  });
+
+  it("rejects an infer command with non-positive dimensions", async () => {
+    ctx.dispatch({
+      type: "infer",
+      pixels: new ArrayBuffer(4),
+      width: -1,
+      height: 0,
+      modelKey: ModelKey.BVRA,
+    });
+
+    await vi.waitFor(() => {
+      const msg = lastMessage();
+      expect(msg?.["type"]).toBe(InferenceWorkerMessageType.Error);
+      expect(msg?.["message"]).toContain("positive width");
     });
   });
 });

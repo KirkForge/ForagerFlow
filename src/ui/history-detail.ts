@@ -1,8 +1,8 @@
 import { Edibility } from "@/core/types";
-import { sanitizeText } from "@/core/sanitize";
 import { t } from "@/i18n";
 import { isDataUrlThumbnail, isValidLocation } from "@/services/history";
 import type { HistoryEntry } from "@/services/history";
+import { createEl } from "@/ui/utils";
 
 export class HistoryDetailPanel {
   private readonly modal: HTMLDialogElement;
@@ -29,7 +29,7 @@ export class HistoryDetailPanel {
 
   open(entry: HistoryEntry): void {
     const label = entry.top1Species;
-    this.title.textContent = sanitizeText(label);
+    this.title.textContent = label;
 
     if (entry.thumbnail && isDataUrlThumbnail(entry.thumbnail)) {
       this.thumbnail.src = entry.thumbnail;
@@ -41,29 +41,55 @@ export class HistoryDetailPanel {
       this.thumbnail.hidden = true;
     }
 
-    const date = sanitizeText(new Date(entry.timestamp).toLocaleString());
-    const model = sanitizeText(entry.modelKey);
+    const date = new Date(entry.timestamp).toLocaleString();
+    const model = entry.modelKey;
     const edibilityClass = this.edibilityClass(entry.top1Edibility);
     const edibilityText = this.edibilityText(entry.top1Edibility);
     const prob = (entry.top1Probability * 100).toFixed(1);
 
-    let metaHtml = `
-      <span class="detail-edibility ${edibilityClass}">${edibilityText}</span>
-      <span class="detail-confidence">${t("history.detail.confidence", { prob })}</span>
-      <span class="history-detail-date">${t("history.detail.date", { date })}</span>
-      <span class="history-detail-model">${t("history.detail.model", { model })}</span>
-    `;
+    this.meta.innerHTML = "";
+    this.meta.appendChild(
+      createEl("span", `detail-edibility ${edibilityClass}`, edibilityText),
+    );
+    this.meta.appendChild(
+      createEl(
+        "span",
+        "detail-confidence",
+        t("history.detail.confidence", { prob }),
+      ),
+    );
+    this.meta.appendChild(
+      createEl(
+        "span",
+        "history-detail-date",
+        t("history.detail.date", { date }),
+      ),
+    );
+    this.meta.appendChild(
+      createEl(
+        "span",
+        "history-detail-model",
+        t("history.detail.model", { model }),
+      ),
+    );
 
     if (entry.location && isValidLocation(entry.location)) {
       const { lat, lng } = entry.location;
-      metaHtml += `<a class="history-detail-location" target="_blank" rel="noopener" href="geo:${String(lat)},${String(lng)}?q=${String(lat)},${String(lng)}">${t("history.detail.location", { lat: lat.toFixed(4), lng: lng.toFixed(4) })}</a>`;
+      const locationLink = createEl(
+        "a",
+        "history-detail-location",
+        t("history.detail.location", {
+          lat: lat.toFixed(4),
+          lng: lng.toFixed(4),
+        }),
+      ) as HTMLAnchorElement;
+      locationLink.href = `geo:${String(lat)},${String(lng)}?q=${String(lat)},${String(lng)}`;
+      locationLink.target = "_blank";
+      locationLink.rel = "noopener";
+      this.meta.appendChild(locationLink);
     }
 
-    this.meta.innerHTML = metaHtml;
-
-    this.notes.textContent = entry.notes
-      ? sanitizeText(entry.notes)
-      : t("knowledge.noData");
+    this.notes.textContent = entry.notes ? entry.notes : t("knowledge.noData");
     this.safety.textContent = t("detail.safetyReminder");
 
     const verifyUrl = new URL("https://www.google.com/search");

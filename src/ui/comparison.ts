@@ -1,9 +1,9 @@
 import type { SpeciesKnowledge, Prediction } from "@/core/types";
 import { Edibility } from "@/core/types";
-import { sanitizeText } from "@/core/sanitize";
 import { t } from "@/i18n";
 import { getLocalizedNotes } from "@/i18n/knowledge";
 import type { CalibrationResult } from "@/inference/confidence";
+import { createEl } from "@/ui/utils";
 
 export interface ComparisonItem {
   prediction: Prediction;
@@ -30,9 +30,10 @@ export class PredictionComparisonPanel {
   }
 
   open(items: ComparisonItem[]): void {
-    this.grid.innerHTML = items
-      .map((item, index) => this.renderCard(item, index))
-      .join("");
+    this.grid.innerHTML = "";
+    for (const [index, item] of items.entries()) {
+      this.grid.appendChild(this.renderCard(item, index));
+    }
     this.safety.textContent = t("detail.safetyReminder");
     this.modal.showModal();
   }
@@ -49,7 +50,7 @@ export class PredictionComparisonPanel {
     this.safety.textContent = "";
   }
 
-  private renderCard(item: ComparisonItem, index: number): string {
+  private renderCard(item: ComparisonItem, index: number): HTMLElement {
     const { prediction, knowledge, confidence } = item;
     const rawPct = (prediction.probability * 100).toFixed(1);
     const calPct = (confidence.score * 100).toFixed(1);
@@ -65,29 +66,65 @@ export class PredictionComparisonPanel {
       `${prediction.label} mushroom identification`,
     );
 
-    return `
-      <div class="comparison-card" data-index="${String(index)}" tabindex="0">
-        <h3>${sanitizeText(prediction.label)}</h3>
-        <div class="detail-meta">
-          <span class="detail-edibility ${edibilityClass}">${edibilityText}</span>
-          <span class="detail-reliability ${reliabilityClass}">${reliabilityText}</span>
-        </div>
-        <p class="detail-notes">${sanitizeText(
-          getLocalizedNotes(knowledge) || t("knowledge.noData"),
-        )}</p>
-        <div class="comparison-stats">
-          <span class="detail-confidence">${t("detail.confidence", { pct: rawPct })}</span>
-          <span class="detail-calibrated">${t("detail.calibratedScore", { pct: calPct })}</span>
-        </div>
-        <a
-          class="verify-link"
-          target="_blank"
-          rel="noopener noreferrer"
-          href="${verifyUrl.toString()}"
-          aria-label="${sanitizeText(t("prediction.verifyAriaLabel", { species: prediction.label }))}"
-        >${t("prediction.verifyOnline")}</a>
-      </div>
-    `;
+    const card = createEl("div", "comparison-card");
+    card.setAttribute("data-index", String(index));
+    card.setAttribute("tabindex", "0");
+    card.setAttribute("role", "button");
+    card.appendChild(createEl("h3", "", prediction.label));
+
+    const meta = createEl("div", "detail-meta");
+    meta.appendChild(
+      createEl("span", `detail-edibility ${edibilityClass}`, edibilityText),
+    );
+    meta.appendChild(
+      createEl(
+        "span",
+        `detail-reliability ${reliabilityClass}`,
+        reliabilityText,
+      ),
+    );
+    card.appendChild(meta);
+
+    card.appendChild(
+      createEl(
+        "p",
+        "detail-notes",
+        getLocalizedNotes(knowledge) || t("knowledge.noData"),
+      ),
+    );
+
+    const stats = createEl("div", "comparison-stats");
+    stats.appendChild(
+      createEl(
+        "span",
+        "detail-confidence",
+        t("detail.confidence", { pct: rawPct }),
+      ),
+    );
+    stats.appendChild(
+      createEl(
+        "span",
+        "detail-calibrated",
+        t("detail.calibratedScore", { pct: calPct }),
+      ),
+    );
+    card.appendChild(stats);
+
+    const verify = createEl(
+      "a",
+      "verify-link",
+      t("prediction.verifyOnline"),
+    ) as HTMLAnchorElement;
+    verify.href = verifyUrl.toString();
+    verify.target = "_blank";
+    verify.rel = "noopener noreferrer";
+    verify.setAttribute(
+      "aria-label",
+      t("prediction.verifyAriaLabel", { species: prediction.label }),
+    );
+    card.appendChild(verify);
+
+    return card;
   }
 
   private bindClose(): void {

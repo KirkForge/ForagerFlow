@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ModelKey } from "@/core/types";
+import { AppError } from "@/core/errors";
 import type { CaptureResult } from "@/services/camera";
 import type * as CameraModule from "@/services/camera";
 import { AppController } from "@/app";
@@ -17,7 +18,11 @@ interface MockInferenceService {
   ) => void;
   onError: (handler: (error: Error) => void) => void;
   onProgress: (
-    handler: (progress: { modelKey: ModelKey; phase: string; percent: number }) => void,
+    handler: (progress: {
+      modelKey: ModelKey;
+      phase: string;
+      percent: number;
+    }) => void,
   ) => void;
   emitStatus: (text: string) => void;
   emitResult: (result: { logits: Float32Array; modelKey: ModelKey }) => void;
@@ -41,7 +46,11 @@ const mockInferenceService = vi.hoisted<MockInferenceService>(() => {
     | null = null;
   let errorHandler: ((error: Error) => void) | null = null;
   let progressHandler:
-    | ((progress: { modelKey: ModelKey; phase: string; percent: number }) => void)
+    | ((progress: {
+        modelKey: ModelKey;
+        phase: string;
+        percent: number;
+      }) => void)
     | null = null;
   return {
     onStatus: (handler) => {
@@ -114,7 +123,8 @@ vi.mock("@/inference/service", () => ({
 }));
 
 vi.mock("@/services/camera", async () => {
-  const actual = await vi.importActual<typeof CameraModule>("@/services/camera");
+  const actual =
+    await vi.importActual<typeof CameraModule>("@/services/camera");
   return {
     CameraService: Object.assign(
       vi.fn(function () {
@@ -137,7 +147,10 @@ vi.mock("@/services/image-input", () => ({
 }));
 
 vi.mock("@/services/history", async () => {
-  const actual = await vi.importActual("@/services/history") as Record<string, unknown>;
+  const actual = (await vi.importActual("@/services/history")) as Record<
+    string,
+    unknown
+  >;
   return {
     ...actual,
     saveIdentification: vi.fn().mockResolvedValue("id-1"),
@@ -283,9 +296,15 @@ describe("AppController", () => {
     });
 
     const progressEl = document.querySelector("#model-progress") as HTMLElement;
-    const progressText = document.querySelector("#model-progress-text") as HTMLElement;
-    const progressPct = document.querySelector("#model-progress-pct") as HTMLElement;
-    const progressBar = document.querySelector("#model-progress-bar") as HTMLElement;
+    const progressText = document.querySelector(
+      "#model-progress-text",
+    ) as HTMLElement;
+    const progressPct = document.querySelector(
+      "#model-progress-pct",
+    ) as HTMLElement;
+    const progressBar = document.querySelector(
+      "#model-progress-bar",
+    ) as HTMLElement;
 
     expect(progressEl.hidden).toBe(false);
     expect(progressText.textContent).toContain("Specialist");
@@ -398,7 +417,7 @@ describe("AppController", () => {
     expect(list.children.length).toBeGreaterThan(0);
 
     const slot = document.querySelector("#last-result") as HTMLElement;
-    expect(slot.style.display).toBe("block");
+    expect(slot.classList.contains("hidden")).toBe(false);
   });
 
   it("shows empty history message when no entries", async () => {
@@ -444,13 +463,26 @@ describe("AppController", () => {
     expect(status.textContent).toBe("Failed to process image.");
   });
 
-  it("sets error state on inference error", async () => {
+  it("sets localized error state on inference error", async () => {
     const controller = new AppController();
     await controller.init();
 
     mockInferenceService.emitError(new Error("model failed"));
     const status = document.querySelector("#status") as HTMLElement;
-    expect(status.textContent).toContain("model failed");
+    expect(status.textContent).toBe("Identification failed. Please try again.");
+  });
+
+  it("sets localized model-load error when model fails to load", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    mockInferenceService.emitError(
+      new AppError("model failed", "MODEL_LOAD_FAILED"),
+    );
+    const status = document.querySelector("#status") as HTMLElement;
+    expect(status.textContent).toBe(
+      "Could not load the model. Check your connection.",
+    );
   });
 
   it("skips capture when button is busy", async () => {
@@ -551,7 +583,10 @@ describe("AppController", () => {
 
   it("opens history detail when an entry is clicked", async () => {
     const { getHistory } = await import("@/services/history");
-    const entry = makeHistoryEntry({ id: "h-detail", top1Species: "Amanita muscaria" });
+    const entry = makeHistoryEntry({
+      id: "h-detail",
+      top1Species: "Amanita muscaria",
+    });
     vi.mocked(getHistory).mockResolvedValue([entry]);
 
     const controller = new AppController();
@@ -939,7 +974,11 @@ describe("AppController", () => {
     } as DOMRect);
 
     video.dispatchEvent(
-      new PointerEvent("pointerdown", { clientX: 160, clientY: 160, bubbles: true }),
+      new PointerEvent("pointerdown", {
+        clientX: 160,
+        clientY: 160,
+        bubbles: true,
+      }),
     );
     await flushPromises();
 
@@ -965,7 +1004,11 @@ describe("AppController", () => {
     } as DOMRect);
 
     video.dispatchEvent(
-      new PointerEvent("pointerdown", { clientX: 80, clientY: 80, bubbles: true }),
+      new PointerEvent("pointerdown", {
+        clientX: 80,
+        clientY: 80,
+        bubbles: true,
+      }),
     );
     await flushPromises();
 
@@ -1178,10 +1221,7 @@ describe("AppController additional coverage", () => {
     await controller.init();
 
     const options = vi.mocked(ResultsRenderer).mock.calls[0]?.[1];
-    options?.onComparisonShow?.([
-      "Agaricus bisporus",
-      "Amanita phalloides",
-    ]);
+    options?.onComparisonShow?.(["Agaricus bisporus", "Amanita phalloides"]);
     expect(mockComparisonPanel.open).not.toHaveBeenCalled();
   });
 
@@ -1254,14 +1294,16 @@ describe("AppController additional coverage", () => {
 
     const list = document.querySelector("#history-list") as HTMLElement;
     expect(list.querySelector("img")).not.toBeNull();
-    expect(list.querySelector(".history-location")?.getAttribute("href")).toMatch(
-      /^geo:/,
-    );
+    expect(
+      list.querySelector(".history-location")?.getAttribute("href"),
+    ).toMatch(/^geo:/);
   });
 
   it("logs a warning for invalid history thumbnails", async () => {
     const { getHistory } = await import("@/services/history");
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    const warnSpy = vi
+      .spyOn(logger, "warn")
+      .mockImplementation(() => undefined);
     vi.mocked(getHistory).mockResolvedValue([
       makeHistoryEntry({
         id: "h-bad-thumb",
@@ -1320,7 +1362,9 @@ describe("AppController additional coverage", () => {
 
   it("does not open history detail when the entry is not found", async () => {
     const { getHistory } = await import("@/services/history");
-    vi.mocked(getHistory).mockResolvedValue([makeHistoryEntry({ id: "h-real" })]);
+    vi.mocked(getHistory).mockResolvedValue([
+      makeHistoryEntry({ id: "h-real" }),
+    ]);
     renderAppHTML();
     const controller = new AppController();
     await controller.init();
@@ -1418,7 +1462,11 @@ describe("AppController additional coverage", () => {
   it("captures location when the toggle is enabled and capture is pressed", async () => {
     renderAppHTML();
     const getCurrentPosition = vi.fn(
-      (success: (position: { coords: { latitude: number; longitude: number; accuracy: number } }) => void) => {
+      (
+        success: (position: {
+          coords: { latitude: number; longitude: number; accuracy: number };
+        }) => void,
+      ) => {
         success({
           coords: { latitude: 55.6761, longitude: 12.5683, accuracy: 5 },
         });
@@ -1469,7 +1517,9 @@ describe("AppController additional coverage", () => {
     const controller = new AppController();
     await controller.init();
 
-    const toggle = document.querySelector("#location-toggle") as HTMLInputElement;
+    const toggle = document.querySelector(
+      "#location-toggle",
+    ) as HTMLInputElement;
     toggle.checked = false;
     toggle.dispatchEvent(new Event("change", { bubbles: true }));
     toggle.checked = true;
@@ -1496,7 +1546,9 @@ describe("AppController additional coverage", () => {
     const controller = new AppController();
     await controller.init();
 
-    const toggle = document.querySelector("#location-toggle") as HTMLInputElement;
+    const toggle = document.querySelector(
+      "#location-toggle",
+    ) as HTMLInputElement;
     toggle.checked = false;
     toggle.dispatchEvent(new Event("change", { bubbles: true }));
     toggle.checked = true;
@@ -1526,7 +1578,9 @@ describe("AppController additional coverage", () => {
     const controller = new AppController();
     await controller.init();
 
-    const toggle = document.querySelector("#location-toggle") as HTMLInputElement;
+    const toggle = document.querySelector(
+      "#location-toggle",
+    ) as HTMLInputElement;
     toggle.checked = false;
     toggle.dispatchEvent(new Event("change", { bubbles: true }));
     toggle.checked = true;

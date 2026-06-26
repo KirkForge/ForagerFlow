@@ -246,6 +246,7 @@ describe("history with IndexedDB", () => {
           top1Species: "Imported",
           top1Probability: 0.8,
           top1Edibility: Edibility.Unknown,
+          predictions: [{ label: "Imported", probability: 0.8 }],
         }),
       ],
     };
@@ -283,7 +284,10 @@ describe("history with IndexedDB", () => {
       await saveIdentification(
         makeReport({
           top1Species: "Amanita muscaria",
-          top1Knowledge: { edibility: Edibility.Poisonous, notes: "Fly agaric." },
+          top1Knowledge: {
+            edibility: Edibility.Poisonous,
+            notes: "Fly agaric.",
+          },
           predictions: [
             { label: "Amanita muscaria", probability: 0.91, index: 0 },
             { label: "Russula emetica", probability: 0.05, index: 1 },
@@ -344,7 +348,11 @@ describe("history with IndexedDB", () => {
     });
 
     it("overwrites duplicate ids when importing", async () => {
-      const entry = makeHistoryEntry({ id: "dup-1", top1Species: "Original" });
+      const entry = makeHistoryEntry({
+        id: "dup-1",
+        top1Species: "Original",
+        predictions: [{ label: "Original", probability: 0.95 }],
+      });
       const backup: HistoryBackup = {
         version: 1,
         exportedAt: new Date().toISOString(),
@@ -355,6 +363,7 @@ describe("history with IndexedDB", () => {
       const updated = makeHistoryEntry({
         id: "dup-1",
         top1Species: "Updated",
+        predictions: [{ label: "Updated", probability: 0.95 }],
       });
       const updatedBackup: HistoryBackup = {
         version: 1,
@@ -385,7 +394,11 @@ describe("history with IndexedDB", () => {
     const openDBSpy = vi.spyOn(historyDb, "openDB").mockResolvedValue({
       transaction: vi.fn().mockReturnValue({
         objectStore: vi.fn().mockReturnValue({
-          put: vi.fn(),
+          put: vi.fn().mockReturnValue({
+            set onerror(_: () => void) {},
+            set onabort(_: () => void) {},
+            set oncomplete(_: () => void) {},
+          }),
         }),
         set onerror(handler: () => void) {
           handler();
@@ -412,7 +425,11 @@ describe("history with IndexedDB", () => {
     const openDBSpy = vi.spyOn(historyDb, "openDB").mockResolvedValue({
       transaction: vi.fn().mockReturnValue({
         objectStore: vi.fn().mockReturnValue({
-          put: vi.fn(),
+          put: vi.fn().mockReturnValue({
+            set onerror(_: () => void) {},
+            set onabort(_: () => void) {},
+            set oncomplete(_: () => void) {},
+          }),
         }),
         set onerror(_: () => void) {},
         set onabort(handler: () => void) {
@@ -439,7 +456,12 @@ describe("history with IndexedDB", () => {
     const backup: HistoryBackup = {
       version: 1,
       exportedAt: new Date().toISOString(),
-      entries: [makeHistoryEntry({ id: "notes-empty", notes: 123 as unknown as string })],
+      entries: [
+        makeHistoryEntry({
+          id: "notes-empty",
+          notes: 123 as unknown as string,
+        }),
+      ],
     };
 
     const count = await importHistory(JSON.stringify(backup));
@@ -474,11 +496,45 @@ describe("history with IndexedDB", () => {
     const backup: HistoryBackup = {
       version: 1,
       exportedAt: new Date().toISOString(),
-      entries: [makeHistoryEntry({ id: "bad-thumb", thumbnail: "https://example.com/x.jpg" })],
+      entries: [
+        makeHistoryEntry({
+          id: "bad-thumb",
+          thumbnail: "https://example.com/x.jpg",
+        }),
+      ],
     };
 
     await expect(importHistory(JSON.stringify(backup))).rejects.toThrow(
       "invalid thumbnail",
+    );
+  });
+
+  it("rejects imports with mismatched top1 species", async () => {
+    const backup: HistoryBackup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries: [
+        makeHistoryEntry({
+          id: "mismatch",
+          top1Species: "Amanita phalloides",
+        }),
+      ],
+    };
+
+    await expect(importHistory(JSON.stringify(backup))).rejects.toThrow(
+      "top1Species does not match predictions",
+    );
+  });
+
+  it("rejects imports with an overly long id", async () => {
+    const backup: HistoryBackup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries: [makeHistoryEntry({ id: "x".repeat(100) })],
+    };
+
+    await expect(importHistory(JSON.stringify(backup))).rejects.toThrow(
+      "invalid id",
     );
   });
 });

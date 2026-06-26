@@ -6,11 +6,29 @@ import { applySafetyLinks } from "@/i18n/safety";
 initLocale();
 applySafetyLinks();
 
+function showFatalStatus(message: string): void {
+  const status = document.getElementById("status");
+  if (status) {
+    status.textContent = message;
+  }
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("error", (event: ErrorEvent) => {
+    logger.error("Unhandled error:", event.error ?? event.message);
+    showFatalStatus(t("status.initError"));
+  });
+  window.addEventListener(
+    "unhandledrejection",
+    (event: PromiseRejectionEvent) => {
+      logger.error("Unhandled promise rejection:", event.reason);
+      showFatalStatus(t("status.initError"));
+    },
+  );
+}
+
 const controller = new AppController();
 controller.init().catch((err: unknown) => {
   logger.error("App initialization failed:", err);
-  const status = document.getElementById("status");
-  if (status) {
-    status.textContent = t("status.initError");
-  }
+  showFatalStatus(t("status.initError"));
 });

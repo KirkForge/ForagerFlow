@@ -39,8 +39,18 @@ describe("generatePredictionReport", () => {
   });
 
   it("sets warning for low calibrated confidence", () => {
+    // Use an all-edible model so the low-confidence branch is exercised without
+    // a toxic-lookalike trigger.
+    const allEdibleModel: ModelRegistryEntry = {
+      ...makeMockModel(),
+      knowledge: {
+        "Agaricus bisporus": { edibility: Edibility.Edible, notes: "Safe." },
+        "Amanita phalloides": { edibility: Edibility.Edible, notes: "Safe." },
+        "Russula emetica": { edibility: Edibility.Edible, notes: "Safe." },
+      },
+    };
     const logits = new Float32Array([1.0, 1.0, 1.0]);
-    const report = generatePredictionReport(logits, makeMockModel());
+    const report = generatePredictionReport(logits, allEdibleModel);
     expect(report.requiresWarning).toBe(true);
     expect(report.warningMessage).toBe(
       "Low confidence — do not act on this prediction.",
@@ -61,8 +71,18 @@ describe("generatePredictionReport", () => {
   });
 
   it("sets no warning for high confidence edible prediction", () => {
+    // Use an all-edible model so the no-warning path is exercised without a
+    // toxic-lookalike trigger.
+    const allEdibleModel: ModelRegistryEntry = {
+      ...makeMockModel(),
+      knowledge: {
+        "Agaricus bisporus": { edibility: Edibility.Edible, notes: "Safe." },
+        "Amanita phalloides": { edibility: Edibility.Edible, notes: "Safe." },
+        "Russula emetica": { edibility: Edibility.Edible, notes: "Safe." },
+      },
+    };
     const logits = new Float32Array([10.0, 1.0, 0.5]);
-    const report = generatePredictionReport(logits, makeMockModel());
+    const report = generatePredictionReport(logits, allEdibleModel);
     expect(report.requiresWarning).toBe(false);
     expect(report.confidence.reliability).toBe("high");
   });
@@ -109,6 +129,23 @@ describe("generatePredictionReport", () => {
     expect(report.hasRiskInTop3).toBe(true);
     expect(report.confidence.score).toBeGreaterThanOrEqual(0.5);
     expect(report.confidence.score).toBeLessThan(0.75);
+    expect(report.requiresWarning).toBe(true);
+    expect(report.warningMessage).toBe(
+      "Cannot rule out a toxic lookalike. Do not consume. Always verify with a certified expert.",
+    );
+  });
+
+  it("warns about toxic lookalike at high confidence when poisonous species ranks 2 or 3", () => {
+    // Top-1 is edible with very high confidence, but a poisonous species is in
+    // the top 3. The lookalike warning must fire regardless of top-1
+    // confidence because confidence in the edible class is not evidence against
+    // a dangerous neighbor.
+    const logits = new Float32Array([10.0, 1.0, 0.5]);
+    const report = generatePredictionReport(logits, makeMockModel());
+    expect(report.top1Species).toBe("Agaricus bisporus");
+    expect(report.top1Knowledge.edibility).toBe(Edibility.Edible);
+    expect(report.confidence.reliability).toBe("high");
+    expect(report.hasRiskInTop3).toBe(true);
     expect(report.requiresWarning).toBe(true);
     expect(report.warningMessage).toBe(
       "Cannot rule out a toxic lookalike. Do not consume. Always verify with a certified expert.",

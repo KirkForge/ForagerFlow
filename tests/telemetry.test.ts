@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { recordTelemetry, setTelemetryEnabled } from "@/core/telemetry";
+import { logger } from "@/core/logger";
 import { config } from "@/core/config";
 
 describe("telemetry", () => {
@@ -75,7 +76,8 @@ describe("telemetry", () => {
     const originalEndpoint = config.telemetryEndpoint;
     (config as { telemetryEndpoint: string }).telemetryEndpoint = "";
     recordTelemetry("no.endpoint");
-    (config as { telemetryEndpoint: string }).telemetryEndpoint = originalEndpoint;
+    (config as { telemetryEndpoint: string }).telemetryEndpoint =
+      originalEndpoint;
 
     expect(sendBeacon).not.toHaveBeenCalled();
   });
@@ -97,6 +99,43 @@ describe("telemetry", () => {
       recordTelemetry("beacon.throws");
     }).not.toThrow();
 
-    (config as { telemetryEndpoint: string }).telemetryEndpoint = originalEndpoint;
+    (config as { telemetryEndpoint: string }).telemetryEndpoint =
+      originalEndpoint;
+  });
+
+  it("redacts sensitive telemetry values", () => {
+    const debugSpy = vi.spyOn(logger, "debug").mockImplementation(() => {});
+    recordTelemetry("beacon.test", {
+      image: "data:image/png;base64,ABC",
+      location: "55.6761,12.5683",
+      long: "x".repeat(500),
+      safe: "ok",
+    });
+
+    const [, data] = debugSpy.mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(data["image"]).toBe("[REDACTED]");
+    expect(data["location"]).toBe("[REDACTED]");
+    expect(data["long"]).toHaveLength(256);
+    expect(data["safe"]).toBe("ok");
+  });
+
+  it("scopes web-vital events to known fields", () => {
+    const debugSpy = vi.spyOn(logger, "debug").mockImplementation(() => {});
+    recordTelemetry("web-vital", {
+      name: "LCP",
+      value: 123,
+      extra: "should be dropped",
+    });
+
+    const [, data] = debugSpy.mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(data["name"]).toBe("LCP");
+    expect(data["value"]).toBe(123);
+    expect(data["extra"]).toBeUndefined();
   });
 });

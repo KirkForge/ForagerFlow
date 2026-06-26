@@ -6,10 +6,9 @@ import { flushPromises } from "./helpers/promises";
 
 describe("SafetyUI", () => {
   let onAcknowledged: () => void;
-  let storageHandler: ((payload: {
-    modelKey: ModelKey;
-    freeBytes: number;
-  }) => void) | null = null;
+  let storageHandler:
+    | ((payload: { modelKey: ModelKey; freeBytes: number }) => void)
+    | null = null;
   const inferenceService = {
     onStorageConfirm: vi.fn((handler) => {
       storageHandler = handler as (payload: {
@@ -95,7 +94,9 @@ describe("SafetyUI", () => {
 
     const initPromise = ui.init();
     const form = document.querySelector("#safety-form") as HTMLFormElement;
-    form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    form.dispatchEvent(
+      new Event("submit", { bubbles: true, cancelable: true }),
+    );
     await initPromise;
 
     expect(localStorage.getItem("ff:safety-ack-v1")).toBe("1");
@@ -133,7 +134,9 @@ describe("SafetyUI", () => {
     const ui = newSafetyUI();
     await ui.init();
 
-    const modal = document.querySelector("#clear-confirm-modal") as HTMLDialogElement;
+    const modal = document.querySelector(
+      "#clear-confirm-modal",
+    ) as HTMLDialogElement;
     const accept = modal.querySelector("[value='accept']") as HTMLButtonElement;
 
     const resultPromise = ui.confirmClearHistory();
@@ -147,7 +150,9 @@ describe("SafetyUI", () => {
     const ui = newSafetyUI();
     await ui.init();
 
-    const modal = document.querySelector("#clear-confirm-modal") as HTMLDialogElement;
+    const modal = document.querySelector(
+      "#clear-confirm-modal",
+    ) as HTMLDialogElement;
     const cancel = modal.querySelector("[value='cancel']") as HTMLButtonElement;
 
     const resultPromise = ui.confirmClearHistory();
@@ -190,7 +195,9 @@ describe("SafetyUI", () => {
     accept.click();
     await flushPromises();
 
-    expect(inferenceService.preloadModel).toHaveBeenCalledWith(ModelKey.Dima806);
+    expect(inferenceService.preloadModel).toHaveBeenCalledWith(
+      ModelKey.Dima806,
+    );
     expect(select.value).toBe(ModelKey.Dima806);
     expect(localStorage.getItem("ff:dima-confirm-v1")).toBe("1");
   });

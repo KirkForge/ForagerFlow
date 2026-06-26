@@ -4,6 +4,7 @@ import type { ModelRegistryEntry } from "@/core/types";
 import { sanitizeText } from "@/core/sanitize";
 import { t } from "@/i18n";
 import { getLocalizedNotes } from "@/i18n/knowledge";
+import { createEl, hide, show } from "@/ui/utils";
 
 export interface ResultsRendererOptions {
   onPredictionClick?: (label: string) => void;
@@ -41,8 +42,8 @@ export class ResultsRenderer {
   clear(): void {
     this.predictionsEl.innerHTML = "";
     this.knowledgeEl.innerHTML = "";
-    this.knowledgeEl.style.display = "none";
-    this.warningEl.style.display = "none";
+    hide(this.knowledgeEl);
+    hide(this.warningEl);
     this.compareActive = false;
     this.selectedLabels.clear();
   }
@@ -54,14 +55,14 @@ export class ResultsRenderer {
 
     if (report.requiresWarning && report.warningMessage) {
       this.warningEl.textContent = report.warningMessage;
-      this.warningEl.style.display = "block";
+      show(this.warningEl);
     }
 
     const toolbar = this.renderCompareToolbar();
-    const predictionsHtml = report.predictions
-      .map((item) => this.renderPrediction(item, model))
-      .join("");
-    this.predictionsEl.innerHTML = toolbar + predictionsHtml;
+    this.predictionsEl.appendChild(toolbar);
+    for (const item of report.predictions) {
+      this.predictionsEl.appendChild(this.renderPrediction(item, model));
+    }
 
     const top = report.predictions[0];
     if (top) {
@@ -72,19 +73,26 @@ export class ResultsRenderer {
       const verifyUrl = new URL("https://www.google.com/search");
       verifyUrl.searchParams.set("q", `${top.label} mushroom identification`);
 
-      this.knowledgeEl.innerHTML = `
-        <h3>${sanitizeText(top.label)}</h3>
-        <p>${sanitizeText(getLocalizedNotes(k))}</p>
-        <a class="verify-link" target="_blank" rel="noopener noreferrer" href="${verifyUrl.toString()}">${t("prediction.verifyOnline")}</a>
-      `;
-      const verify = this.knowledgeEl.querySelector(".verify-link");
-      if (verify) {
-        verify.setAttribute(
-          "aria-label",
-          t("prediction.verifyAriaLabel", { species: top.label }),
-        );
-      }
-      this.knowledgeEl.style.display = "block";
+      this.knowledgeEl.appendChild(createEl("h3", "", top.label));
+      this.knowledgeEl.appendChild(
+        createEl("p", "", getLocalizedNotes(k) || t("knowledge.noData")),
+      );
+
+      const verify = createEl(
+        "a",
+        "verify-link",
+        t("prediction.verifyOnline"),
+      ) as HTMLAnchorElement;
+      verify.href = verifyUrl.toString();
+      verify.target = "_blank";
+      verify.rel = "noopener noreferrer";
+      verify.setAttribute(
+        "aria-label",
+        t("prediction.verifyAriaLabel", { species: top.label }),
+      );
+      this.knowledgeEl.appendChild(verify);
+
+      show(this.knowledgeEl);
       if (this.onPredictionClick) {
         this.knowledgeEl.style.cursor = "pointer";
         this.knowledgeEl.setAttribute("role", "button");
@@ -97,25 +105,43 @@ export class ResultsRenderer {
     }
   }
 
-  private renderCompareToolbar(): string {
+  private renderCompareToolbar(): HTMLElement {
     const activeClass = this.compareActive ? "compare-active" : "";
-    const showBtn = this.compareActive
-      ? `<button type="button" id="compare-show" class="compare-show" disabled>${t("comparison.show")}</button>`
-      : "";
-    return `
-      <div class="compare-toolbar ${activeClass}">
-        <button type="button" id="compare-toggle" class="compare-toggle" aria-pressed="${String(this.compareActive)}">
-          ${t("comparison.toggle")}
-        </button>
-        ${showBtn}
-      </div>
-    `;
+    const toolbar = createEl(
+      "div",
+      `compare-toolbar ${activeClass}`.trim(),
+      "",
+    );
+
+    const toggle = createEl(
+      "button",
+      "compare-toggle",
+      t("comparison.toggle"),
+    ) as HTMLButtonElement;
+    toggle.id = "compare-toggle";
+    toggle.type = "button";
+    toggle.setAttribute("aria-pressed", String(this.compareActive));
+    toolbar.appendChild(toggle);
+
+    if (this.compareActive) {
+      const showBtn = createEl(
+        "button",
+        "compare-show",
+        t("comparison.show"),
+      ) as HTMLButtonElement;
+      showBtn.id = "compare-show";
+      showBtn.type = "button";
+      showBtn.disabled = true;
+      toolbar.appendChild(showBtn);
+    }
+
+    return toolbar;
   }
 
   private renderPrediction(
     item: { label: string; probability: number },
     model: ModelRegistryEntry,
-  ): string {
+  ): HTMLElement {
     const k = model.knowledge[item.label] ?? {
       edibility: Edibility.Unknown,
       notes: t("knowledge.noData"),
@@ -130,35 +156,58 @@ export class ResultsRenderer {
         ? t("prediction.unknown")
         : t("prediction.edible");
     const clickable = this.onPredictionClick ? "prediction-clickable" : "";
-    const roleAttr = this.onPredictionClick ? 'role="button"' : "";
-    const tabindexAttr = this.onPredictionClick ? 'tabindex="0"' : "";
-    const ariaLabel = this.onPredictionClick
-      ? sanitizeText(t("prediction.openDetailsAria", { species: item.label }))
-      : "";
-    const ariaAttr = ariaLabel ? `aria-label="${ariaLabel}"` : "";
-    const checkbox = this.compareActive
-      ? `<input type="checkbox" class="compare-checkbox" data-label="${sanitizeText(item.label)}" aria-label="${sanitizeText(t("comparison.selectAria", { species: item.label }))}" />`
-      : "";
 
-    return `
-      <div class="prediction ${clickable}" data-label="${sanitizeText(item.label)}" ${roleAttr} ${tabindexAttr} ${ariaAttr}>
-        ${checkbox}
-        <div class="label">
-          <div class="prediction-name">${sanitizeText(item.label)}</div>
-          <div class="prediction-edibility ${edClass}">${edText}</div>
-        </div>
-        <div class="bar-wrap">
-          <div class="bar" style="width: ${pct}%"></div>
-        </div>
-        <div class="pct">${pct}%</div>
-      </div>
-    `;
+    const row = createEl(
+      "div",
+      ["prediction", clickable].filter(Boolean).join(" "),
+    );
+    row.setAttribute("data-label", item.label);
+    if (this.onPredictionClick) {
+      row.setAttribute("role", "button");
+      row.setAttribute("tabindex", "0");
+      row.setAttribute(
+        "aria-label",
+        t("prediction.openDetailsAria", { species: item.label }),
+      );
+    }
+
+    if (this.compareActive) {
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.className = "compare-checkbox";
+      checkbox.setAttribute("data-label", item.label);
+      checkbox.setAttribute(
+        "aria-label",
+        t("comparison.selectAria", { species: item.label }),
+      );
+      row.appendChild(checkbox);
+    }
+
+    const labelWrap = createEl("div", "label");
+    labelWrap.appendChild(createEl("div", "prediction-name", item.label));
+    labelWrap.appendChild(
+      createEl("div", `prediction-edibility ${edClass}`, edText),
+    );
+    row.appendChild(labelWrap);
+
+    const barWrap = createEl("div", "bar-wrap");
+    const bar = createEl("div", "bar");
+    bar.style.width = `${pct}%`;
+    barWrap.appendChild(bar);
+    row.appendChild(barWrap);
+
+    row.appendChild(createEl("div", "pct", `${pct}%`));
+    return row;
   }
 
   private bindPredictionClicks(): void {
     this.predictionsEl.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
-      if (target.closest(".compare-checkbox") || target.closest(".compare-toggle") || target.closest(".compare-show")) {
+      if (
+        target.closest(".compare-checkbox") ||
+        target.closest(".compare-toggle") ||
+        target.closest(".compare-show")
+      ) {
         return;
       }
       const prediction = target.closest("[data-label]");
@@ -230,7 +279,7 @@ export class ResultsRenderer {
   private refreshToolbar(): void {
     const toolbar = this.predictionsEl.querySelector(".compare-toolbar");
     if (!toolbar) return;
-    toolbar.outerHTML = this.renderCompareToolbar();
+    toolbar.replaceWith(this.renderCompareToolbar());
     this.updatePredictionCheckboxes();
   }
 
@@ -261,7 +310,9 @@ export class ResultsRenderer {
     const showBtn = this.predictionsEl.querySelector("#compare-show");
     if (!(showBtn instanceof HTMLButtonElement)) return;
     showBtn.disabled = this.selectedLabels.size < 2;
-    showBtn.textContent = t("comparison.show", { count: String(this.selectedLabels.size) });
+    showBtn.textContent = t("comparison.show", {
+      count: String(this.selectedLabels.size),
+    });
   }
 
   private emitComparisonChange(): void {
@@ -277,7 +328,9 @@ export class ResultsRenderer {
       msg.className = "compare-max-msg";
       toolbar.appendChild(msg);
     }
-    msg.textContent = t("comparison.maxReached", { max: String(this.maxCompare) });
+    msg.textContent = t("comparison.maxReached", {
+      max: String(this.maxCompare),
+    });
     window.setTimeout(() => {
       msg.remove();
     }, 2000);

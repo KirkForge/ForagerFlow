@@ -69,8 +69,8 @@ export class SafetyUI {
         } catch (err) {
           logger.warn("Could not persist safety acknowledgement:", err);
         }
-        this.els.safetyModal.removeEventListener("cancel", onCancel);
         this.els.safetyModal.close();
+        this.els.safetyModal.removeEventListener("cancel", onCancel);
         resolve();
       };
       const onCancel = (e: Event) => {

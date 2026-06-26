@@ -40,6 +40,10 @@ export const enMessages: Messages = {
   "status.exportHistoryError": "Failed to export history.",
   "status.historyImported": "Imported {{count}} history entries.",
   "status.importHistoryError": "Failed to import history.",
+  "status.inferenceError": "Identification failed. Please try again.",
+  "status.modelLoadError": "Could not load the model. Check your connection.",
+  "status.labelMismatchError":
+    "Model output does not match labels. Please reload.",
 
   // Results
   "results.region": "Inference results",

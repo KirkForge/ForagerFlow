@@ -136,7 +136,12 @@ function validateHistoryEntry(raw: unknown, index: number): HistoryEntry {
   const entry = raw as Record<string, unknown>;
 
   const id = entry["id"];
-  if (typeof id !== "string" || id.length === 0) {
+  if (
+    typeof id !== "string" ||
+    id.length === 0 ||
+    id.length > 64 ||
+    !/^[\w-]+$/.test(id)
+  ) {
     throw new Error(`History entry ${String(index + 1)} has invalid id`);
   }
 
@@ -153,7 +158,11 @@ function validateHistoryEntry(raw: unknown, index: number): HistoryEntry {
   }
 
   const top1Species = entry["top1Species"];
-  if (typeof top1Species !== "string" || top1Species.length === 0) {
+  if (
+    typeof top1Species !== "string" ||
+    top1Species.length === 0 ||
+    top1Species.length > 128
+  ) {
     throw new Error(
       `History entry ${String(index + 1)} has invalid top1Species`,
     );
@@ -185,6 +194,20 @@ function validateHistoryEntry(raw: unknown, index: number): HistoryEntry {
     );
   }
 
+  if (predictions.length > 0) {
+    const top1 = predictions[0];
+    if (top1?.label !== top1Species) {
+      throw new Error(
+        `History entry ${String(index + 1)} top1Species does not match predictions[0]`,
+      );
+    }
+    if (Math.abs(top1.probability - top1Probability) > 1e-9) {
+      throw new Error(
+        `History entry ${String(index + 1)} top1Probability does not match predictions[0]`,
+      );
+    }
+  }
+
   const thumbnail = entry["thumbnail"];
   if (!isDataUrlThumbnail(thumbnail)) {
     throw new Error(
@@ -193,7 +216,7 @@ function validateHistoryEntry(raw: unknown, index: number): HistoryEntry {
   }
 
   const notes = entry["notes"];
-  const notesString = typeof notes === "string" ? notes : "";
+  const notesString = typeof notes === "string" ? notes.slice(0, 1000) : "";
 
   const location = entry["location"];
   const validLocation = isValidLocation(location) ? location : undefined;
@@ -395,13 +418,10 @@ export async function importHistory(json: string): Promise<number> {
   const tx = db.transaction(STORE_NAME, "readwrite");
   const store = tx.objectStore(STORE_NAME);
   let imported = 0;
-  for (const [index, raw] of entries.entries()) {
-    const entry = validateHistoryEntry(raw, index);
-    store.put(entry);
-    imported++;
-  }
 
-  await new Promise<void>((resolve, reject) => {
+  let rejectImport!: (reason: Error) => void;
+  const completion = new Promise<void>((resolve, reject) => {
+    rejectImport = reject;
     tx.oncomplete = () => {
       resolve();
     };
@@ -412,6 +432,19 @@ export async function importHistory(json: string): Promise<number> {
       reject(new Error("IDB import aborted"));
     };
   });
+
+  for (const [index, raw] of entries.entries()) {
+    const entry = validateHistoryEntry(raw, index);
+    const request = store.put(entry);
+    request.onerror = () => {
+      rejectImport(
+        new Error(request.error?.message ?? "IDB import put failed"),
+      );
+    };
+    imported++;
+  }
+
+  await completion;
 
   await recordBackupTimestamp(new Date().toISOString());
   return imported;

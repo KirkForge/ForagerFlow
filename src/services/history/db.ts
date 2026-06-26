@@ -104,6 +104,9 @@ export async function setMeta(key: string, value: unknown): Promise<void> {
     tx.oncomplete = () => {
       resolve();
     };
+    tx.onabort = () => {
+      reject(new Error("IDB meta transaction aborted"));
+    };
     request.onerror = () => {
       reject(new Error(request.error?.message ?? "IDB meta write failed"));
     };

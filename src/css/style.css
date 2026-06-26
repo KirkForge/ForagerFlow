@@ -13,6 +13,12 @@
   --radius-sm: 4px;
 }
 
+/* Strong hide helpers so they override element-specific display rules. */
+[hidden],
+.hidden {
+  display: none !important;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -53,6 +59,10 @@ header h1 {
   margin: 0;
   font-size: 18px;
   letter-spacing: 0.5px;
+}
+
+header .header-logo {
+  font-size: 20px;
 }
 
 header .badge {
@@ -122,7 +132,9 @@ video {
   backdrop-filter: blur(4px);
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-  transition: transform 0.1s ease, background 0.15s ease;
+  transition:
+    transform 0.1s ease,
+    background 0.15s ease;
 }
 
 #capture-btn:focus-visible {
@@ -150,7 +162,9 @@ video {
   line-height: 1;
   cursor: pointer;
   backdrop-filter: blur(4px);
-  transition: background 0.15s ease, transform 0.1s ease;
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease;
 }
 
 #torch-btn[hidden] {
@@ -182,7 +196,10 @@ video {
   transform: translate(-50%, -50%) scale(0.8);
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    visibility 0.2s ease,
+    transform 0.2s ease;
   z-index: 3;
 }
 
@@ -391,7 +408,9 @@ video {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.15s ease, transform 0.1s ease;
+  transition:
+    opacity 0.15s ease,
+    transform 0.1s ease;
 }
 
 #recapture-btn[hidden] {

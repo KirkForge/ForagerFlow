@@ -1,10 +1,7 @@
 /// <reference lib="webworker" />
 
 import { config } from "@/core/config";
-import {
-  createRangedResponse,
-  hasEnoughStorageToCache,
-} from "@/sw-utils";
+import { createRangedResponse, hasEnoughStorageToCache } from "@/sw-utils";
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -32,7 +29,25 @@ self.addEventListener("install", (e: ExtendableEvent) => {
   e.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_SHELL);
-      await cache.addAll(SHELL_ASSETS);
+      // Cache shell assets individually so a single 404 does not abort the
+      // whole install. Non-critical assets missing degrades offline experience
+      // but keeps the service worker active.
+      await Promise.all(
+        SHELL_ASSETS.map(async (url) => {
+          try {
+            const response = await fetch(url);
+            if (response.ok) {
+              await cache.put(url, response);
+            } else {
+              console.warn(
+                `[FORAGERFLOW SW] Shell asset ${url} returned ${String(response.status)}`,
+              );
+            }
+          } catch (err) {
+            console.warn(`[FORAGERFLOW SW] Failed to cache ${url}:`, err);
+          }
+        }),
+      );
     })(),
   );
   void self.skipWaiting();
@@ -93,11 +108,16 @@ async function handleNavigation(req: Request): Promise<Response> {
   try {
     const networkRes = await fetch(req);
     if (networkRes.ok) {
+      // Store both keys so requests to / and /index.html both resolve offline.
       await cache.put("/index.html", networkRes.clone());
+      await cache.put("/", networkRes.clone());
     }
     return networkRes;
   } catch {
-    const cached = await cache.match("/index.html");
+    const cached =
+      (await cache.match(req.url)) ??
+      (await cache.match("/index.html")) ??
+      (await cache.match("/"));
     if (cached) return cached;
     return handleOfflineFallback();
   }

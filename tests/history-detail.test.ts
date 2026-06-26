@@ -54,12 +54,12 @@ describe("HistoryDetailPanel", () => {
     ) as HTMLDialogElement;
     expect(modal.open).toBe(true);
 
-    expect(
-      document.querySelector("#history-detail-title")?.textContent,
-    ).toBe("Agaricus bisporus");
-    expect(
-      document.querySelector("#history-detail-notes")?.textContent,
-    ).toBe("Safe.");
+    expect(document.querySelector("#history-detail-title")?.textContent).toBe(
+      "Agaricus bisporus",
+    );
+    expect(document.querySelector("#history-detail-notes")?.textContent).toBe(
+      "Safe.",
+    );
     const meta = document.querySelector("#history-detail-meta") as HTMLElement;
     expect(meta.textContent).toContain("Edible");
     expect(meta.textContent).toContain("Confidence: 87.0%");

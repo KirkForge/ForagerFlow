@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#0f1115" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; font-src 'self'"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; font-src 'self'"
     />
     <title>ForagerFlow</title>
     <link rel="manifest" href="/manifest.webmanifest" />
@@ -15,7 +15,7 @@
   <body>
     <div id="app" aria-label="ForagerFlow svampeidentifikation">
       <header role="banner">
-        <span aria-hidden="true" style="font-size: 20px">&#127812;</span>
+        <span aria-hidden="true" class="header-logo">&#127812;</span>
         <h1>ForagerFlow</h1>
         <span id="badge" class="badge" role="status" aria-live="polite"
           >Online</span
@@ -36,7 +36,7 @@
         id="last-result"
         role="region"
         aria-label="Seneste identifikation"
-        style="display: none"
+        class="hidden"
       ></div>
 
       <div id="camera-wrap" role="region" aria-label="Kameravisning">
@@ -72,7 +72,7 @@
           id="camera-error"
           role="alert"
           aria-live="assertive"
-          style="display: none"
+          class="hidden"
         >
           <p>Kameraet er ikke tilgængeligt.</p>
           <button
@@ -120,17 +120,15 @@
         </div>
         <div
           id="knowledge"
-          class="knowledge"
+          class="knowledge hidden"
           role="region"
           aria-label="Artens detaljer"
-          style="display: none"
         ></div>
         <div
           id="warning"
-          class="warning"
+          class="warning hidden"
           role="alert"
           aria-live="assertive"
-          style="display: none"
         ></div>
       </div>
 
@@ -153,7 +151,7 @@
               id="history-import-input"
               accept="application/json"
               aria-label="Historik-sikkerhedskopi"
-              style="display: none"
+              hidden
             />
           </div>
           <button id="history-clear" aria-label="Ryd al historik">Ryd</button>
@@ -215,7 +213,7 @@
         href="https://www.giftlinjen.dk/"
         target="_blank"
         rel="noopener noreferrer"
-        style="display: none"
+        class="hidden"
         >Giftlinjen</a
       >
     </div>

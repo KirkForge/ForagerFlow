@@ -438,7 +438,8 @@ describe("InferenceService", () => {
     expect(worker.terminate).toHaveBeenCalled();
     expect(service.isReady()).toBe(false);
 
-    (config as { modelIdleUnloadMs: number }).modelIdleUnloadMs = originalIdleMs;
+    (config as { modelIdleUnloadMs: number }).modelIdleUnloadMs =
+      originalIdleMs;
   });
 
   it("resets the idle timer on inference", () => {
@@ -461,7 +462,8 @@ describe("InferenceService", () => {
     vi.advanceTimersByTime(20);
     expect(worker.terminate).toHaveBeenCalled();
 
-    (config as { modelIdleUnloadMs: number }).modelIdleUnloadMs = originalIdleMs;
+    (config as { modelIdleUnloadMs: number }).modelIdleUnloadMs =
+      originalIdleMs;
   });
 
   it("does not unload the worker when idle timeout is disabled", () => {
@@ -479,7 +481,8 @@ describe("InferenceService", () => {
     vi.advanceTimersByTime(1000);
     expect(worker.terminate).not.toHaveBeenCalled();
 
-    (config as { modelIdleUnloadMs: number }).modelIdleUnloadMs = originalIdleMs;
+    (config as { modelIdleUnloadMs: number }).modelIdleUnloadMs =
+      originalIdleMs;
   });
 
   it("preloads a model by spawning the worker and switching", () => {
@@ -544,7 +547,9 @@ describe("InferenceService", () => {
   });
 
   it("warns when resuming storage confirmation with none pending", () => {
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    const warnSpy = vi
+      .spyOn(logger, "warn")
+      .mockImplementation(() => undefined);
     service.initialize();
     service.resumeStorageConfirm();
     expect(warnSpy).toHaveBeenCalledWith(

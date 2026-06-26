@@ -110,11 +110,9 @@ describe("i18n", () => {
     setLocale("en", false);
     applyStaticI18n();
 
-    const [title, aria, keep] = Array.from(document.querySelectorAll("span")) as [
-      HTMLSpanElement,
-      HTMLSpanElement,
-      HTMLSpanElement,
-    ];
+    const [title, aria, keep] = Array.from(
+      document.querySelectorAll("span"),
+    ) as [HTMLSpanElement, HTMLSpanElement, HTMLSpanElement];
     expect(title.textContent).toBe("History");
     expect(aria.getAttribute("aria-label")).toBe("ForagerFlow");
     expect(keep.textContent).toBe("keep");
