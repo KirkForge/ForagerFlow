@@ -106,3 +106,69 @@ jobs:
             "dist/twa/foragerflow-release-unsigned.apk" \
             "foragerflow-${{ github.ref_name }}-sbom.json" \
             --clobber
+
+      # ── gap #5: APK signing + Play Console upload ───────────────────────────
+      # Defensive: every step below is gated on the signing keystore secret
+      # being present, so a release with no secrets configured behaves exactly
+      # as before (unsigned APK + tar + SBOM already uploaded above). To enable
+      # signing + Play upload, set these repo secrets:
+      #   ANDROID_KEYSTORE_BASE64    base64-encoded .keystore / .jks
+      #   ANDROID_KEYSTORE_PASSWORD  keystore password
+      #   ANDROID_KEY_ALIAS          key alias
+      #   ANDROID_KEY_PASSWORD       key password
+      #   PLAY_SERVICE_ACCOUNT_JSON  Play Console service account JSON (Play only)
+      - name: Decode signing keystore
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/foragerflow.keystore"
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/foragerflow.keystore" >> "$GITHUB_ENV"
+
+      - name: Sign APK
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          # ponytail: apksigner ships in Android build-tools; pick the newest.
+          APKSIGNER="$(find "$ANDROID_SDK_ROOT/build-tools" -name apksigner -type f | sort -V | tail -1)"
+          test -x "$APKSIGNER" || { echo "apksigner not found"; exit 1; }
+          UNSIGNED="dist/twa/foragerflow-release-unsigned.apk"
+          SIGNED="dist/twa/foragerflow-release-signed.apk"
+          cp "$UNSIGNED" "$SIGNED"
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE_PATH" \
+            --ks-pass "pass:$ANDROID_KEYSTORE_PASSWORD" \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --key-pass "pass:$ANDROID_KEY_PASSWORD" \
+            "$SIGNED"
+          "$APKSIGNER" verify --print-certs "$SIGNED" | head -5
+
+      - name: Attach signed APK to release
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.ref_name }}" \
+            "dist/twa/foragerflow-release-signed.apk" --clobber
+
+      - name: Write Play service account key
+        if: ${{ env.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/play-sa.json"
+          echo "PLAY_SA_PATH=$RUNNER_TEMP/play-sa.json" >> "$GITHUB_ENV"
+
+      - name: Upload to Google Play (internal track)
+        if: ${{ env.PLAY_SA_PATH != '' }}
+        uses: google-github-actions/upload-to-play@v1
+        with:
+          serviceAccountJson: ${{ env.PLAY_SA_PATH }}
+          packageName: com.kirkforge.foragerflow
+          releaseFiles: dist/twa/foragerflow-release-signed.apk
+          track: internal
