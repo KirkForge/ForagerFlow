@@ -102,7 +102,7 @@
         <div id="status" class="status" role="status" aria-live="polite">
           Indlæser...
         </div>
-        <div id="predictions" aria-label="Top forslag" aria-live="polite"></div>
+        <div id="predictions" role="status" aria-label="Top forslag"></div>
         <button
           id="recapture-btn"
           type="button"
@@ -195,7 +195,11 @@
             aria-live="polite"
           ></span>
         </div>
-        <div id="history-list" aria-label="Tidligere identifikationer"></div>
+        <div
+          id="history-list"
+          role="region"
+          aria-label="Tidligere identifikationer"
+        ></div>
       </div>
     </div>
 
