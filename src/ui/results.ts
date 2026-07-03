@@ -313,7 +313,6 @@ export class ResultsRenderer {
     });
   }
 
-
   private showMaxReached(): void {
     const toolbar = this.predictionsEl.querySelector(".compare-toolbar");
     if (!toolbar) return;
@@ -339,5 +338,4 @@ export class ResultsRenderer {
       }
     });
   }
-
 }

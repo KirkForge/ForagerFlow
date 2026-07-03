@@ -166,9 +166,7 @@ describe("telemetry", () => {
       const originalEndpoint = config.telemetryEndpoint;
       (config as { telemetryEndpoint: string }).telemetryEndpoint =
         "/api/telemetry";
-      const debugSpy = vi
-        .spyOn(logger, "debug")
-        .mockImplementation(() => {});
+      const debugSpy = vi.spyOn(logger, "debug").mockImplementation(() => {});
       recordCrash(new Error("boom"), "AppController.init");
       (config as { telemetryEndpoint: string }).telemetryEndpoint =
         originalEndpoint;
@@ -189,7 +187,8 @@ describe("telemetry", () => {
       const err = new Error(
         "failed data:image/png;base64,ABC at 55.6761,12.5683",
       );
-      err.stack = "Error: failed data:image/png;base64,XYZ\n  at 55.6761,12.5683";
+      err.stack =
+        "Error: failed data:image/png;base64,XYZ\n  at 55.6761,12.5683";
       recordCrash(err);
       const [, data] = debugSpy.mock.calls.find(
         (c) => (c[0] as string) === "Telemetry: crash",

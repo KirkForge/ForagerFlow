@@ -15,14 +15,46 @@ export class HistoryDetailPanel {
   private readonly closeBtn: HTMLButtonElement;
 
   constructor(root: HTMLElement | Document = document) {
-    this.modal = requireElement("#history-detail-modal", root, "HistoryDetailPanel");
-    this.title = requireElement("#history-detail-title", root, "HistoryDetailPanel");
-    this.thumbnail = requireElement("#history-detail-thumbnail", root, "HistoryDetailPanel");
-    this.meta = requireElement("#history-detail-meta", root, "HistoryDetailPanel");
-    this.notes = requireElement("#history-detail-notes", root, "HistoryDetailPanel");
-    this.safety = requireElement("#history-detail-safety", root, "HistoryDetailPanel");
-    this.verify = requireElement("#history-detail-verify", root, "HistoryDetailPanel");
-    this.closeBtn = requireElement("#history-detail-close", root, "HistoryDetailPanel");
+    this.modal = requireElement(
+      "#history-detail-modal",
+      root,
+      "HistoryDetailPanel",
+    );
+    this.title = requireElement(
+      "#history-detail-title",
+      root,
+      "HistoryDetailPanel",
+    );
+    this.thumbnail = requireElement(
+      "#history-detail-thumbnail",
+      root,
+      "HistoryDetailPanel",
+    );
+    this.meta = requireElement(
+      "#history-detail-meta",
+      root,
+      "HistoryDetailPanel",
+    );
+    this.notes = requireElement(
+      "#history-detail-notes",
+      root,
+      "HistoryDetailPanel",
+    );
+    this.safety = requireElement(
+      "#history-detail-safety",
+      root,
+      "HistoryDetailPanel",
+    );
+    this.verify = requireElement(
+      "#history-detail-verify",
+      root,
+      "HistoryDetailPanel",
+    );
+    this.closeBtn = requireElement(
+      "#history-detail-close",
+      root,
+      "HistoryDetailPanel",
+    );
     this.bindClose();
     this.closeBtn.setAttribute("aria-label", t("history.detail.closeAria"));
   }
@@ -158,5 +190,4 @@ export class HistoryDetailPanel {
         return t("prediction.edible");
     }
   }
-
 }

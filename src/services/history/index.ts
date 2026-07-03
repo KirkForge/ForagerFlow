@@ -6,11 +6,7 @@ import type {
 } from "@/core/types";
 import { logger } from "@/core/logger";
 import { openDB, withTransaction, setMeta, STORE_NAME } from "./db";
-import {
-  encryptBackup,
-  decryptBackup,
-  isEncryptedEnvelope,
-} from "./crypto";
+import { encryptBackup, decryptBackup, isEncryptedEnvelope } from "./crypto";
 
 export { isEncryptedEnvelope } from "./crypto";
 

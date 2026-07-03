@@ -696,7 +696,9 @@ describe("AppController", () => {
     await flushPromises();
 
     // Passphrase modal is open; type a passphrase and submit.
-    const input = document.querySelector("#passphrase-input") as HTMLInputElement;
+    const input = document.querySelector(
+      "#passphrase-input",
+    ) as HTMLInputElement;
     const form = document.querySelector("#passphrase-form") as HTMLFormElement;
     input.value = "hunter2";
     form.dispatchEvent(new Event("submit", { cancelable: true }));
@@ -708,9 +710,8 @@ describe("AppController", () => {
   });
 
   it("imports an encrypted backup by prompting for a passphrase", async () => {
-    const { importHistory, isEncryptedEnvelope } = await import(
-      "@/services/history"
-    );
+    const { importHistory, isEncryptedEnvelope } =
+      await import("@/services/history");
     vi.mocked(isEncryptedEnvelope).mockReturnValueOnce(true);
     const fileText = '{"v":1,"kdf":"PBKDF2-SHA256","ct":"x"}';
     const file = new File([fileText], "backup.json", {

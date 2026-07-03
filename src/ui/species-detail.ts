@@ -18,13 +18,41 @@ export class SpeciesDetailPanel {
   private readonly closeBtn: HTMLButtonElement;
 
   constructor(root: HTMLElement | Document = document) {
-    this.modal = requireElement("#species-detail-modal", root, "SpeciesDetailPanel");
-    this.title = requireElement("#species-detail-title", root, "SpeciesDetailPanel");
-    this.meta = requireElement("#species-detail-meta", root, "SpeciesDetailPanel");
-    this.notes = requireElement("#species-detail-notes", root, "SpeciesDetailPanel");
-    this.safety = requireElement("#species-detail-safety", root, "SpeciesDetailPanel");
-    this.verify = requireElement("#species-detail-verify", root, "SpeciesDetailPanel");
-    this.closeBtn = requireElement("#species-detail-close", root, "SpeciesDetailPanel");
+    this.modal = requireElement(
+      "#species-detail-modal",
+      root,
+      "SpeciesDetailPanel",
+    );
+    this.title = requireElement(
+      "#species-detail-title",
+      root,
+      "SpeciesDetailPanel",
+    );
+    this.meta = requireElement(
+      "#species-detail-meta",
+      root,
+      "SpeciesDetailPanel",
+    );
+    this.notes = requireElement(
+      "#species-detail-notes",
+      root,
+      "SpeciesDetailPanel",
+    );
+    this.safety = requireElement(
+      "#species-detail-safety",
+      root,
+      "SpeciesDetailPanel",
+    );
+    this.verify = requireElement(
+      "#species-detail-verify",
+      root,
+      "SpeciesDetailPanel",
+    );
+    this.closeBtn = requireElement(
+      "#species-detail-close",
+      root,
+      "SpeciesDetailPanel",
+    );
     this.bindClose();
     this.closeBtn.setAttribute("aria-label", t("detail.closeAria"));
   }
@@ -146,5 +174,4 @@ export class SpeciesDetailPanel {
   private capitalize(value: string): string {
     return value.charAt(0).toUpperCase() + value.slice(1);
   }
-
 }

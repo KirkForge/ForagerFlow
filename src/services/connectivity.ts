@@ -29,8 +29,7 @@ export function updateOnlineStatus(badge: HTMLElement): void {
  * classify.
  */
 export function isCellularConnection(): boolean {
-  const connection = (
-    navigator as { connection?: { type?: string } }
-  ).connection;
+  const connection = (navigator as { connection?: { type?: string } })
+    .connection;
   return connection?.type === "cellular";
 }

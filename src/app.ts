@@ -99,7 +99,11 @@ export class AppController {
     this.focusReticle = document.querySelector<HTMLElement>("#focus-reticle");
     this.recaptureBtn =
       document.querySelector<HTMLButtonElement>("#recapture-btn");
-    this.progressEl = requireElement("#model-progress", document, "AppController");
+    this.progressEl = requireElement(
+      "#model-progress",
+      document,
+      "AppController",
+    );
     this.progressTextEl = requireElement(
       "#model-progress-text",
       document,
@@ -811,18 +815,18 @@ export class AppController {
   // form submit + Esc-cancel) so no new UI machinery. Resolves the entered
   // string, or null when the user cancels.
   private promptPassphrase(): Promise<string | null> {
-    const modal = document.getElementById("passphrase-modal") as
-      | HTMLDialogElement
-      | null;
-    const input = document.getElementById("passphrase-input") as
-      | HTMLInputElement
-      | null;
-    const form = document.getElementById("passphrase-form") as
-      | HTMLFormElement
-      | null;
-    const cancel = document.getElementById("passphrase-cancel") as
-      | HTMLButtonElement
-      | null;
+    const modal = document.getElementById(
+      "passphrase-modal",
+    ) as HTMLDialogElement | null;
+    const input = document.getElementById(
+      "passphrase-input",
+    ) as HTMLInputElement | null;
+    const form = document.getElementById(
+      "passphrase-form",
+    ) as HTMLFormElement | null;
+    const cancel = document.getElementById(
+      "passphrase-cancel",
+    ) as HTMLButtonElement | null;
     if (!modal || !input || !form || !cancel) {
       return Promise.resolve(null);
     }
@@ -967,5 +971,4 @@ export class AppController {
       inferenceService.switchModel(ModelKey.BVRA);
     });
   }
-
 }

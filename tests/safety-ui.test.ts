@@ -11,9 +11,8 @@ class MockInferenceService {
   private storageHandler:
     | ((payload: { modelKey: ModelKey; freeBytes: number }) => void)
     | null = null;
-  private networkHandler:
-    | ((payload: { modelKey: ModelKey }) => void)
-    | null = null;
+  private networkHandler: ((payload: { modelKey: ModelKey }) => void) | null =
+    null;
 
   onStorageConfirm(
     handler: (payload: { modelKey: ModelKey; freeBytes: number }) => void,
@@ -428,9 +427,7 @@ describe("SafetyUI", () => {
     const ui = createUI();
     await ui.init();
 
-    const select = document.querySelector(
-      "#model-select",
-    ) as HTMLSelectElement;
+    const select = document.querySelector("#model-select") as HTMLSelectElement;
     select.value = ModelKey.Dima806;
 
     inferenceService.emitNetworkConfirm({ modelKey: ModelKey.Dima806 });

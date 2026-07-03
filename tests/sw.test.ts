@@ -259,7 +259,10 @@ describe("Service Worker", () => {
 
     expect(await response.text()).toBe("cached-js");
     await vi.waitFor(() => {
-      expect(shellCache.put).toHaveBeenCalledWith(request, expect.any(Response));
+      expect(shellCache.put).toHaveBeenCalledWith(
+        request,
+        expect.any(Response),
+      );
     });
   });
 

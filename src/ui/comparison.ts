@@ -19,11 +19,31 @@ export class PredictionComparisonPanel {
   private readonly closeBtn: HTMLButtonElement;
 
   constructor(root: HTMLElement | Document = document) {
-    this.modal = requireElement("#comparison-modal", root, "PredictionComparisonPanel");
-    this.title = requireElement("#comparison-title", root, "PredictionComparisonPanel");
-    this.grid = requireElement("#comparison-grid", root, "PredictionComparisonPanel");
-    this.safety = requireElement("#comparison-safety", root, "PredictionComparisonPanel");
-    this.closeBtn = requireElement("#comparison-close", root, "PredictionComparisonPanel");
+    this.modal = requireElement(
+      "#comparison-modal",
+      root,
+      "PredictionComparisonPanel",
+    );
+    this.title = requireElement(
+      "#comparison-title",
+      root,
+      "PredictionComparisonPanel",
+    );
+    this.grid = requireElement(
+      "#comparison-grid",
+      root,
+      "PredictionComparisonPanel",
+    );
+    this.safety = requireElement(
+      "#comparison-safety",
+      root,
+      "PredictionComparisonPanel",
+    );
+    this.closeBtn = requireElement(
+      "#comparison-close",
+      root,
+      "PredictionComparisonPanel",
+    );
     this.bindClose();
     this.title.textContent = t("comparison.title");
     this.closeBtn.setAttribute("aria-label", t("comparison.closeAria"));
@@ -169,5 +189,4 @@ export class PredictionComparisonPanel {
   private capitalize(value: string): string {
     return value.charAt(0).toUpperCase() + value.slice(1);
   }
-
 }

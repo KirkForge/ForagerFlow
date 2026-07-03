@@ -92,9 +92,7 @@ export async function encryptBackup(
 export function isEncryptedEnvelope(value: string): boolean {
   try {
     const parsed = JSON.parse(value) as Partial<EncryptedEnvelope>;
-    return (
-      parsed.v === 1 && parsed.kdf === "PBKDF2-SHA256" && "ct" in parsed
-    );
+    return parsed.v === 1 && parsed.kdf === "PBKDF2-SHA256" && "ct" in parsed;
   } catch {
     return false;
   }
@@ -129,13 +127,11 @@ export async function decryptBackup(
   const iterations = parsed.iter ?? PBKDF2_ITERATIONS;
   const key = await deriveAesKey(passphrase, salt, iterations);
   try {
-    const pt = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv },
-      key,
-      ct,
-    );
+    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct);
     return new TextDecoder().decode(pt);
   } catch {
-    throw new Error("Could not decrypt backup — wrong passphrase or corrupted file");
+    throw new Error(
+      "Could not decrypt backup — wrong passphrase or corrupted file",
+    );
   }
 }

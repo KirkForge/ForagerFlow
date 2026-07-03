@@ -151,14 +151,14 @@ export function recordCrash(error: unknown, context = ""): void {
 
   const isError = error instanceof Error;
   const message = redactSensitiveSubstrings(
-    truncate(isError ? (error).message : String(error), 512),
+    truncate(isError ? error.message : String(error), 512),
   );
   const stack = isError
-    ? redactSensitiveSubstrings(truncate((error).stack ?? "", 2048))
+    ? redactSensitiveSubstrings(truncate(error.stack ?? "", 2048))
     : null;
 
   const data: Record<string, unknown> = {
-    kind: isError ? (error).constructor.name : "Error",
+    kind: isError ? error.constructor.name : "Error",
     message,
     stack,
     context: redactSensitiveSubstrings(truncate(context, 256)),

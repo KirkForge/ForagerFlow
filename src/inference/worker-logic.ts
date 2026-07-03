@@ -220,7 +220,9 @@ export function createWorker(
       // ask the server for the remainder with a Range request rather than
       // restarting a multi-hundred-MB download from zero.
       const resumeFrom =
-        partial !== null && partial.modelKey === modelKey && partial.received > 0
+        partial !== null &&
+        partial.modelKey === modelKey &&
+        partial.received > 0
           ? partial.received
           : 0;
       const resp =

@@ -184,39 +184,41 @@ describe("createWorker", () => {
     // streams 40 bytes before the connection drops; the retry (Range) gets a
     // 206 with the remaining 60 bytes. Using a single mockImplementation keeps
     // the mock queue clean across tests (no leftover mockResolvedValueOnce).
-    fetchMock.mockImplementation((url: string, opts?: { headers?: Record<string, string> }) => {
-      if (opts?.headers?.["Range"]) {
+    fetchMock.mockImplementation(
+      (url: string, opts?: { headers?: Record<string, string> }) => {
+        if (opts?.headers?.["Range"]) {
+          return Promise.resolve({
+            ok: true,
+            status: 206,
+            headers: { get: vi.fn().mockReturnValue(String(60)) },
+            body: {
+              getReader: () => ({
+                read: vi
+                  .fn()
+                  .mockResolvedValueOnce({ done: false, value: restChunk })
+                  .mockResolvedValueOnce({ done: true }),
+                releaseLock: vi.fn(),
+              }),
+            },
+          } as unknown as Response);
+        }
+        void url;
         return Promise.resolve({
           ok: true,
-          status: 206,
-          headers: { get: vi.fn().mockReturnValue(String(60)) },
+          status: 200,
+          headers: { get: vi.fn().mockReturnValue(String(total)) },
           body: {
             getReader: () => ({
               read: vi
                 .fn()
-                .mockResolvedValueOnce({ done: false, value: restChunk })
-                .mockResolvedValueOnce({ done: true }),
+                .mockResolvedValueOnce({ done: false, value: firstChunk })
+                .mockRejectedValueOnce(new Error("network dropped")),
               releaseLock: vi.fn(),
             }),
           },
         } as unknown as Response);
-      }
-      void url;
-      return Promise.resolve({
-        ok: true,
-        status: 200,
-        headers: { get: vi.fn().mockReturnValue(String(total)) },
-        body: {
-          getReader: () => ({
-            read: vi
-              .fn()
-              .mockResolvedValueOnce({ done: false, value: firstChunk })
-              .mockRejectedValueOnce(new Error("network dropped")),
-            releaseLock: vi.fn(),
-          }),
-        },
-      } as unknown as Response);
-    });
+      },
+    );
 
     const cmd = {
       type: "switch" as const,
@@ -244,7 +246,10 @@ describe("createWorker", () => {
       expect(msg?.["modelKey"]).toBe(ModelKey.BVRA);
     });
 
-    const calls = fetchMock.mock.calls as unknown[][] as [string, { headers?: { Range?: string } }][];
+    const calls = fetchMock.mock.calls as unknown[][] as [
+      string,
+      { headers?: { Range?: string } },
+    ][];
     const firstCall = calls[callsBefore]!;
     const retryCall = calls[callsBefore + 1]!;
     // First attempt: plain GET, no Range header.
@@ -256,7 +261,9 @@ describe("createWorker", () => {
 
     // The assembled buffer is the full 100 bytes: 40 of 7 then 60 of 9.
     const createCalls = (
-      mockOrt.InferenceSession.create as unknown as { mock: { calls: unknown[][] } }
+      mockOrt.InferenceSession.create as unknown as {
+        mock: { calls: unknown[][] };
+      }
     ).mock.calls;
     const passed = createCalls[createCalls.length - 1]![0] as Uint8Array;
     expect(passed.length).toBe(100);
@@ -271,9 +278,26 @@ describe("createWorker", () => {
     fullBody.set(firstChunk, 0);
     for (let i = 40; i < 100; i++) fullBody[i] = 9;
 
-    fetchMock.mockImplementation((url: string, opts?: { headers?: Record<string, string> }) => {
-      if (opts?.headers?.["Range"]) {
-        // Server ignores the range and returns the full 200 body.
+    fetchMock.mockImplementation(
+      (url: string, opts?: { headers?: Record<string, string> }) => {
+        if (opts?.headers?.["Range"]) {
+          // Server ignores the range and returns the full 200 body.
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: { get: vi.fn().mockReturnValue(String(total)) },
+            body: {
+              getReader: () => ({
+                read: vi
+                  .fn()
+                  .mockResolvedValueOnce({ done: false, value: fullBody })
+                  .mockResolvedValueOnce({ done: true }),
+                releaseLock: vi.fn(),
+              }),
+            },
+          } as unknown as Response);
+        }
+        void url;
         return Promise.resolve({
           ok: true,
           status: 200,
@@ -282,29 +306,14 @@ describe("createWorker", () => {
             getReader: () => ({
               read: vi
                 .fn()
-                .mockResolvedValueOnce({ done: false, value: fullBody })
-                .mockResolvedValueOnce({ done: true }),
+                .mockResolvedValueOnce({ done: false, value: firstChunk })
+                .mockRejectedValueOnce(new Error("network dropped")),
               releaseLock: vi.fn(),
             }),
           },
         } as unknown as Response);
-      }
-      void url;
-      return Promise.resolve({
-        ok: true,
-        status: 200,
-        headers: { get: vi.fn().mockReturnValue(String(total)) },
-        body: {
-          getReader: () => ({
-            read: vi
-              .fn()
-              .mockResolvedValueOnce({ done: false, value: firstChunk })
-              .mockRejectedValueOnce(new Error("network dropped")),
-            releaseLock: vi.fn(),
-          }),
-        },
-      } as unknown as Response);
-    });
+      },
+    );
 
     const cmd = {
       type: "switch" as const,
@@ -329,7 +338,9 @@ describe("createWorker", () => {
     // The assembled buffer is the fresh full body (100 bytes), not the stale
     // 40-byte partial prepended onto a duplicate (which would be 140).
     const createCalls = (
-      mockOrt.InferenceSession.create as unknown as { mock: { calls: unknown[][] } }
+      mockOrt.InferenceSession.create as unknown as {
+        mock: { calls: unknown[][] };
+      }
     ).mock.calls;
     const passed = createCalls[createCalls.length - 1]![0] as Uint8Array;
     expect(passed.length).toBe(100);
