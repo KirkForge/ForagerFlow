@@ -11,6 +11,11 @@ concurrency:
 
 jobs:
   release:
+    # ponytail: gates #14 — required reviewers / wait timer are configured in
+    # repo Settings → Environments → "production". The environment reference
+    # alone enforces whatever protection rules exist there (no protection
+    # configured yet = runs unrestricted until an admin adds them).
+    environment: production
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -82,9 +87,22 @@ jobs:
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
         run: node scripts/build-twa.cjs
 
+      - name: Install Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
+            | sh -s -- -b /usr/local/bin
+
+      - name: Generate SBOM (CycloneDX)  # gap #11
+        run: |
+          syft . -o cyclonedx-json --file "foragerflow-${{ github.ref_name }}-sbom.json"
+
       - name: Upload release assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           tar -czf "foragerflow-${{ github.ref_name }}.tar.gz" -C dist .
-          gh release upload "${{ github.ref_name }}" "foragerflow-${{ github.ref_name }}.tar.gz" "dist/twa/foragerflow-release-unsigned.apk" --clobber
+          gh release upload "${{ github.ref_name }}" \
+            "foragerflow-${{ github.ref_name }}.tar.gz" \
+            "dist/twa/foragerflow-release-unsigned.apk" \
+            "foragerflow-${{ github.ref_name }}-sbom.json" \
+            --clobber
