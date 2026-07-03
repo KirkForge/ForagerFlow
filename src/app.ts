@@ -24,9 +24,11 @@ import {
   searchHistory,
   clearHistory,
   exportHistory,
+  exportHistoryEncrypted,
   importHistory,
   isDataUrlThumbnail,
   isValidLocation,
+  isEncryptedEnvelope,
 } from "@/services/history";
 import type { HistoryEntry, GeoLocation } from "@/services/history";
 import { closeDB } from "@/services/history/db";
@@ -747,7 +749,21 @@ export class AppController {
 
   private async handleExportHistory(): Promise<void> {
     try {
-      const json = await exportHistory();
+      const encryptToggle = document.querySelector<HTMLInputElement>(
+        "#history-encrypt-export",
+      );
+      let json: string;
+      if (encryptToggle?.checked) {
+        const passphrase = await this.promptPassphrase();
+        if (passphrase === null) return; // user cancelled
+        if (!passphrase) {
+          this.statusEl.textContent = t("status.passphraseRequired");
+          return;
+        }
+        json = await exportHistoryEncrypted(passphrase);
+      } else {
+        json = await exportHistory();
+      }
       const blob = new Blob([json], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -771,7 +787,13 @@ export class AppController {
 
     try {
       const text = await file.text();
-      const count = await importHistory(text);
+      let passphrase: string | undefined;
+      if (isEncryptedEnvelope(text)) {
+        const entered = await this.promptPassphrase();
+        if (entered === null) return; // user cancelled
+        passphrase = entered;
+      }
+      const count = await importHistory(text, passphrase);
       void this.renderHistory();
       void this.renderLastResult();
       this.statusEl.textContent = t("status.historyImported", {
@@ -783,6 +805,54 @@ export class AppController {
     } finally {
       input.value = "";
     }
+  }
+
+  // ponytail: passphrase entry reuses the existing confirm-modal shape (dialog +
+  // form submit + Esc-cancel) so no new UI machinery. Resolves the entered
+  // string, or null when the user cancels.
+  private promptPassphrase(): Promise<string | null> {
+    const modal = document.getElementById("passphrase-modal") as
+      | HTMLDialogElement
+      | null;
+    const input = document.getElementById("passphrase-input") as
+      | HTMLInputElement
+      | null;
+    const form = document.getElementById("passphrase-form") as
+      | HTMLFormElement
+      | null;
+    const cancel = document.getElementById("passphrase-cancel") as
+      | HTMLButtonElement
+      | null;
+    if (!modal || !input || !form || !cancel) {
+      return Promise.resolve(null);
+    }
+    input.value = "";
+    modal.showModal();
+    input.focus();
+    return new Promise<string | null>((resolve) => {
+      const cleanup = () => {
+        form.removeEventListener("submit", onSubmit);
+        cancel.removeEventListener("click", onCancel);
+        modal.removeEventListener("cancel", onDialogCancel);
+        modal.close();
+      };
+      const onSubmit = (e: SubmitEvent) => {
+        e.preventDefault();
+        cleanup();
+        resolve(input.value);
+      };
+      const onCancel = () => {
+        cleanup();
+        resolve(null);
+      };
+      const onDialogCancel = (e: Event) => {
+        e.preventDefault();
+        onCancel();
+      };
+      form.addEventListener("submit", onSubmit, { once: true });
+      cancel.addEventListener("click", onCancel, { once: true });
+      modal.addEventListener("cancel", onDialogCancel, { once: true });
+    });
   }
 
   private bindEvents(): void {

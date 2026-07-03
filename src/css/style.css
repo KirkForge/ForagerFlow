@@ -766,7 +766,9 @@ video {
 #safety-modal,
 #model-confirm-modal,
 #storage-confirm-modal,
+#network-confirm-modal,
 #clear-confirm-modal,
+#passphrase-modal,
 #species-detail-modal,
 #comparison-modal,
 #history-detail-modal {
@@ -782,7 +784,9 @@ video {
 #safety-modal::backdrop,
 #model-confirm-modal::backdrop,
 #storage-confirm-modal::backdrop,
+#network-confirm-modal::backdrop,
 #clear-confirm-modal::backdrop,
+#passphrase-modal::backdrop,
 #species-detail-modal::backdrop,
 #comparison-modal::backdrop,
 #history-detail-modal::backdrop {
@@ -791,14 +795,18 @@ video {
 #safety-modal h2,
 #model-confirm-modal h2,
 #storage-confirm-modal h2,
-#clear-confirm-modal h2 {
+#network-confirm-modal h2,
+#clear-confirm-modal h2,
+#passphrase-modal h2 {
   margin: 0 0 12px;
   font-size: 16px;
 }
 #safety-modal p,
 #model-confirm-modal p,
 #storage-confirm-modal p,
-#clear-confirm-modal p {
+#network-confirm-modal p,
+#clear-confirm-modal p,
+#passphrase-modal p {
   margin: 0 0 10px;
   font-size: 13px;
   line-height: 1.5;

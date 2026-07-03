@@ -63,6 +63,13 @@ export default tseslint.config(
     },
   },
   {
+    // e2e + playwright config live outside tsconfig's include (playwright
+    // compiles them itself), so they can't go through projectService — but
+    // they still get recommended + stylistic rules, just not type-checked.
+    files: ["e2e/**/*.ts", "playwright.config.ts"],
+    extends: [tseslint.configs.disableTypeChecked],
+  },
+  {
     plugins: {
       local: {
         rules: {
@@ -75,6 +82,19 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ["dist/", "node_modules/", "pwa/", "*.js", "eslint-rules/"],
+    // ponytail: *.js in flat-config doesn't cross /, so generated/vendored
+    // .js under subdirs must be ignored by directory. .gitnexus/ is tooling
+    // dropped by `gitnexus analyze`, coverage/ is vitest output, public/js/
+    // is the vendored ONNX runtime.
+    ignores: [
+      "dist/",
+      "node_modules/",
+      "pwa/",
+      "coverage/",
+      ".gitnexus/",
+      "public/js/",
+      "*.js",
+      "eslint-rules/",
+    ],
   },
 );

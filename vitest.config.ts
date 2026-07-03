@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 
 const packageJson = JSON.parse(
   readFileSync(resolve(__dirname, "package.json"), "utf8"),
-);
+) as { version: string };
 
 export default defineConfig({
   resolve: {

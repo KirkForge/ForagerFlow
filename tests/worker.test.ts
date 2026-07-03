@@ -173,6 +173,170 @@ describe("createWorker", () => {
     });
   });
 
+  it("resumes a dropped download with a Range request on retry", async () => {
+    const total = 100;
+    const firstChunk = new Uint8Array(40).fill(7);
+    const restChunk = new Uint8Array(60).fill(9);
+
+    const callsBefore = fetchMock.mock.calls.length;
+
+    // Key the response on the Range header: first attempt is a plain GET and
+    // streams 40 bytes before the connection drops; the retry (Range) gets a
+    // 206 with the remaining 60 bytes. Using a single mockImplementation keeps
+    // the mock queue clean across tests (no leftover mockResolvedValueOnce).
+    fetchMock.mockImplementation((url: string, opts?: { headers?: Record<string, string> }) => {
+      if (opts?.headers?.["Range"]) {
+        return Promise.resolve({
+          ok: true,
+          status: 206,
+          headers: { get: vi.fn().mockReturnValue(String(60)) },
+          body: {
+            getReader: () => ({
+              read: vi
+                .fn()
+                .mockResolvedValueOnce({ done: false, value: restChunk })
+                .mockResolvedValueOnce({ done: true }),
+              releaseLock: vi.fn(),
+            }),
+          },
+        } as unknown as Response);
+      }
+      void url;
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: { get: vi.fn().mockReturnValue(String(total)) },
+        body: {
+          getReader: () => ({
+            read: vi
+              .fn()
+              .mockResolvedValueOnce({ done: false, value: firstChunk })
+              .mockRejectedValueOnce(new Error("network dropped")),
+            releaseLock: vi.fn(),
+          }),
+        },
+      } as unknown as Response);
+    });
+
+    const cmd = {
+      type: "switch" as const,
+      modelPath: "/model/resume.onnx",
+      modelKey: ModelKey.BVRA,
+      mean: [0, 0, 0] as [number, number, number],
+      std: [1, 1, 1] as [number, number, number],
+    };
+
+    ctx.dispatch(cmd);
+
+    await vi.waitFor(() => {
+      const msg = lastMessage();
+      expect(msg?.["type"]).toBe(InferenceWorkerMessageType.Error);
+      expect(String(msg?.["message"])).toContain("network dropped");
+    });
+
+    // Retry — same model, same worker instance → resumes from byte 40.
+    ctx.dispatch(cmd);
+
+    await vi.waitFor(() => {
+      const msg = lastMessage();
+      expect(msg?.["type"]).toBe(InferenceWorkerMessageType.Status);
+      expect(msg?.["text"]).toBe("Ready");
+      expect(msg?.["modelKey"]).toBe(ModelKey.BVRA);
+    });
+
+    const calls = fetchMock.mock.calls as unknown[][] as [string, { headers?: { Range?: string } }][];
+    const firstCall = calls[callsBefore]!;
+    const retryCall = calls[callsBefore + 1]!;
+    // First attempt: plain GET, no Range header.
+    expect(firstCall[0]).toBe("/model/resume.onnx");
+    expect(firstCall[1]).toBeUndefined();
+    // Retry: requested the remainder via Range, not the whole file.
+    expect(retryCall[0]).toBe("/model/resume.onnx");
+    expect(retryCall[1].headers?.Range).toBe("bytes=40-");
+
+    // The assembled buffer is the full 100 bytes: 40 of 7 then 60 of 9.
+    const createCalls = (
+      mockOrt.InferenceSession.create as unknown as { mock: { calls: unknown[][] } }
+    ).mock.calls;
+    const passed = createCalls[createCalls.length - 1]![0] as Uint8Array;
+    expect(passed.length).toBe(100);
+    expect(passed[0]).toBe(7);
+    expect(passed[40]).toBe(9);
+  });
+
+  it("restarts from zero when the server ignores the range request", async () => {
+    const total = 100;
+    const firstChunk = new Uint8Array(40).fill(7);
+    const fullBody = new Uint8Array(100);
+    fullBody.set(firstChunk, 0);
+    for (let i = 40; i < 100; i++) fullBody[i] = 9;
+
+    fetchMock.mockImplementation((url: string, opts?: { headers?: Record<string, string> }) => {
+      if (opts?.headers?.["Range"]) {
+        // Server ignores the range and returns the full 200 body.
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: { get: vi.fn().mockReturnValue(String(total)) },
+          body: {
+            getReader: () => ({
+              read: vi
+                .fn()
+                .mockResolvedValueOnce({ done: false, value: fullBody })
+                .mockResolvedValueOnce({ done: true }),
+              releaseLock: vi.fn(),
+            }),
+          },
+        } as unknown as Response);
+      }
+      void url;
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: { get: vi.fn().mockReturnValue(String(total)) },
+        body: {
+          getReader: () => ({
+            read: vi
+              .fn()
+              .mockResolvedValueOnce({ done: false, value: firstChunk })
+              .mockRejectedValueOnce(new Error("network dropped")),
+            releaseLock: vi.fn(),
+          }),
+        },
+      } as unknown as Response);
+    });
+
+    const cmd = {
+      type: "switch" as const,
+      modelPath: "/model/no-range.onnx",
+      modelKey: ModelKey.BVRA,
+      mean: [0, 0, 0] as [number, number, number],
+      std: [1, 1, 1] as [number, number, number],
+    };
+
+    ctx.dispatch(cmd);
+    await vi.waitFor(() => {
+      expect(lastMessage()?.["type"]).toBe(InferenceWorkerMessageType.Error);
+    });
+
+    ctx.dispatch(cmd);
+    await vi.waitFor(() => {
+      const msg = lastMessage();
+      expect(msg?.["type"]).toBe(InferenceWorkerMessageType.Status);
+      expect(msg?.["text"]).toBe("Ready");
+    });
+
+    // The assembled buffer is the fresh full body (100 bytes), not the stale
+    // 40-byte partial prepended onto a duplicate (which would be 140).
+    const createCalls = (
+      mockOrt.InferenceSession.create as unknown as { mock: { calls: unknown[][] } }
+    ).mock.calls;
+    const passed = createCalls[createCalls.length - 1]![0] as Uint8Array;
+    expect(passed.length).toBe(100);
+    expect(passed[0]).toBe(7);
+    expect(passed[40]).toBe(9);
+  });
+
   it("disposes the previous session when switching models", async () => {
     fetchMock.mockResolvedValue({
       ok: true,

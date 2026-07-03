@@ -30,6 +30,7 @@ export class SafetyUI {
     safetyContinue: HTMLButtonElement;
     modelConfirm: ConfirmModalElements;
     storageConfirm: ConfirmModalElements;
+    networkConfirm: ConfirmModalElements;
     clearConfirm: ConfirmModalElements;
     modelSelect: HTMLSelectElement;
   };
@@ -55,6 +56,7 @@ export class SafetyUI {
       ),
       modelConfirm: this.confirmEls("#model-confirm-modal"),
       storageConfirm: this.confirmEls("#storage-confirm-modal"),
+      networkConfirm: this.confirmEls("#network-confirm-modal"),
       clearConfirm: this.confirmEls("#clear-confirm-modal"),
       modelSelect: requireElement<HTMLSelectElement>(
         "#model-select",
@@ -68,6 +70,7 @@ export class SafetyUI {
     this.bindSafetyModal();
     this.bindModelConfirm();
     this.bindStorageConfirmFromService();
+    this.bindNetworkConfirmFromService();
 
     if (this.hasAcknowledged()) {
       return;
@@ -178,6 +181,21 @@ export class SafetyUI {
       void this.showConfirmModal(this.els.storageConfirm).then((accepted) => {
         if (accepted) {
           this.opts.inferenceService.resumeStorageConfirm();
+        }
+      });
+    });
+  }
+
+  private bindNetworkConfirmFromService(): void {
+    this.opts.inferenceService.onNetworkConfirm(() => {
+      void this.showConfirmModal(this.els.networkConfirm).then((accepted) => {
+        if (accepted) {
+          this.opts.inferenceService.resumeNetworkConfirm();
+        } else {
+          // ponytail: revert the selector to the model that was active before
+          // the switch attempt — the service never changed currentModelKey.
+          const revertTo = this.opts.inferenceService.cancelNetworkConfirm();
+          this.els.modelSelect.value = revertTo;
         }
       });
     });

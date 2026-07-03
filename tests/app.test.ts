@@ -158,7 +158,11 @@ vi.mock("@/services/history", async () => {
     searchHistory: vi.fn().mockResolvedValue([]),
     clearHistory: vi.fn().mockResolvedValue(undefined),
     exportHistory: vi.fn().mockResolvedValue('{"version":1,"entries":[]}'),
+    exportHistoryEncrypted: vi
+      .fn()
+      .mockResolvedValue('{"v":1,"kdf":"PBKDF2-SHA256","ct":"x"}'),
     importHistory: vi.fn().mockResolvedValue(0),
+    isEncryptedEnvelope: vi.fn().mockReturnValue(false),
   };
 });
 
@@ -214,7 +218,15 @@ function renderAppHTML(): void {
       <button id="history-export">Export</button>
       <button id="history-import">Import</button>
       <input id="history-import-input" type="file" accept="application/json" />
+      <input type="checkbox" id="history-encrypt-export" />
       <button id="history-clear">Clear</button>
+      <dialog id="passphrase-modal">
+        <form method="dialog" id="passphrase-form">
+          <input type="password" id="passphrase-input" autocomplete="off" />
+          <button type="button" id="passphrase-cancel" value="cancel">Cancel</button>
+          <button type="submit" id="passphrase-accept" value="accept">OK</button>
+        </form>
+      </dialog>
       <button id="camera-retry">Retry</button>
       <input id="location-toggle" type="checkbox" />
       <span id="location-status"></span>
@@ -246,6 +258,10 @@ function renderAppHTML(): void {
       </div>
     </dialog>
   `;
+  for (const dialog of document.querySelectorAll("dialog")) {
+    (dialog as HTMLDialogElement).showModal = vi.fn();
+    (dialog as HTMLDialogElement).close = vi.fn();
+  }
 }
 
 describe("AppController", () => {
@@ -660,6 +676,69 @@ describe("AppController", () => {
     expect(status.textContent).toBe("Failed to export history.");
   });
 
+  it("exports encrypted history when the encrypt toggle is on", async () => {
+    const { exportHistoryEncrypted } = await import("@/services/history");
+    const createObjectURLSpy = vi
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue("blob:enc");
+    vi.spyOn(URL, "revokeObjectURL");
+
+    const controller = new AppController();
+    await controller.init();
+
+    const toggle = document.querySelector(
+      "#history-encrypt-export",
+    ) as HTMLInputElement;
+    toggle.checked = true;
+
+    const exportBtn = document.querySelector("#history-export") as HTMLElement;
+    exportBtn.click();
+    await flushPromises();
+
+    // Passphrase modal is open; type a passphrase and submit.
+    const input = document.querySelector("#passphrase-input") as HTMLInputElement;
+    const form = document.querySelector("#passphrase-form") as HTMLFormElement;
+    input.value = "hunter2";
+    form.dispatchEvent(new Event("submit", { cancelable: true }));
+    await flushPromises();
+
+    expect(exportHistoryEncrypted).toHaveBeenCalledWith("hunter2");
+    expect(createObjectURLSpy).toHaveBeenCalled();
+    createObjectURLSpy.mockRestore();
+  });
+
+  it("imports an encrypted backup by prompting for a passphrase", async () => {
+    const { importHistory, isEncryptedEnvelope } = await import(
+      "@/services/history"
+    );
+    vi.mocked(isEncryptedEnvelope).mockReturnValueOnce(true);
+    const fileText = '{"v":1,"kdf":"PBKDF2-SHA256","ct":"x"}';
+    const file = new File([fileText], "backup.json", {
+      type: "application/json",
+    });
+
+    const controller = new AppController();
+    await controller.init();
+
+    const input = document.querySelector(
+      "#history-import-input",
+    ) as HTMLInputElement;
+    setFiles(input, file);
+    input.dispatchEvent(new Event("change"));
+    await flushPromises();
+
+    // Encrypted envelope detected → passphrase modal opens.
+    const pwInput = document.querySelector(
+      "#passphrase-input",
+    ) as HTMLInputElement;
+    const form = document.querySelector("#passphrase-form") as HTMLFormElement;
+    pwInput.value = "hunter2";
+    form.dispatchEvent(new Event("submit", { cancelable: true }));
+    await flushPromises();
+
+    expect(importHistory).toHaveBeenCalledWith(fileText, "hunter2");
+  });
+
   it("opens the import file picker when import button is clicked", async () => {
     const controller = new AppController();
     await controller.init();
@@ -693,7 +772,7 @@ describe("AppController", () => {
     input.dispatchEvent(new Event("change"));
 
     await flushPromises();
-    expect(importHistory).toHaveBeenCalledWith(fileText);
+    expect(importHistory).toHaveBeenCalledWith(fileText, undefined);
     const status = document.querySelector("#status") as HTMLElement;
     expect(status.textContent).toBe("Imported 0 history entries.");
   });

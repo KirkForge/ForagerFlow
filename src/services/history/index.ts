@@ -6,6 +6,13 @@ import type {
 } from "@/core/types";
 import { logger } from "@/core/logger";
 import { openDB, withTransaction, setMeta, STORE_NAME } from "./db";
+import {
+  encryptBackup,
+  decryptBackup,
+  isEncryptedEnvelope,
+} from "./crypto";
+
+export { isEncryptedEnvelope } from "./crypto";
 
 export interface GeoLocation {
   lat: number;
@@ -393,10 +400,31 @@ export async function exportHistory(): Promise<string> {
   return JSON.stringify(backup);
 }
 
-export async function importHistory(json: string): Promise<number> {
+/**
+ * Encrypted variant of {@link exportHistory}. Emits a passphrase-protected
+ * AES-GCM envelope (species, confidence, timestamps, and any GPS stay
+ * confidential). Decryption needs the same passphrase via importHistory.
+ */
+export async function exportHistoryEncrypted(
+  passphrase: string,
+): Promise<string> {
+  return encryptBackup(await exportHistory(), passphrase);
+}
+
+export async function importHistory(
+  json: string,
+  passphrase?: string,
+): Promise<number> {
+  // Auto-detect encrypted envelopes and decrypt before parsing. This keeps a
+  // single import entry point: callers pass the file text (and a passphrase
+  // only when the UI detected an envelope).
+  const plaintext = isEncryptedEnvelope(json)
+    ? await decryptBackup(json, passphrase ?? "")
+    : json;
+
   let parsed: unknown;
   try {
-    parsed = JSON.parse(json);
+    parsed = JSON.parse(plaintext);
   } catch {
     throw new Error("Backup file is not valid JSON");
   }

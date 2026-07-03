@@ -126,3 +126,62 @@ export function recordTelemetry(
     }
   }
 }
+
+function redactSensitiveSubstrings(value: string): string {
+  // Strip data: URIs and bare geo coordinates from free-form text so crash
+  // messages/stacks cannot leak a captured image or a user's location.
+  return value
+    .replace(/data:[^\s,]*/g, REDACTED)
+    .replace(/-?\d{1,3}\.\d+,-?\d{1,3}\.\d+/g, REDACTED);
+}
+
+function truncate(value: string, max: number): string {
+  return value.length > max ? `${value.slice(0, max)}…` : value;
+}
+
+/**
+ * Capture an unhandled error for remote crash reporting during beta. Reuses the
+ * existing telemetry gate (VITE_FEATURE_TELEMETRY) and beacon transport, so it
+ * only sends when VITE_TELEMETRY_ENDPOINT is configured — zero network by
+ * default. Stack/message are redacted for data: URIs and geo coordinates and
+ * length-capped; no image/location/user PII is carried.
+ */
+export function recordCrash(error: unknown, context = ""): void {
+  if (!telemetryEnabled) return;
+
+  const isError = error instanceof Error;
+  const message = redactSensitiveSubstrings(
+    truncate(isError ? (error).message : String(error), 512),
+  );
+  const stack = isError
+    ? redactSensitiveSubstrings(truncate((error).stack ?? "", 2048))
+    : null;
+
+  const data: Record<string, unknown> = {
+    kind: isError ? (error).constructor.name : "Error",
+    message,
+    stack,
+    context: redactSensitiveSubstrings(truncate(context, 256)),
+    appVersion: config.appVersion,
+    href: typeof location !== "undefined" ? location.pathname : "",
+  };
+
+  const event: TelemetryEvent = {
+    name: "crash",
+    timestamp: new Date().toISOString(),
+    data,
+  };
+
+  logger.debug("Telemetry: crash", data);
+
+  if (config.telemetryEndpoint && isBeaconSupported()) {
+    try {
+      const blob = new Blob([JSON.stringify(event)], {
+        type: "application/json",
+      });
+      globalThis.navigator.sendBeacon(config.telemetryEndpoint, blob);
+    } catch (err) {
+      logger.warn("Beacon crash send failed:", err);
+    }
+  }
+}

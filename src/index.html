@@ -153,6 +153,10 @@
               aria-label="Historik-sikkerhedskopi"
               hidden
             />
+            <label class="history-encrypt-toggle">
+              <input type="checkbox" id="history-encrypt-export" />
+              <span data-i18n-key="history.encryptExport">Kryptér</span>
+            </label>
           </div>
           <button id="history-clear" aria-label="Ryd al historik">Ryd</button>
         </div>
@@ -306,6 +310,30 @@
     </dialog>
 
     <dialog
+      id="network-confirm-modal"
+      aria-labelledby="network-confirm-title"
+      aria-describedby="network-confirm-body"
+    >
+      <form method="dialog" id="network-confirm-form">
+        <h2 id="network-confirm-title" data-i18n-key="networkConfirm.title">
+          Download over mobildata?
+        </h2>
+        <p id="network-confirm-body" data-i18n-key="networkConfirm.body">
+          Du er på en forbrugsbaseret mobilforbindelse. Modellen er stor og kan
+          bruge meget data. Vil du downloade nu?
+        </p>
+        <div class="safety-modal-actions">
+          <button type="button" id="network-confirm-cancel" value="cancel">
+            Annullér
+          </button>
+          <button type="button" id="network-confirm-accept" value="accept">
+            Download alligevel
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog
       id="clear-confirm-modal"
       aria-labelledby="clear-confirm-title"
       aria-describedby="clear-confirm-body"
@@ -322,6 +350,35 @@
           </button>
           <button type="button" id="clear-confirm-accept" value="accept">
             Ryd alt
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog
+      id="passphrase-modal"
+      aria-labelledby="passphrase-modal-title"
+      aria-describedby="passphrase-modal-body"
+    >
+      <form method="dialog" id="passphrase-form">
+        <h2 id="passphrase-modal-title" data-i18n-key="passphrase.title">
+          Adgangskode
+        </h2>
+        <p id="passphrase-modal-body" data-i18n-key="passphrase.body">
+          Indtast en adgangskode for at kryptere sikkerhedskopien.
+        </p>
+        <input
+          type="password"
+          id="passphrase-input"
+          autocomplete="off"
+          aria-label="Adgangskode"
+        />
+        <div class="safety-modal-actions">
+          <button type="button" id="passphrase-cancel" value="cancel">
+            Annullér
+          </button>
+          <button type="submit" id="passphrase-accept" value="accept">
+            OK
           </button>
         </div>
       </form>

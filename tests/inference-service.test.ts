@@ -38,6 +38,11 @@ describe("InferenceService", () => {
       configurable: true,
       writable: true,
     });
+    Object.defineProperty(globalThis.navigator, "connection", {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
@@ -47,6 +52,14 @@ describe("InferenceService", () => {
   ): void {
     Object.defineProperty(globalThis.navigator, "storage", {
       value: { estimate },
+      configurable: true,
+      writable: true,
+    });
+  }
+
+  function installConnection(type: string | undefined): void {
+    Object.defineProperty(globalThis.navigator, "connection", {
+      value: type === undefined ? undefined : { type },
       configurable: true,
       writable: true,
     });
@@ -554,6 +567,97 @@ describe("InferenceService", () => {
     service.resumeStorageConfirm();
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining("no pending storage confirmation"),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it("emits networkConfirm and blocks the download on a cellular connection", () => {
+    installConnection("cellular");
+    const confirmations: { modelKey: ModelKey }[] = [];
+    service.onNetworkConfirm((c) => confirmations.push(c));
+
+    service.initialize();
+    service.switchModel(ModelKey.Dima806);
+
+    expect(confirmations).toEqual([{ modelKey: ModelKey.Dima806 }]);
+    // The worker must not have been told to switch while awaiting confirmation.
+    expect(worker.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: WorkerCommandType.Switch,
+        modelKey: ModelKey.Dima806,
+      }),
+    );
+  });
+
+  it("resumes the model download after network confirmation", () => {
+    installConnection("cellular");
+    service.initialize();
+    service.switchModel(ModelKey.Dima806);
+
+    service.resumeNetworkConfirm();
+    expect(worker.postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        type: WorkerCommandType.Switch,
+        modelKey: ModelKey.Dima806,
+      }),
+    );
+  });
+
+  it("reverts to the previously active model when the network confirm is cancelled", () => {
+    installConnection("cellular");
+    service.initialize();
+    service.switchModel(ModelKey.BVRA, {
+      skipStorageCheck: true,
+      skipNetworkCheck: true,
+    });
+    // Sanity: BVRA is the active model before the cellular switch attempt.
+    expect(service.getActiveModelKey()).toBe(ModelKey.BVRA);
+
+    service.switchModel(ModelKey.Dima806);
+    const revertTo = service.cancelNetworkConfirm();
+    expect(revertTo).toBe(ModelKey.BVRA);
+    expect(service.getActiveModelKey()).toBe(ModelKey.BVRA);
+  });
+
+  it("does not re-prompt for a model once it has been confirmed this session", () => {
+    installConnection("cellular");
+    const confirmations: { modelKey: ModelKey }[] = [];
+    service.onNetworkConfirm((c) => confirmations.push(c));
+    service.initialize();
+
+    service.switchModel(ModelKey.Dima806);
+    service.resumeNetworkConfirm();
+    confirmations.length = 0;
+
+    // Second switch to the same model: already confirmed, no new prompt.
+    service.switchModel(ModelKey.Dima806);
+    expect(confirmations).toHaveLength(0);
+    expect(worker.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: WorkerCommandType.Switch,
+        modelKey: ModelKey.Dima806,
+      }),
+    );
+  });
+
+  it("does not prompt when the connection is not cellular", () => {
+    installConnection("wifi");
+    const confirmations: { modelKey: ModelKey }[] = [];
+    service.onNetworkConfirm((c) => confirmations.push(c));
+    service.initialize();
+
+    service.switchModel(ModelKey.Dima806, { skipStorageCheck: true });
+    expect(confirmations).toHaveLength(0);
+  });
+
+  it("warns when resuming network confirmation with none pending", () => {
+    const warnSpy = vi
+      .spyOn(logger, "warn")
+      .mockImplementation(() => undefined);
+    service.initialize();
+    service.resumeNetworkConfirm();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("no pending network confirmation"),
     );
     warnSpy.mockRestore();
   });

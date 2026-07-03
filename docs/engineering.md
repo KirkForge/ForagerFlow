@@ -80,16 +80,25 @@ inference details:
 - `SpeciesDetailPanel` / `HistoryDetailPanel` – detail views.
 - `PredictionComparisonPanel` – side-by-side comparison.
 
-Shared helpers are in `src/ui/utils.ts`. User-visible text must go through the
+Shared helpers are in `src/ui/utils.ts`. `requireElement()` is the single typed
+DOM query helper used across panels; it throws a descriptive error and guards
+that the returned node is an `HTMLElement`. `show()`/`hide()` toggle a
+`.hidden` class instead of touching inline styles so the CSP can drop
+`'unsafe-inline'` from `style-src`. User-visible text must go through the
 ` t()` helper (see [Internationalisation](#internationalisation)).
 
 ## Offline-first mechanics
 
 The app is designed to work without a network once installed.
 
-- **Model caching:** the service worker uses range-request slicing to cache
-  `.onnx` and `.wasm` files efficiently. `navigator.storage.estimate()` is checked
-  before large downloads.
+- **App shell:** the service worker caches the shell versioned by the build
+  and serves a static offline fallback HTML page when navigation fails. Shell
+  assets are cached individually so one missing asset does not abort the whole
+  install.
+- **Model caching:** range-request slicing caches `.onnx` and `.wasm` files
+  efficiently, even when the cached response omitted `Content-Length`. Range
+  responses are recomputed from the stored body. `navigator.storage.estimate()`
+  is checked before large downloads.
 - **History:** IndexedDB via `fake-indexeddb` in tests and the native API in the
   browser.
 - **Installability:** the PWA manifest, icons, and service-worker scope make the
@@ -130,8 +139,11 @@ Tests live next to the code in `tests/` and use Vitest with `globals: true`.
 
 - `tests/helpers/` contains shared promise flushes and fixture factories.
 - `tests/*.test.ts` cover the corresponding `src/` modules.
-- Service Worker and Worker entry points are excluded from coverage because they
-  require a real browser runtime.
+- `tests/sw.test.ts` exercises the Service Worker in a Node environment
+  (install, activate, navigation fallback, model range requests, and
+  stale-while-revalidate static assets). The `src/sw.ts` and `src/worker.ts`
+  entry points remain excluded from coverage thresholds because they run in
+  separate browser runtimes.
 
 Coverage thresholds are set to **80%** for branches, functions, lines, and
 statements in `vitest.config.ts`.
@@ -192,8 +204,11 @@ to satisfy the `local/no-raw-ui-strings` lint rule.
 ## Security and dependencies
 
 - No user credentials, no cookies, no third-party trackers by default.
+- The `index.html` CSP drops `'unsafe-inline'` from `script-src` and `style-src`;
+  `'wasm-unsafe-eval'` is kept only for ONNX Runtime.
 - Telemetry is opt-in via `navigator.sendBeacon` and only sends the configured
-  endpoint.
+  endpoint. Events are scrubbed before sending: long strings are truncated,
+  image/location/user-like keys are redacted, and unknown event keys are dropped.
 - ONNX models are downloaded from the same origin or a trusted host; the service
   worker enforces caching and the CSP allows `wasm-unsafe-eval` only for the
   ONNX runtime.

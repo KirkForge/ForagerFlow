@@ -38,6 +38,8 @@ export const daMessages: Messages = {
   "status.clearHistoryError": "Kunne ikke rydde historikken.",
   "status.historyExported": "Historik eksporteret.",
   "status.exportHistoryError": "Kunne ikke eksportere historikken.",
+  "status.passphraseRequired":
+    "Indtast en adgangskode for at kryptere sikkerhedskopien.",
   "status.historyImported": "Importerede {{count}} historikposter.",
   "status.importHistoryError": "Kunne ikke importere historikken.",
   "status.inferenceError": "Identifikation mislykkedes. Prøv igen.",
@@ -103,7 +105,17 @@ export const daMessages: Messages = {
   "history.clearAria": "Ryd al historik",
   "history.exportAria": "Eksportér historik til fil",
   "history.importAria": "Importér historik fra fil",
+  "history.encryptExport": "Kryptér",
+  "history.encryptExportAria": "Kryptér eksporter med en adgangskode",
   "history.empty": "Ingen tidligere identifikationer endnu.",
+
+  // Passphrase modal (encrypted history export/import)
+  "passphrase.title": "Adgangskode",
+  "passphrase.body":
+    "Indtast en adgangskode for at kryptere sikkerhedskopien. Uden den kan filen ikke læses.",
+  "passphrase.inputAria": "Adgangskode",
+  "passphrase.accept": "OK",
+  "passphrase.cancel": "Annullér",
   "history.lastIdentification": "Seneste identifikation",
   "history.thumbnailAlt": "Miniaturebillede af {{species}}",
   "history.confidence": "{{prob}}% sikkerhed",
@@ -160,6 +172,13 @@ export const daMessages: Messages = {
     "Din enhed rapporterer {{freeMB}} MB ledig lagerplads. Den valgte model kræver {{modelSize}}. Fortsæt alligevel?",
   "storageConfirm.cancel": "Annullér",
   "storageConfirm.continue": "Fortsæt alligevel",
+
+  // Network (mobile data) confirm modal
+  "networkConfirm.title": "Download over mobildata?",
+  "networkConfirm.body":
+    "Du er på en forbrugsbaseret mobilforbindelse. Modellen er stor og kan bruge meget data. Vil du downloade nu?",
+  "networkConfirm.cancel": "Annullér",
+  "networkConfirm.accept": "Download alligevel",
 
   // Clear confirm modal
   "clearConfirm.title": "Ryd al historik?",

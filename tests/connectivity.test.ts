@@ -40,7 +40,8 @@ describe("connectivity", () => {
     });
 
     registerServiceWorker();
-    expect(register).toHaveBeenCalledWith("/sw.js");
+    // Built sw.js is an ESM bundle, so it must register as a module script.
+    expect(register).toHaveBeenCalledWith("/sw.js", { type: "module" });
   });
 
   it("logs a warning when service worker registration fails", async () => {

@@ -6,7 +6,9 @@ import {
   searchHistory,
   clearHistory,
   exportHistory,
+  exportHistoryEncrypted,
   importHistory,
+  isEncryptedEnvelope,
   type HistoryEntry,
   type HistoryBackup,
 } from "@/services/history";
@@ -46,6 +48,15 @@ describe("history with IndexedDB", () => {
 
     const entries = await getHistory(10);
     expect(entries[0]!.thumbnail).toBe(thumbnail);
+  });
+
+  it("stores the provided geo location on the entry", async () => {
+    const report = makeReport();
+    const location = { lat: 55.6761, lng: 12.5683, accuracy: 10 };
+    await saveIdentification(report, ModelKey.BVRA, undefined, location);
+
+    const entries = await getHistory(10);
+    expect(entries[0]!.location).toEqual(location);
   });
 
   it("returns empty array when history is empty", async () => {
@@ -265,6 +276,41 @@ describe("history with IndexedDB", () => {
 
   it("throws when importing a backup with no entries", async () => {
     await expect(importHistory('{"version":1}')).rejects.toThrow("no entries");
+  });
+
+  it("round-trips an encrypted export through importHistory", async () => {
+    await saveIdentification(makeReport(), ModelKey.BVRA);
+
+    const envelope = await exportHistoryEncrypted("hunter2");
+    expect(isEncryptedEnvelope(envelope)).toBe(true);
+    // Plaintext export fields must not appear on the envelope.
+    const parsed = JSON.parse(envelope) as { entries?: unknown };
+    expect(parsed.entries).toBeUndefined();
+
+    await clearHistory();
+    expect(await getHistory(10)).toHaveLength(0);
+
+    const count = await importHistory(envelope, "hunter2");
+    expect(count).toBe(1);
+
+    const entries = await getHistory(10);
+    expect(entries[0]!.top1Species).toBe("Agaricus bisporus");
+  });
+
+  it("fails to import an encrypted envelope with the wrong passphrase", async () => {
+    const envelope = await exportHistoryEncrypted("right");
+    await expect(importHistory(envelope, "wrong")).rejects.toThrow(
+      /wrong passphrase|Could not decrypt/,
+    );
+  });
+
+  it("still imports plaintext backups when no passphrase is supplied", async () => {
+    const backup: HistoryBackup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries: [],
+    };
+    expect(await importHistory(JSON.stringify(backup))).toBe(0);
   });
 
   describe("searchHistory", () => {

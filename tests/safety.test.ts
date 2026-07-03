@@ -18,6 +18,9 @@ describe("SafetyUI", () => {
     }),
     preloadModel: vi.fn(),
     resumeStorageConfirm: vi.fn(),
+    onNetworkConfirm: vi.fn(),
+    resumeNetworkConfirm: vi.fn(),
+    cancelNetworkConfirm: vi.fn().mockReturnValue(ModelKey.BVRA),
   } as unknown as InferenceService;
 
   function renderSafetyHTML(): void {
@@ -34,6 +37,10 @@ describe("SafetyUI", () => {
       </dialog>
       <dialog id="storage-confirm-modal">
         <p id="storage-confirm-body"></p>
+        <button value="cancel">Cancel</button>
+        <button value="accept">Accept</button>
+      </dialog>
+      <dialog id="network-confirm-modal">
         <button value="cancel">Cancel</button>
         <button value="accept">Accept</button>
       </dialog>

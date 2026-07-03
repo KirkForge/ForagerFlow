@@ -12,6 +12,7 @@ import {
 import { logger } from "@/core/logger";
 import { modelRegistry } from "@/data/model-registry";
 import { config } from "@/core/config";
+import { isCellularConnection } from "@/services/connectivity";
 
 interface InferenceWorker extends Worker {
   onmessage: ((e: MessageEvent<WorkerMessage>) => void) | null;
@@ -36,6 +37,7 @@ export type StorageConfirmHandler = (payload: {
   modelKey: ModelKey;
   freeBytes: number;
 }) => void;
+export type NetworkConfirmHandler = (payload: { modelKey: ModelKey }) => void;
 export type ProgressHandler = (progress: LoadProgress) => void;
 
 export class InferenceService {
@@ -52,15 +54,20 @@ export class InferenceService {
   }[] = [];
   private awaitingStorageConfirm = false;
   private pendingStorageModelKey: ModelKey | null = null;
+  private awaitingNetworkConfirm = false;
+  private pendingNetworkModelKey: ModelKey | null = null;
+  private previousModelKey: ModelKey = ModelKey.BVRA;
   private terminated = false;
 
   private onStatusHandler: StatusHandler | null = null;
   private onResultHandler: ResultHandler | null = null;
   private onErrorHandler: ErrorHandler | null = null;
   private onStorageConfirmHandler: StorageConfirmHandler | null = null;
+  private onNetworkConfirmHandler: NetworkConfirmHandler | null = null;
   private onProgressHandler: ProgressHandler | null = null;
   private activeProgress: LoadProgress | null = null;
   private idleTimeout: ReturnType<typeof setTimeout> | null = null;
+  private networkCheckedFor = new Set<ModelKey>();
 
   onStatus(handler: StatusHandler): void {
     this.onStatusHandler = handler;
@@ -76,6 +83,10 @@ export class InferenceService {
 
   onStorageConfirm(handler: StorageConfirmHandler): void {
     this.onStorageConfirmHandler = handler;
+  }
+
+  onNetworkConfirm(handler: NetworkConfirmHandler): void {
+    this.onNetworkConfirmHandler = handler;
   }
 
   onProgress(handler: ProgressHandler): void {
@@ -199,8 +210,31 @@ export class InferenceService {
     }
   }
 
-  switchModel(key: ModelKey, opts: { skipStorageCheck?: boolean } = {}): void {
+  switchModel(
+    key: ModelKey,
+    opts: { skipStorageCheck?: boolean; skipNetworkCheck?: boolean } = {},
+  ): void {
     const model = modelRegistry[key];
+
+    // Cellular guard: large model downloads are metered. Prompt once per model
+    // per session before letting the request through (the SW cache serves
+    // repeat loads, so a confirmed model won't re-prompt).
+    if (
+      !opts.skipNetworkCheck &&
+      !this.networkCheckedFor.has(key) &&
+      isCellularConnection()
+    ) {
+      this.networkCheckedFor.add(key);
+      this.awaitingNetworkConfirm = true;
+      this.pendingNetworkModelKey = key;
+      this.previousModelKey = this.currentModelKey;
+      this.onNetworkConfirmHandler?.({ modelKey: key });
+      this.onStatusHandler?.(
+        `Mobile data connection — confirm to download ${model.name}.`,
+      );
+      return;
+    }
+    this.networkCheckedFor.add(key);
 
     if (!opts.skipStorageCheck && this.shouldCheckStorageFor(key)) {
       void this.checkStorageAndMaybeEmit(key);
@@ -271,6 +305,34 @@ export class InferenceService {
     this.pendingStorageModelKey = null;
     this.onStatusHandler?.("Continuing model load...");
     this.switchModel(key, { skipStorageCheck: true });
+  }
+
+  /**
+   * User accepted the mobile-data download. Continue the model switch, still
+   * subject to the storage check (skipNetworkCheck is set so we don't re-prompt).
+   */
+  resumeNetworkConfirm(): void {
+    if (!this.awaitingNetworkConfirm || this.pendingNetworkModelKey === null) {
+      logger.warn("resumeNetworkConfirm: no pending network confirmation");
+      return;
+    }
+    const key = this.pendingNetworkModelKey;
+    this.awaitingNetworkConfirm = false;
+    this.pendingNetworkModelKey = null;
+    this.onStatusHandler?.("Downloading model over mobile data...");
+    this.switchModel(key, { skipNetworkCheck: true });
+  }
+
+  /**
+   * User declined the mobile-data download. Revert to the model that was active
+   * before the switch so the UI can sync the selector back.
+   */
+  cancelNetworkConfirm(): ModelKey {
+    this.awaitingNetworkConfirm = false;
+    const revertTo = this.previousModelKey;
+    this.pendingNetworkModelKey = null;
+    this.onStatusHandler?.("Model download cancelled.");
+    return revertTo;
   }
 
   private storageCheckedFor = new Set<ModelKey>();
@@ -379,6 +441,8 @@ export class InferenceService {
     }
     this.awaitingStorageConfirm = false;
     this.pendingStorageModelKey = null;
+    this.awaitingNetworkConfirm = false;
+    this.pendingNetworkModelKey = null;
     this.inferQueue = [];
     this.worker?.terminate();
     this.worker = null;
@@ -388,6 +452,7 @@ export class InferenceService {
     this.onResultHandler = null;
     this.onErrorHandler = null;
     this.onStorageConfirmHandler = null;
+    this.onNetworkConfirmHandler = null;
     this.onProgressHandler = null;
   }
 }

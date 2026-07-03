@@ -38,6 +38,7 @@ export const enMessages: Messages = {
   "status.clearHistoryError": "Failed to clear history.",
   "status.historyExported": "History exported.",
   "status.exportHistoryError": "Failed to export history.",
+  "status.passphraseRequired": "Enter a passphrase to encrypt the backup.",
   "status.historyImported": "Imported {{count}} history entries.",
   "status.importHistoryError": "Failed to import history.",
   "status.inferenceError": "Identification failed. Please try again.",
@@ -102,7 +103,17 @@ export const enMessages: Messages = {
   "history.clearAria": "Clear all history",
   "history.exportAria": "Export history to file",
   "history.importAria": "Import history from file",
+  "history.encryptExport": "Encrypt",
+  "history.encryptExportAria": "Encrypt exports with a passphrase",
   "history.empty": "No past identifications yet.",
+
+  // Passphrase modal (encrypted history export/import)
+  "passphrase.title": "Passphrase",
+  "passphrase.body":
+    "Enter a passphrase to encrypt the backup. Without it the file cannot be read.",
+  "passphrase.inputAria": "Passphrase",
+  "passphrase.accept": "OK",
+  "passphrase.cancel": "Cancel",
   "history.lastIdentification": "Last identification",
   "history.thumbnailAlt": "Thumbnail for {{species}}",
   "history.confidence": "{{prob}}% confidence",
@@ -159,6 +170,13 @@ export const enMessages: Messages = {
     "Your device reports {{freeMB}} MB of free storage. The selected model needs {{modelSize}}. Continue anyway?",
   "storageConfirm.cancel": "Cancel",
   "storageConfirm.continue": "Continue anyway",
+
+  // Network (mobile data) confirm modal
+  "networkConfirm.title": "Download over mobile data?",
+  "networkConfirm.body":
+    "You are on a metered mobile connection. The model is large and may use significant data. Download now?",
+  "networkConfirm.cancel": "Cancel",
+  "networkConfirm.accept": "Download anyway",
 
   // Clear confirm modal
   "clearConfirm.title": "Clear all history?",

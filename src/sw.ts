@@ -136,7 +136,10 @@ async function handleModelRequest(req: Request): Promise<Response> {
 
   try {
     const networkRes = await fetch(req);
-    if (networkRes.ok) {
+    // Only cache complete (200) responses — a 206 partial from a resumed
+    // download must never be stored under the model URL or a later non-range
+    // request would read back a truncated body.
+    if (networkRes.ok && networkRes.status === 200) {
       const estimate = await navigator.storage.estimate();
       const canCache = hasEnoughStorageToCache(
         networkRes,
@@ -145,7 +148,14 @@ async function handleModelRequest(req: Request): Promise<Response> {
         config.swMinFreeBytes,
       );
       if (canCache) {
-        await cache.put(req, networkRes.clone());
+        // ponytail: cache in the background so the client streams the live body
+        // and can resume a dropped download with a Range request. Awaiting the
+        // full cache write before returning would block the client until the
+        // model is fully buffered, defeating resume on a flaky connection.
+        void cache.put(req, networkRes.clone()).catch(() => {
+          // Best-effort: a quota or network failure here must not fail the
+          // in-flight model load the client is already streaming.
+        });
       }
     }
     return networkRes;
