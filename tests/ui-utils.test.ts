@@ -22,6 +22,7 @@ describe("ui/utils", () => {
 
   describe("createEl", () => {
     it("creates an element with class and text", () => {
+      // eslint-disable-next-line local/no-raw-ui-strings
       const el = createEl("div", "cls", "txt");
       expect(el.tagName).toBe("DIV");
       expect(el.className).toBe("cls");

@@ -21,7 +21,7 @@ describe("applySafetyLinks", () => {
   beforeEach(() => {
     document.body.innerHTML = `
       <a id="find-mycologist-link" href="#">Mycologist</a>
-      <a id="poison-control-link" href="#" style="display: none">Poison</a>
+      <a id="poison-control-link" href="#" class="hidden">Poison</a>
     `;
   });
 
@@ -35,7 +35,7 @@ describe("applySafetyLinks", () => {
       "poison-control-link",
     ) as HTMLAnchorElement;
     expect(myco.href).toBe("https://www.svampeforeningen.dk/");
-    expect(poison.style.display).not.toBe("none");
+    expect(poison.classList.contains("hidden")).toBe(false);
     expect(poison.href).toBe("https://www.giftlinjen.dk/");
     expect(poison.textContent).toBe("Giftlinjen");
   });
@@ -46,6 +46,6 @@ describe("applySafetyLinks", () => {
     const poison = document.getElementById(
       "poison-control-link",
     ) as HTMLAnchorElement;
-    expect(poison.style.display).toBe("none");
+    expect(poison.classList.contains("hidden")).toBe(true);
   });
 });

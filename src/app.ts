@@ -1,4 +1,5 @@
-import { ModelKey } from "@/core/types";
+import { Edibility, ModelKey } from "@/core/types";
+import type { PredictionReport } from "@/inference/results";
 import { inferenceService } from "@/inference/service";
 import { CameraService } from "@/services/camera";
 import { processFileInput } from "@/services/image-input";
@@ -8,23 +9,40 @@ import {
 } from "@/services/connectivity";
 import { generatePredictionReport } from "@/inference/results";
 import { modelRegistry } from "@/data/model-registry";
-import { ResultsRenderer, SafetyUI } from "@/ui";
+import {
+  ResultsRenderer,
+  SafetyUI,
+  SpeciesDetailPanel,
+  PredictionComparisonPanel,
+  HistoryDetailPanel,
+} from "@/ui";
+import type { ComparisonItem } from "@/ui/comparison";
+import type { LoadProgress } from "@/inference/service";
 import {
   saveIdentification,
   getHistory,
+  searchHistory,
   clearHistory,
   exportHistory,
+  exportHistoryEncrypted,
   importHistory,
   isDataUrlThumbnail,
   isValidLocation,
+  isEncryptedEnvelope,
 } from "@/services/history";
 import type { HistoryEntry, GeoLocation } from "@/services/history";
 import { closeDB } from "@/services/history/db";
 import { initWebVitals } from "@/services/web-vitals";
+import type { AppError } from "@/core/errors";
 import { logger } from "@/core/logger";
-import { sanitizeText } from "@/core/sanitize";
 import { config } from "@/core/config";
-import { getEdibilityClass, createEl } from "@/ui/utils";
+import {
+  getEdibilityClass,
+  createEl,
+  hide,
+  requireElement,
+  show,
+} from "@/ui/utils";
 import { t } from "@/i18n";
 
 const LOCATION_ENABLED_KEY = "ff:location-enabled-v1";
@@ -32,28 +50,80 @@ const LOCATION_ENABLED_KEY = "ff:location-enabled-v1";
 export class AppController {
   private camera = new CameraService(config.captureSize);
   renderer: ResultsRenderer;
+  detailPanel: SpeciesDetailPanel;
+  comparisonPanel: PredictionComparisonPanel;
+  historyDetailPanel: HistoryDetailPanel;
   safety!: SafetyUI;
   statusEl: HTMLElement;
   badgeEl: HTMLElement;
   videoEl: HTMLVideoElement;
   captureBtn: HTMLButtonElement;
+  torchBtn: HTMLButtonElement | null = null;
+  cameraWrap: HTMLElement;
+  focusReticle: HTMLElement | null = null;
+  recaptureBtn: HTMLButtonElement | null = null;
+  progressEl: HTMLElement;
+  progressTextEl: HTMLElement;
+  progressPctEl: HTMLElement;
+  progressBarEl: HTMLElement;
   cameraErrorEl: HTMLElement;
   fileFallbackBtn: HTMLButtonElement | null = null;
   fileInputEl: HTMLInputElement | null = null;
   locationToggle: HTMLInputElement | null = null;
   locationStatus: HTMLElement | null = null;
+  historySearchEl: HTMLInputElement | null = null;
+  historySearchClearEl: HTMLButtonElement | null = null;
   #historyRenderPending = false;
+  #historySearchQuery = "";
   #pendingThumbnail: string | null = null;
   #pendingLocation: GeoLocation | undefined;
+  #lastReport: PredictionReport | undefined;
+  #focusReticleTimeout: number | undefined;
 
   constructor() {
-    this.statusEl = this.require("#status");
-    this.badgeEl = this.require("#badge");
-    this.videoEl = this.require("#video") as unknown as HTMLVideoElement;
-    this.captureBtn = this.require(
+    this.statusEl = requireElement("#status", document, "AppController");
+    this.badgeEl = requireElement("#badge", document, "AppController");
+    this.videoEl = requireElement<HTMLVideoElement>(
+      "#video",
+      document,
+      "AppController",
+    );
+    this.captureBtn = requireElement<HTMLButtonElement>(
       "#capture-btn",
-    ) as unknown as HTMLButtonElement;
-    this.cameraErrorEl = this.require("#camera-error");
+      document,
+      "AppController",
+    );
+    this.torchBtn = document.querySelector<HTMLButtonElement>("#torch-btn");
+    this.updateTorchButton(false);
+    this.cameraWrap = requireElement("#camera-wrap", document, "AppController");
+    this.focusReticle = document.querySelector<HTMLElement>("#focus-reticle");
+    this.recaptureBtn =
+      document.querySelector<HTMLButtonElement>("#recapture-btn");
+    this.progressEl = requireElement(
+      "#model-progress",
+      document,
+      "AppController",
+    );
+    this.progressTextEl = requireElement(
+      "#model-progress-text",
+      document,
+      "AppController",
+    );
+    this.progressPctEl = requireElement(
+      "#model-progress-pct",
+      document,
+      "AppController",
+    );
+    this.progressBarEl = requireElement(
+      "#model-progress-bar",
+      document,
+      "AppController",
+    );
+    this.cameraErrorEl = requireElement(
+      "#camera-error",
+      document,
+      "AppController",
+    );
     this.fileFallbackBtn =
       document.querySelector<HTMLButtonElement>("#file-fallback-btn");
     this.fileInputEl = document.querySelector<HTMLInputElement>("#file-input");
@@ -61,7 +131,46 @@ export class AppController {
       document.querySelector<HTMLInputElement>("#location-toggle");
     this.locationStatus =
       document.querySelector<HTMLElement>("#location-status");
-    this.renderer = new ResultsRenderer(this.require("#app"));
+    this.historySearchEl =
+      document.querySelector<HTMLInputElement>("#history-search");
+    this.historySearchClearEl = document.querySelector<HTMLButtonElement>(
+      "#history-search-clear",
+    );
+    this.historySearchEl?.setAttribute(
+      "placeholder",
+      t("history.searchPlaceholder"),
+    );
+    this.historySearchEl?.setAttribute("aria-label", t("history.searchAria"));
+    this.historySearchClearEl?.setAttribute(
+      "aria-label",
+      t("history.searchClearAria"),
+    );
+    this.renderer = new ResultsRenderer(
+      requireElement("#app", document, "AppController"),
+      {
+        onPredictionClick: (label) => {
+          this.openSpeciesDetail(label);
+        },
+        onComparisonShow: (labels) => {
+          this.openComparison(labels);
+        },
+      },
+    );
+    this.detailPanel = new SpeciesDetailPanel();
+    this.comparisonPanel = new PredictionComparisonPanel();
+    this.historyDetailPanel = new HistoryDetailPanel();
+  }
+
+  #localizedErrorMessage(error: AppError): string {
+    switch (error.code) {
+      case "MODEL_LOAD_FAILED":
+        return t("status.modelLoadError");
+      case "LABEL_LOGIT_MISMATCH":
+        return t("status.labelMismatchError");
+      case "INFERENCE_FAILED":
+      default:
+        return t("status.inferenceError");
+    }
   }
 
   async init(): Promise<void> {
@@ -83,12 +192,19 @@ export class AppController {
       this.statusEl.textContent = text;
     });
 
+    inferenceService.onProgress((progress) => {
+      this.updateModelProgress(progress);
+    });
+
     inferenceService.onResult(({ logits, modelKey }) => {
       try {
         const model = modelRegistry[modelKey];
         const report = generatePredictionReport(logits, model);
+        this.#lastReport = report;
         this.renderer.render(report, model);
         this.setCaptureBusy(false);
+        this.setRecaptureVisible(true);
+        this.hideModelProgress();
         void saveIdentification(
           report,
           modelKey,
@@ -105,15 +221,17 @@ export class AppController {
         void this.renderHistory();
       } catch (err) {
         logger.error("Failed to render result:", err);
-        this.statusEl.textContent = "Error displaying result.";
+        this.statusEl.textContent = t("status.displayError");
         this.setCaptureBusy(false);
         this.#pendingThumbnail = null;
       }
     });
 
     inferenceService.onError((error) => {
-      this.statusEl.textContent = `Error: ${error.message}`;
+      logger.error("Inference error:", error);
+      this.statusEl.textContent = this.#localizedErrorMessage(error);
       this.setCaptureBusy(false);
+      this.setRecaptureVisible(false);
       this.#pendingThumbnail = null;
     });
 
@@ -130,11 +248,69 @@ export class AppController {
     try {
       await this.camera.start(this.videoEl);
       this.statusEl.textContent = t("status.cameraActive");
-      this.cameraErrorEl.style.display = "none";
+      hide(this.cameraErrorEl);
+      this.updateTorchVisibility();
     } catch {
       this.statusEl.textContent = t("status.cameraError");
-      this.cameraErrorEl.style.display = "flex";
+      show(this.cameraErrorEl);
+      this.updateTorchVisibility();
     }
+  }
+
+  private updateTorchVisibility(): void {
+    if (!this.torchBtn) return;
+    this.torchBtn.hidden = !this.camera.torchSupported();
+  }
+
+  private updateTorchButton(on: boolean): void {
+    if (!this.torchBtn) return;
+    this.torchBtn.setAttribute(
+      "aria-label",
+      on ? t("camera.torchOn") : t("camera.torchOff"),
+    );
+    this.torchBtn.classList.toggle("torch-on", on);
+  }
+
+  private async handleTorchToggle(): Promise<void> {
+    const next = !this.camera.isTorchOn();
+    const ok = await this.camera.setTorch(next);
+    if (ok) {
+      this.updateTorchButton(next);
+      if ("vibrate" in navigator) {
+        navigator.vibrate(20);
+      }
+    }
+  }
+
+  private handleVideoPointerDown(e: PointerEvent): void {
+    e.preventDefault();
+    const point = CameraService.mapDomPointToNormalized(
+      this.videoEl,
+      e.clientX,
+      e.clientY,
+    );
+    if (!point) return;
+    void (async () => {
+      const ok = await this.camera.focusAt(point.x, point.y);
+      if (ok) {
+        this.showFocusReticle(e.clientX, e.clientY);
+        if ("vibrate" in navigator) {
+          navigator.vibrate(15);
+        }
+      }
+    })();
+  }
+
+  private showFocusReticle(clientX: number, clientY: number): void {
+    if (!this.focusReticle) return;
+    const rect = this.cameraWrap.getBoundingClientRect();
+    this.focusReticle.style.left = `${String(clientX - rect.left)}px`;
+    this.focusReticle.style.top = `${String(clientY - rect.top)}px`;
+    this.focusReticle.classList.add("active");
+    window.clearTimeout(this.#focusReticleTimeout);
+    this.#focusReticleTimeout = window.setTimeout(() => {
+      this.focusReticle?.classList.remove("active");
+    }, 1200);
   }
 
   private handleCapture(): void {
@@ -145,6 +321,7 @@ export class AppController {
       return;
     }
     this.setCaptureBusy(true);
+    this.setRecaptureVisible(false);
     this.statusEl.textContent = t("status.identifying");
     this.#pendingThumbnail = result.thumbnail;
     this.startLocationCapture();
@@ -155,6 +332,46 @@ export class AppController {
     this.captureBtn.dataset["busy"] = busy ? "true" : "false";
     this.captureBtn.disabled = busy;
     this.captureBtn.setAttribute("aria-busy", busy ? "true" : "false");
+  }
+
+  private setRecaptureVisible(visible: boolean): void {
+    if (!this.recaptureBtn) return;
+    this.recaptureBtn.hidden = !visible;
+  }
+
+  private updateModelProgress(progress: LoadProgress): void {
+    this.progressEl.hidden = false;
+    const phaseText =
+      progress.phase === "download"
+        ? t("model.progressDownload")
+        : t("model.progressCompile");
+    this.progressTextEl.textContent = t("model.progressLabel", {
+      model: modelRegistry[progress.modelKey].name,
+      phase: phaseText,
+    });
+    const pct = `${String(progress.percent)}%`;
+    this.progressPctEl.textContent = pct;
+    this.progressBarEl.style.width = pct;
+  }
+
+  private hideModelProgress(): void {
+    this.progressEl.hidden = true;
+    this.progressBarEl.style.width = "0%";
+  }
+
+  private handleRecapture(): void {
+    this.renderer.clear();
+    this.detailPanel.close();
+    this.comparisonPanel.close();
+    this.historyDetailPanel.close();
+    this.#lastReport = undefined;
+    this.statusEl.textContent = t("status.cameraActive");
+    this.setRecaptureVisible(false);
+    this.hideModelProgress();
+    if ("vibrate" in navigator) {
+      navigator.vibrate(10);
+    }
+    this.cameraWrap.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   private async handleFileSelect(e: Event): Promise<void> {
@@ -180,11 +397,102 @@ export class AppController {
     void this.startCamera();
   }
 
+  private handleSearchInput(e: Event): void {
+    const input = e.target as HTMLInputElement;
+    this.#historySearchQuery = input.value;
+    this.updateSearchClearVisibility();
+    void this.renderHistory();
+  }
+
+  private handleSearchClear(): void {
+    if (this.historySearchEl) {
+      this.historySearchEl.value = "";
+    }
+    this.#historySearchQuery = "";
+    this.updateSearchClearVisibility();
+    void this.renderHistory();
+  }
+
+  private updateSearchClearVisibility(): void {
+    if (!this.historySearchClearEl) return;
+    this.historySearchClearEl.hidden =
+      this.#historySearchQuery.trim().length === 0;
+  }
+
   private handleModelSwitch(e: Event): void {
     const select = e.target as HTMLSelectElement;
     const key = select.value === "dima806" ? ModelKey.Dima806 : ModelKey.BVRA;
     this.renderer.clear();
+    this.detailPanel.close();
+    this.comparisonPanel.close();
+    this.historyDetailPanel.close();
+    this.#lastReport = undefined;
+    this.setRecaptureVisible(false);
+    this.hideModelProgress();
     inferenceService.switchModel(key);
+  }
+
+  private openSpeciesDetail(label: string): void {
+    const modelKey = inferenceService.getActiveModelKey();
+    const model = modelRegistry[modelKey];
+    const prediction = this.#lastReport?.predictions.find(
+      (p) => p.label === label,
+    ) ?? {
+      label,
+      probability: 0,
+      index: -1,
+    };
+    const confidence = this.#lastReport?.confidence ?? {
+      score: prediction.probability,
+      reliability: "low",
+      gap: 0,
+    };
+    const knowledge = model.knowledge[label] ?? {
+      edibility: Edibility.Unknown,
+      notes: t("knowledge.noData"),
+    };
+    this.detailPanel.open(label, prediction, knowledge, confidence);
+  }
+
+  private openComparison(labels: string[]): void {
+    if (labels.length < 2 || !this.#lastReport) return;
+
+    const modelKey = inferenceService.getActiveModelKey();
+    const model = modelRegistry[modelKey];
+    const items: ComparisonItem[] = [];
+
+    for (const label of labels) {
+      const prediction = this.#lastReport.predictions.find(
+        (p) => p.label === label,
+      );
+      if (!prediction) continue;
+      const knowledge = model.knowledge[label] ?? {
+        edibility: Edibility.Unknown,
+        notes: t("knowledge.noData"),
+      };
+      items.push({
+        prediction,
+        knowledge,
+        confidence: this.#lastReport.confidence,
+      });
+    }
+
+    if (items.length >= 2) {
+      this.comparisonPanel.open(items);
+    }
+  }
+
+  private async openHistoryDetail(id: string): Promise<void> {
+    if (!id) return;
+    try {
+      const entries = await getHistory(20);
+      const entry = entries.find((e) => e.id === id);
+      if (entry) {
+        this.historyDetailPanel.open(entry);
+      }
+    } catch (err) {
+      logger.error("Failed to open history detail:", err);
+    }
   }
 
   handleOfflineChange(): void {
@@ -288,9 +596,9 @@ export class AppController {
     const slot = document.getElementById("last-result");
     if (!slot) return;
 
-    const date = sanitizeText(new Date(last.timestamp).toLocaleString());
-    const species = sanitizeText(last.top1Species);
-    const edibility = sanitizeText(last.top1Edibility);
+    const date = new Date(last.timestamp).toLocaleString();
+    const species = last.top1Species;
+    const edibility = last.top1Edibility;
     const prob = (last.top1Probability * 100).toFixed(1);
     const edClass = getEdibilityClass(last.top1Edibility);
 
@@ -309,16 +617,16 @@ export class AppController {
     inner.appendChild(meta);
 
     slot.appendChild(inner);
-    slot.style.display = "block";
+    show(slot);
   }
 
   private renderHistoryItem(entry: HistoryEntry): HTMLElement {
-    const date = sanitizeText(new Date(entry.timestamp).toLocaleDateString());
-    const model = sanitizeText(entry.modelKey);
-    const species = sanitizeText(entry.top1Species);
-    const edibility = sanitizeText(entry.top1Edibility);
+    const date = new Date(entry.timestamp).toLocaleDateString();
+    const model = entry.modelKey;
+    const species = entry.top1Species;
+    const edibility = entry.top1Edibility;
     const prob = (entry.top1Probability * 100).toFixed(1);
-    const id = sanitizeText(entry.id);
+    const id = entry.id;
     const edClass = getEdibilityClass(entry.top1Edibility);
 
     const entryEl = createEl("div", "history-entry");
@@ -385,11 +693,20 @@ export class AppController {
     }
 
     try {
-      const entries = await getHistory(20);
+      const query = this.#historySearchQuery.trim();
+      const entries = query
+        ? await searchHistory(query, { limit: 20 })
+        : await getHistory(20);
 
       if (entries.length === 0) {
         list.innerHTML = "";
-        list.appendChild(createEl("p", "history-empty", t("history.empty")));
+        list.appendChild(
+          createEl(
+            "p",
+            "history-empty",
+            query ? t("history.noSearchResults") : t("history.empty"),
+          ),
+        );
         return;
       }
 
@@ -436,7 +753,21 @@ export class AppController {
 
   private async handleExportHistory(): Promise<void> {
     try {
-      const json = await exportHistory();
+      const encryptToggle = document.querySelector<HTMLInputElement>(
+        "#history-encrypt-export",
+      );
+      let json: string;
+      if (encryptToggle?.checked) {
+        const passphrase = await this.promptPassphrase();
+        if (passphrase === null) return; // user cancelled
+        if (!passphrase) {
+          this.statusEl.textContent = t("status.passphraseRequired");
+          return;
+        }
+        json = await exportHistoryEncrypted(passphrase);
+      } else {
+        json = await exportHistory();
+      }
       const blob = new Blob([json], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -460,7 +791,13 @@ export class AppController {
 
     try {
       const text = await file.text();
-      const count = await importHistory(text);
+      let passphrase: string | undefined;
+      if (isEncryptedEnvelope(text)) {
+        const entered = await this.promptPassphrase();
+        if (entered === null) return; // user cancelled
+        passphrase = entered;
+      }
+      const count = await importHistory(text, passphrase);
       void this.renderHistory();
       void this.renderLastResult();
       this.statusEl.textContent = t("status.historyImported", {
@@ -474,9 +811,69 @@ export class AppController {
     }
   }
 
+  // ponytail: passphrase entry reuses the existing confirm-modal shape (dialog +
+  // form submit + Esc-cancel) so no new UI machinery. Resolves the entered
+  // string, or null when the user cancels.
+  private promptPassphrase(): Promise<string | null> {
+    const modal = document.getElementById(
+      "passphrase-modal",
+    ) as HTMLDialogElement | null;
+    const input = document.getElementById(
+      "passphrase-input",
+    ) as HTMLInputElement | null;
+    const form = document.getElementById(
+      "passphrase-form",
+    ) as HTMLFormElement | null;
+    const cancel = document.getElementById(
+      "passphrase-cancel",
+    ) as HTMLButtonElement | null;
+    if (!modal || !input || !form || !cancel) {
+      return Promise.resolve(null);
+    }
+    input.value = "";
+    modal.showModal();
+    input.focus();
+    return new Promise<string | null>((resolve) => {
+      const cleanup = () => {
+        form.removeEventListener("submit", onSubmit);
+        cancel.removeEventListener("click", onCancel);
+        modal.removeEventListener("cancel", onDialogCancel);
+        modal.close();
+      };
+      const onSubmit = (e: SubmitEvent) => {
+        e.preventDefault();
+        cleanup();
+        resolve(input.value);
+      };
+      const onCancel = () => {
+        cleanup();
+        resolve(null);
+      };
+      const onDialogCancel = (e: Event) => {
+        e.preventDefault();
+        onCancel();
+      };
+      form.addEventListener("submit", onSubmit, { once: true });
+      cancel.addEventListener("click", onCancel, { once: true });
+      modal.addEventListener("cancel", onDialogCancel, { once: true });
+    });
+  }
+
   private bindEvents(): void {
     this.captureBtn.addEventListener("click", () => {
       this.handleCapture();
+    });
+
+    this.recaptureBtn?.addEventListener("click", () => {
+      this.handleRecapture();
+    });
+
+    this.torchBtn?.addEventListener("click", () => {
+      void this.handleTorchToggle();
+    });
+
+    this.videoEl.addEventListener("pointerdown", (e) => {
+      this.handleVideoPointerDown(e);
     });
 
     this.fileInputEl?.addEventListener("change", (e) => {
@@ -513,6 +910,18 @@ export class AppController {
       this.handleRetryCamera();
     });
 
+    this.historySearchEl?.addEventListener("input", (e) => {
+      this.handleSearchInput(e);
+    });
+    this.historySearchEl?.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        this.handleSearchClear();
+      }
+    });
+    this.historySearchClearEl?.addEventListener("click", () => {
+      this.handleSearchClear();
+    });
+
     const modelSelect = document.getElementById("model-select");
     modelSelect?.addEventListener("change", (e) => {
       this.handleModelSwitch(e);
@@ -527,20 +936,25 @@ export class AppController {
 
     const historyList = document.getElementById("history-list");
     historyList?.addEventListener("click", (e) => {
-      const btn = (e.target as HTMLElement).closest<HTMLElement>(
-        ".history-delete",
-      );
-      if (!btn) return;
-      const id = btn.dataset["id"];
-      if (!id) return;
-      void (async () => {
-        const { deleteEntry } = await import(
-          /* @vite-ignore */ "@/services/history/delete-entry"
-        );
-        await deleteEntry(id);
-        void this.renderHistory();
-        void this.renderLastResult();
-      })();
+      const target = e.target as HTMLElement;
+      const btn = target.closest<HTMLElement>(".history-delete");
+      if (btn) {
+        const id = btn.dataset["id"];
+        if (!id) return;
+        void (async () => {
+          const { deleteEntry } = await import(
+            /* @vite-ignore */ "@/services/history/delete-entry"
+          );
+          await deleteEntry(id);
+          void this.renderHistory();
+          void this.renderLastResult();
+        })();
+        return;
+      }
+      const entryEl = target.closest<HTMLElement>(".history-entry");
+      if (entryEl) {
+        void this.openHistoryDetail(entryEl.dataset["id"] ?? "");
+      }
     });
 
     window.addEventListener("pagehide", (e) => {
@@ -556,11 +970,5 @@ export class AppController {
       void this.startCamera();
       inferenceService.switchModel(ModelKey.BVRA);
     });
-  }
-
-  private require(selector: string): HTMLElement {
-    const el = document.querySelector(selector);
-    if (!el) throw new Error(`Required element not found: ${selector}`);
-    return el as HTMLElement;
   }
 }

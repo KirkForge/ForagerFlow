@@ -22,6 +22,14 @@ dist/
 build/
 *.tsbuildinfo
 
+# --- TWA generated resources (produced by scripts/build-twa.cjs) ---
+twa/app/build/
+twa/app/src/main/res/mipmap-*/
+twa/app/src/main/res/mipmap-*-round/
+twa/app/src/main/res/values/twa-config.xml
+twa/.gradle/
+twa/local.properties
+
 # --- Test artifacts ---
 test-results/
 playwright-report/
@@ -40,6 +48,7 @@ CACHEDIR.TAG
 llm/
 state.md
 AGENTS.md
+CLAUDE.md
 .claude/
 
 # --- Model snapshots from HuggingFace (generated) ---

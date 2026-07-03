@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ModelKey } from "@/core/types";
+import { AppError } from "@/core/errors";
 import type { CaptureResult } from "@/services/camera";
+import type * as CameraModule from "@/services/camera";
 import { AppController } from "@/app";
+import { ResultsRenderer } from "@/ui";
 import { flushPromises } from "./helpers/promises";
 import { makeHistoryEntry } from "./helpers/fixtures";
 import { setLocale } from "@/i18n";
+import { getHistory, searchHistory } from "@/services/history";
+import { logger } from "@/core/logger";
 
 interface MockInferenceService {
   onStatus: (handler: (text: string) => void) => void;
@@ -12,9 +17,21 @@ interface MockInferenceService {
     handler: (result: { logits: Float32Array; modelKey: ModelKey }) => void,
   ) => void;
   onError: (handler: (error: Error) => void) => void;
+  onProgress: (
+    handler: (progress: {
+      modelKey: ModelKey;
+      phase: string;
+      percent: number;
+    }) => void,
+  ) => void;
   emitStatus: (text: string) => void;
   emitResult: (result: { logits: Float32Array; modelKey: ModelKey }) => void;
   emitError: (error: Error) => void;
+  emitProgress: (progress: {
+    modelKey: ModelKey;
+    phase: string;
+    percent: number;
+  }) => void;
   initialize: ReturnType<typeof vi.fn>;
   switchModel: ReturnType<typeof vi.fn>;
   infer: ReturnType<typeof vi.fn>;
@@ -28,6 +45,13 @@ const mockInferenceService = vi.hoisted<MockInferenceService>(() => {
     | ((result: { logits: Float32Array; modelKey: ModelKey }) => void)
     | null = null;
   let errorHandler: ((error: Error) => void) | null = null;
+  let progressHandler:
+    | ((progress: {
+        modelKey: ModelKey;
+        phase: string;
+        percent: number;
+      }) => void)
+    | null = null;
   return {
     onStatus: (handler) => {
       statusHandler = handler;
@@ -38,15 +62,24 @@ const mockInferenceService = vi.hoisted<MockInferenceService>(() => {
     onError: (handler) => {
       errorHandler = handler;
     },
+    onProgress: (handler) => {
+      progressHandler = handler;
+    },
     emitStatus: (text: string) => statusHandler?.(text),
     emitResult: (result: { logits: Float32Array; modelKey: ModelKey }) =>
       resultHandler?.(result),
     emitError: (error: Error) => errorHandler?.(error),
+    emitProgress: (progress: {
+      modelKey: ModelKey;
+      phase: string;
+      percent: number;
+    }) => progressHandler?.(progress),
     initialize: vi.fn(),
     switchModel: vi.fn(),
     infer: vi.fn(),
     terminate: vi.fn(),
     isReady: vi.fn().mockReturnValue(false),
+    getActiveModelKey: vi.fn().mockReturnValue("bvra"),
   };
 });
 
@@ -54,6 +87,10 @@ const mockCamera = vi.hoisted(() => ({
   start: vi.fn().mockResolvedValue(undefined),
   stop: vi.fn(),
   capture: vi.fn(),
+  torchSupported: vi.fn().mockReturnValue(false),
+  isTorchOn: vi.fn().mockReturnValue(false),
+  setTorch: vi.fn().mockResolvedValue(false),
+  focusAt: vi.fn().mockResolvedValue(false),
 }));
 
 const mockRenderer = vi.hoisted(() => ({
@@ -66,15 +103,39 @@ const mockSafety = vi.hoisted(() => ({
   confirmClearHistory: vi.fn().mockResolvedValue(true),
 }));
 
+const mockDetailPanel = vi.hoisted(() => ({
+  open: vi.fn(),
+  close: vi.fn(),
+}));
+
+const mockComparisonPanel = vi.hoisted(() => ({
+  open: vi.fn(),
+  close: vi.fn(),
+}));
+
+const mockHistoryDetailPanel = vi.hoisted(() => ({
+  open: vi.fn(),
+  close: vi.fn(),
+}));
+
 vi.mock("@/inference/service", () => ({
   inferenceService: mockInferenceService,
 }));
 
-vi.mock("@/services/camera", () => ({
-  CameraService: vi.fn(function () {
-    return mockCamera;
-  }),
-}));
+vi.mock("@/services/camera", async () => {
+  const actual =
+    await vi.importActual<typeof CameraModule>("@/services/camera");
+  return {
+    CameraService: Object.assign(
+      vi.fn(function () {
+        return mockCamera;
+      }),
+      {
+        mapDomPointToNormalized: actual.CameraService.mapDomPointToNormalized,
+      },
+    ),
+  };
+});
 
 vi.mock("@/services/image-input", () => ({
   processFileInput: vi.fn().mockResolvedValue({
@@ -85,13 +146,25 @@ vi.mock("@/services/image-input", () => ({
   } as CaptureResult),
 }));
 
-vi.mock("@/services/history", () => ({
-  saveIdentification: vi.fn().mockResolvedValue("id-1"),
-  getHistory: vi.fn().mockResolvedValue([]),
-  clearHistory: vi.fn().mockResolvedValue(undefined),
-  exportHistory: vi.fn().mockResolvedValue('{"version":1,"entries":[]}'),
-  importHistory: vi.fn().mockResolvedValue(0),
-}));
+vi.mock("@/services/history", async () => {
+  const actual = (await vi.importActual("@/services/history")) as Record<
+    string,
+    unknown
+  >;
+  return {
+    ...actual,
+    saveIdentification: vi.fn().mockResolvedValue("id-1"),
+    getHistory: vi.fn().mockResolvedValue([]),
+    searchHistory: vi.fn().mockResolvedValue([]),
+    clearHistory: vi.fn().mockResolvedValue(undefined),
+    exportHistory: vi.fn().mockResolvedValue('{"version":1,"entries":[]}'),
+    exportHistoryEncrypted: vi
+      .fn()
+      .mockResolvedValue('{"v":1,"kdf":"PBKDF2-SHA256","ct":"x"}'),
+    importHistory: vi.fn().mockResolvedValue(0),
+    isEncryptedEnvelope: vi.fn().mockReturnValue(false),
+  };
+});
 
 vi.mock("@/services/history/delete-entry", () => ({
   deleteEntry: vi.fn().mockResolvedValue(undefined),
@@ -104,6 +177,15 @@ vi.mock("@/ui", () => ({
   SafetyUI: vi.fn(function () {
     return mockSafety;
   }),
+  SpeciesDetailPanel: vi.fn(function () {
+    return mockDetailPanel;
+  }),
+  PredictionComparisonPanel: vi.fn(function () {
+    return mockComparisonPanel;
+  }),
+  HistoryDetailPanel: vi.fn(function () {
+    return mockHistoryDetailPanel;
+  }),
 }));
 
 function renderAppHTML(): void {
@@ -111,8 +193,12 @@ function renderAppHTML(): void {
     <div id="app">
       <div id="status"></div>
       <div id="badge"></div>
-      <video id="video"></video>
-      <button id="capture-btn">Capture</button>
+      <div id="camera-wrap">
+        <video id="video"></video>
+        <div id="focus-reticle" hidden></div>
+        <button id="capture-btn">Capture</button>
+        <button id="torch-btn" hidden>🔦</button>
+      </div>
       <div id="camera-error"></div>
       <button id="file-fallback-btn">Upload</button>
       <input id="file-input" type="file" />
@@ -121,18 +207,61 @@ function renderAppHTML(): void {
         <option value="dima806">dima806</option>
       </select>
       <div id="predictions"></div>
+      <button id="recapture-btn" type="button" hidden>Recapture</button>
       <div id="knowledge"></div>
       <div id="warning"></div>
       <div id="low-confidence"></div>
       <div id="last-result"></div>
       <div id="history-list"></div>
+      <input id="history-search" type="search" />
+      <button id="history-search-clear">×</button>
       <button id="history-export">Export</button>
       <button id="history-import">Import</button>
       <input id="history-import-input" type="file" accept="application/json" />
+      <input type="checkbox" id="history-encrypt-export" />
       <button id="history-clear">Clear</button>
+      <dialog id="passphrase-modal">
+        <form method="dialog" id="passphrase-form">
+          <input type="password" id="passphrase-input" autocomplete="off" />
+          <button type="button" id="passphrase-cancel" value="cancel">Cancel</button>
+          <button type="submit" id="passphrase-accept" value="accept">OK</button>
+        </form>
+      </dialog>
       <button id="camera-retry">Retry</button>
+      <input id="location-toggle" type="checkbox" />
+      <span id="location-status"></span>
+      <div id="results">
+        <div id="model-progress" role="status" hidden>
+          <div class="model-progress-label">
+            <span id="model-progress-text"></span>
+            <span id="model-progress-pct"></span>
+          </div>
+          <div class="model-progress-track">
+            <div id="model-progress-bar" class="model-progress-bar"></div>
+          </div>
+        </div>
+      </div>
     </div>
+    <dialog id="history-detail-modal">
+      <div id="history-detail-content">
+        <div class="detail-header">
+          <h2 id="history-detail-title"></h2>
+          <button id="history-detail-close" type="button" value="close">×</button>
+        </div>
+        <div id="history-detail-body">
+          <img id="history-detail-thumbnail" class="history-detail-thumbnail" alt="" hidden />
+          <div id="history-detail-meta" class="detail-meta"></div>
+          <p id="history-detail-notes" class="detail-notes"></p>
+          <p id="history-detail-safety" class="detail-safety"></p>
+          <a id="history-detail-verify" class="verify-link" href="#"></a>
+        </div>
+      </div>
+    </dialog>
   `;
+  for (const dialog of document.querySelectorAll("dialog")) {
+    (dialog as HTMLDialogElement).showModal = vi.fn();
+    (dialog as HTMLDialogElement).close = vi.fn();
+  }
 }
 
 describe("AppController", () => {
@@ -170,6 +299,33 @@ describe("AppController", () => {
     });
 
     expect(mockRenderer.render).toHaveBeenCalled();
+  });
+
+  it("updates the model progress UI", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    mockInferenceService.emitProgress({
+      modelKey: ModelKey.BVRA,
+      phase: "download",
+      percent: 42,
+    });
+
+    const progressEl = document.querySelector("#model-progress") as HTMLElement;
+    const progressText = document.querySelector(
+      "#model-progress-text",
+    ) as HTMLElement;
+    const progressPct = document.querySelector(
+      "#model-progress-pct",
+    ) as HTMLElement;
+    const progressBar = document.querySelector(
+      "#model-progress-bar",
+    ) as HTMLElement;
+
+    expect(progressEl.hidden).toBe(false);
+    expect(progressText.textContent).toContain("Specialist");
+    expect(progressPct.textContent).toBe("42%");
+    expect(progressBar.style.width).toBe("42%");
   });
 
   it("shows camera error when camera fails to start", async () => {
@@ -277,7 +433,7 @@ describe("AppController", () => {
     expect(list.children.length).toBeGreaterThan(0);
 
     const slot = document.querySelector("#last-result") as HTMLElement;
-    expect(slot.style.display).toBe("block");
+    expect(slot.classList.contains("hidden")).toBe(false);
   });
 
   it("shows empty history message when no entries", async () => {
@@ -323,13 +479,26 @@ describe("AppController", () => {
     expect(status.textContent).toBe("Failed to process image.");
   });
 
-  it("sets error state on inference error", async () => {
+  it("sets localized error state on inference error", async () => {
     const controller = new AppController();
     await controller.init();
 
     mockInferenceService.emitError(new Error("model failed"));
     const status = document.querySelector("#status") as HTMLElement;
-    expect(status.textContent).toContain("model failed");
+    expect(status.textContent).toBe("Identification failed. Please try again.");
+  });
+
+  it("sets localized model-load error when model fails to load", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    mockInferenceService.emitError(
+      new AppError("model failed", "MODEL_LOAD_FAILED"),
+    );
+    const status = document.querySelector("#status") as HTMLElement;
+    expect(status.textContent).toBe(
+      "Could not load the model. Check your connection.",
+    );
   });
 
   it("skips capture when button is busy", async () => {
@@ -428,6 +597,46 @@ describe("AppController", () => {
     expect(deleteEntry).toHaveBeenCalledWith("h-del");
   });
 
+  it("opens history detail when an entry is clicked", async () => {
+    const { getHistory } = await import("@/services/history");
+    const entry = makeHistoryEntry({
+      id: "h-detail",
+      top1Species: "Amanita muscaria",
+    });
+    vi.mocked(getHistory).mockResolvedValue([entry]);
+
+    const controller = new AppController();
+    await controller.init();
+    await flushPromises();
+
+    const list = document.querySelector("#history-list") as HTMLElement;
+    const entryEl = list.querySelector(".history-entry") as HTMLElement;
+    entryEl.click();
+
+    await flushPromises();
+    expect(mockHistoryDetailPanel.open).toHaveBeenCalledWith(entry);
+  });
+
+  it("does not open history detail when delete button is clicked", async () => {
+    const { getHistory } = await import("@/services/history");
+    const { deleteEntry } = await import("@/services/history/delete-entry");
+    vi.mocked(getHistory).mockResolvedValue([
+      makeHistoryEntry({ id: "h-no-detail" }),
+    ]);
+
+    const controller = new AppController();
+    await controller.init();
+    await flushPromises();
+
+    const list = document.querySelector("#history-list") as HTMLElement;
+    const delBtn = list.querySelector(".history-delete") as HTMLElement;
+    delBtn.click();
+
+    await flushPromises();
+    expect(deleteEntry).toHaveBeenCalled();
+    expect(mockHistoryDetailPanel.open).not.toHaveBeenCalled();
+  });
+
   it("exports history when export button is clicked", async () => {
     const { exportHistory } = await import("@/services/history");
     const createObjectURLSpy = vi
@@ -467,6 +676,70 @@ describe("AppController", () => {
     expect(status.textContent).toBe("Failed to export history.");
   });
 
+  it("exports encrypted history when the encrypt toggle is on", async () => {
+    const { exportHistoryEncrypted } = await import("@/services/history");
+    const createObjectURLSpy = vi
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue("blob:enc");
+    vi.spyOn(URL, "revokeObjectURL");
+
+    const controller = new AppController();
+    await controller.init();
+
+    const toggle = document.querySelector(
+      "#history-encrypt-export",
+    ) as HTMLInputElement;
+    toggle.checked = true;
+
+    const exportBtn = document.querySelector("#history-export") as HTMLElement;
+    exportBtn.click();
+    await flushPromises();
+
+    // Passphrase modal is open; type a passphrase and submit.
+    const input = document.querySelector(
+      "#passphrase-input",
+    ) as HTMLInputElement;
+    const form = document.querySelector("#passphrase-form") as HTMLFormElement;
+    input.value = "hunter2";
+    form.dispatchEvent(new Event("submit", { cancelable: true }));
+    await flushPromises();
+
+    expect(exportHistoryEncrypted).toHaveBeenCalledWith("hunter2");
+    expect(createObjectURLSpy).toHaveBeenCalled();
+    createObjectURLSpy.mockRestore();
+  });
+
+  it("imports an encrypted backup by prompting for a passphrase", async () => {
+    const { importHistory, isEncryptedEnvelope } =
+      await import("@/services/history");
+    vi.mocked(isEncryptedEnvelope).mockReturnValueOnce(true);
+    const fileText = '{"v":1,"kdf":"PBKDF2-SHA256","ct":"x"}';
+    const file = new File([fileText], "backup.json", {
+      type: "application/json",
+    });
+
+    const controller = new AppController();
+    await controller.init();
+
+    const input = document.querySelector(
+      "#history-import-input",
+    ) as HTMLInputElement;
+    setFiles(input, file);
+    input.dispatchEvent(new Event("change"));
+    await flushPromises();
+
+    // Encrypted envelope detected → passphrase modal opens.
+    const pwInput = document.querySelector(
+      "#passphrase-input",
+    ) as HTMLInputElement;
+    const form = document.querySelector("#passphrase-form") as HTMLFormElement;
+    pwInput.value = "hunter2";
+    form.dispatchEvent(new Event("submit", { cancelable: true }));
+    await flushPromises();
+
+    expect(importHistory).toHaveBeenCalledWith(fileText, "hunter2");
+  });
+
   it("opens the import file picker when import button is clicked", async () => {
     const controller = new AppController();
     await controller.init();
@@ -500,7 +773,7 @@ describe("AppController", () => {
     input.dispatchEvent(new Event("change"));
 
     await flushPromises();
-    expect(importHistory).toHaveBeenCalledWith(fileText);
+    expect(importHistory).toHaveBeenCalledWith(fileText, undefined);
     const status = document.querySelector("#status") as HTMLElement;
     expect(status.textContent).toBe("Imported 0 history entries.");
   });
@@ -524,6 +797,904 @@ describe("AppController", () => {
     await flushPromises();
     const status = document.querySelector("#status") as HTMLElement;
     expect(status.textContent).toBe("Failed to import history.");
+  });
+
+  it("opens species detail when a prediction is clicked", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+
+    const options = vi.mocked(ResultsRenderer).mock.calls[0]?.[1];
+    expect(options).toBeDefined();
+    expect(options?.onPredictionClick).toBeTypeOf("function");
+    options?.onPredictionClick?.(model.labels[0] ?? "Agaricus bisporus");
+
+    expect(mockDetailPanel.open).toHaveBeenCalled();
+  });
+
+  it("opens comparison panel when two predictions are selected", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+
+    const options = vi.mocked(ResultsRenderer).mock.calls[0]?.[1];
+    expect(options).toBeDefined();
+    options?.onComparisonShow?.([
+      model.labels[0] ?? "Agaricus bisporus",
+      model.labels[1] ?? "Amanita phalloides",
+    ]);
+
+    expect(mockComparisonPanel.open).toHaveBeenCalled();
+  });
+
+  it("closes detail and comparison panels on model switch", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const select = document.querySelector("#model-select") as HTMLSelectElement;
+    select.value = "dima806";
+    select.dispatchEvent(new Event("change"));
+
+    expect(mockDetailPanel.close).toHaveBeenCalled();
+    expect(mockComparisonPanel.close).toHaveBeenCalled();
+  });
+
+  it("shows re-capture button after inference result", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+
+    const recaptureBtn = document.querySelector(
+      "#recapture-btn",
+    ) as HTMLButtonElement;
+    expect(recaptureBtn.hidden).toBe(false);
+  });
+
+  it("hides re-capture button when a new capture starts", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+
+    mockCamera.capture.mockReturnValue({
+      buffer: new ArrayBuffer(224 * 224 * 4),
+      width: 224,
+      height: 224,
+      thumbnail: "thumb",
+    } as CaptureResult);
+
+    const captureBtn = document.querySelector("#capture-btn") as HTMLElement;
+    captureBtn.click();
+
+    const recaptureBtn = document.querySelector(
+      "#recapture-btn",
+    ) as HTMLButtonElement;
+    expect(recaptureBtn.hidden).toBe(true);
+  });
+
+  it("hides re-capture button on inference error", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+
+    mockInferenceService.emitError(new Error("model failed"));
+
+    const recaptureBtn = document.querySelector(
+      "#recapture-btn",
+    ) as HTMLButtonElement;
+    expect(recaptureBtn.hidden).toBe(true);
+  });
+
+  it("hides re-capture button on model switch", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+
+    const select = document.querySelector("#model-select") as HTMLSelectElement;
+    select.value = "dima806";
+    select.dispatchEvent(new Event("change"));
+
+    const recaptureBtn = document.querySelector(
+      "#recapture-btn",
+    ) as HTMLButtonElement;
+    expect(recaptureBtn.hidden).toBe(true);
+  });
+
+  it("handles re-capture button click", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+
+    const cameraWrap = document.querySelector("#camera-wrap") as HTMLElement;
+    const scrollMock = vi.fn();
+    cameraWrap.scrollIntoView = scrollMock;
+
+    const recaptureBtn = document.querySelector(
+      "#recapture-btn",
+    ) as HTMLButtonElement;
+    recaptureBtn.click();
+
+    expect(mockRenderer.clear).toHaveBeenCalled();
+    expect(mockDetailPanel.close).toHaveBeenCalled();
+    expect(mockComparisonPanel.close).toHaveBeenCalled();
+    const status = document.querySelector("#status") as HTMLElement;
+    expect(status.textContent).toBe("Camera active. Tap shutter to identify.");
+    expect(recaptureBtn.hidden).toBe(true);
+    expect(scrollMock).toHaveBeenCalled();
+  });
+
+  it("filters history when search input changes", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const entry = makeHistoryEntry({ top1Species: "Amanita muscaria" });
+    vi.mocked(searchHistory).mockResolvedValueOnce([entry]);
+
+    const input = document.querySelector<HTMLInputElement>("#history-search")!;
+    input.value = "amanita";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    await flushPromises();
+
+    expect(searchHistory).toHaveBeenCalledWith("amanita", { limit: 20 });
+    const list = document.getElementById("history-list")!;
+    expect(list.textContent).toContain("Amanita muscaria");
+  });
+
+  it("clears history search and reloads all entries", async () => {
+    const controller = new AppController();
+    await controller.init();
+
+    const input = document.querySelector<HTMLInputElement>("#history-search")!;
+    input.value = "amanita";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await flushPromises();
+
+    vi.mocked(searchHistory).mockClear();
+    vi.mocked(getHistory).mockClear();
+
+    const clearBtn = document.querySelector<HTMLButtonElement>(
+      "#history-search-clear",
+    )!;
+    clearBtn.click();
+    await flushPromises();
+
+    expect(input.value).toBe("");
+    expect(searchHistory).not.toHaveBeenCalled();
+    expect(getHistory).toHaveBeenCalledWith(20);
+  });
+
+  it("shows torch button when supported and toggles it", async () => {
+    vi.mocked(mockCamera.torchSupported).mockReturnValue(true);
+    vi.mocked(mockCamera.setTorch).mockResolvedValue(true);
+
+    const controller = new AppController();
+    await controller.init();
+
+    const torchBtn = document.querySelector<HTMLButtonElement>("#torch-btn")!;
+    expect(torchBtn.hidden).toBe(false);
+    expect(torchBtn.getAttribute("aria-label")).toBe("Turn flashlight on");
+
+    torchBtn.click();
+    await flushPromises();
+
+    expect(mockCamera.setTorch).toHaveBeenCalledWith(true);
+    expect(torchBtn.classList.contains("torch-on")).toBe(true);
+    expect(torchBtn.getAttribute("aria-label")).toBe("Turn flashlight off");
+  });
+
+  it("hides torch button when not supported", async () => {
+    vi.mocked(mockCamera.torchSupported).mockReturnValue(false);
+
+    const controller = new AppController();
+    await controller.init();
+
+    const torchBtn = document.querySelector<HTMLButtonElement>("#torch-btn")!;
+    expect(torchBtn.hidden).toBe(true);
+  });
+
+  it("focuses on video tap when supported", async () => {
+    vi.mocked(mockCamera.focusAt).mockResolvedValue(true);
+
+    const controller = new AppController();
+    await controller.init();
+
+    const video = document.querySelector<HTMLVideoElement>("#video")!;
+    Object.defineProperty(video, "videoWidth", { value: 640 });
+    Object.defineProperty(video, "videoHeight", { value: 480 });
+    vi.spyOn(video, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 320,
+      height: 320,
+    } as DOMRect);
+
+    video.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        clientX: 160,
+        clientY: 160,
+        bubbles: true,
+      }),
+    );
+    await flushPromises();
+
+    expect(mockCamera.focusAt).toHaveBeenCalledWith(0.5, 0.5);
+    const reticle = document.querySelector<HTMLElement>("#focus-reticle")!;
+    expect(reticle.classList.contains("active")).toBe(true);
+  });
+
+  it("does not show reticle when focus is unsupported", async () => {
+    vi.mocked(mockCamera.focusAt).mockResolvedValue(false);
+
+    const controller = new AppController();
+    await controller.init();
+
+    const video = document.querySelector<HTMLVideoElement>("#video")!;
+    Object.defineProperty(video, "videoWidth", { value: 640 });
+    Object.defineProperty(video, "videoHeight", { value: 480 });
+    vi.spyOn(video, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 320,
+      height: 320,
+    } as DOMRect);
+
+    video.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        clientX: 80,
+        clientY: 80,
+        bubbles: true,
+      }),
+    );
+    await flushPromises();
+
+    expect(mockCamera.focusAt).toHaveBeenCalled();
+    const reticle = document.querySelector<HTMLElement>("#focus-reticle")!;
+    expect(reticle.classList.contains("active")).toBe(false);
+  });
+});
+
+describe("AppController additional coverage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setLocale("en");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  function renderMinimalAppHTML(): void {
+    document.body.innerHTML = `
+      <div id="app">
+        <div id="status"></div>
+        <div id="badge"></div>
+        <div id="camera-wrap">
+          <video id="video"></video>
+          <button id="capture-btn">Capture</button>
+        </div>
+        <div id="camera-error"></div>
+        <div id="model-progress" role="status" hidden>
+          <div class="model-progress-label">
+            <span id="model-progress-text"></span>
+            <span id="model-progress-pct"></span>
+          </div>
+          <div class="model-progress-track">
+            <div id="model-progress-bar" class="model-progress-bar"></div>
+          </div>
+        </div>
+        <div id="predictions"></div>
+        <div id="knowledge"></div>
+        <div id="warning"></div>
+        <select id="model-select">
+          <option value="bvra">BVRA</option>
+          <option value="dima806">dima806</option>
+        </select>
+      </div>
+    `;
+  }
+
+  it("throws when a required element is missing", () => {
+    document.body.innerHTML = "";
+    expect(() => new AppController()).toThrow(/required element not found/);
+  });
+
+  it("initializes when optional elements are missing", async () => {
+    renderMinimalAppHTML();
+    const controller = new AppController();
+    await expect(controller.init()).resolves.toBeUndefined();
+    expect(mockCamera.start).toHaveBeenCalled();
+  });
+
+  it("does not throw when the focus reticle is missing", async () => {
+    renderMinimalAppHTML();
+    vi.mocked(mockCamera.focusAt).mockResolvedValue(true);
+
+    const controller = new AppController();
+    await controller.init();
+
+    const video = document.querySelector<HTMLVideoElement>("#video")!;
+    Object.defineProperty(video, "videoWidth", { value: 640 });
+    Object.defineProperty(video, "videoHeight", { value: 480 });
+    vi.spyOn(video, "getBoundingClientRect").mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 320,
+      height: 320,
+    } as DOMRect);
+
+    video.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        clientX: 160,
+        clientY: 160,
+        bubbles: true,
+      }),
+    );
+    await flushPromises();
+
+    expect(mockCamera.focusAt).toHaveBeenCalled();
+  });
+
+  it("skips tap-to-focus when the normalized point cannot be computed", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const video = document.querySelector<HTMLVideoElement>("#video")!;
+    Object.defineProperty(video, "videoWidth", { value: 0 });
+    Object.defineProperty(video, "videoHeight", { value: 0 });
+
+    video.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        clientX: 160,
+        clientY: 160,
+        bubbles: true,
+      }),
+    );
+    await flushPromises();
+
+    expect(mockCamera.focusAt).not.toHaveBeenCalled();
+  });
+
+  it("updates progress for the compile phase", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    mockInferenceService.emitProgress({
+      modelKey: ModelKey.BVRA,
+      phase: "compile",
+      percent: 33,
+    });
+
+    const progressText = document.querySelector(
+      "#model-progress-text",
+    ) as HTMLElement;
+    expect(progressText.textContent).toContain("compile");
+  });
+
+  it("does nothing when file input change has no files", async () => {
+    const { processFileInput } = await import("@/services/image-input");
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const input = document.querySelector("#file-input") as HTMLInputElement;
+    input.dispatchEvent(new Event("change"));
+    await flushPromises();
+
+    expect(processFileInput).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when import input change has no files", async () => {
+    const { importHistory } = await import("@/services/history");
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const input = document.querySelector(
+      "#history-import-input",
+    ) as HTMLInputElement;
+    input.dispatchEvent(new Event("change"));
+    await flushPromises();
+
+    expect(importHistory).not.toHaveBeenCalled();
+  });
+
+  it("renders species detail with fallback data when there is no result", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const options = vi.mocked(ResultsRenderer).mock.calls[0]?.[1];
+    options?.onPredictionClick?.("Agaricus bisporus");
+
+    expect(mockDetailPanel.open).toHaveBeenCalledWith(
+      "Agaricus bisporus",
+      expect.objectContaining({ label: "Agaricus bisporus", probability: 0 }),
+      expect.anything(),
+      expect.objectContaining({ score: 0, reliability: "low" }),
+    );
+  });
+
+  it("uses fallback prediction when the clicked label is not in the report", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+
+    const options = vi.mocked(ResultsRenderer).mock.calls[0]?.[1];
+    options?.onPredictionClick?.("Missing species");
+
+    expect(mockDetailPanel.open).toHaveBeenCalledWith(
+      "Missing species",
+      expect.objectContaining({ label: "Missing species", probability: 0 }),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it("does not open comparison with fewer than two labels", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const options = vi.mocked(ResultsRenderer).mock.calls[0]?.[1];
+    options?.onComparisonShow?.(["Agaricus bisporus"]);
+    expect(mockComparisonPanel.open).not.toHaveBeenCalled();
+  });
+
+  it("does not open comparison when there is no last report", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const options = vi.mocked(ResultsRenderer).mock.calls[0]?.[1];
+    options?.onComparisonShow?.(["Agaricus bisporus", "Amanita phalloides"]);
+    expect(mockComparisonPanel.open).not.toHaveBeenCalled();
+  });
+
+  it("does not open comparison when fewer than two predictions match", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+
+    const options = vi.mocked(ResultsRenderer).mock.calls[0]?.[1];
+    options?.onComparisonShow?.(["Agaricus bisporus", "Missing species"]);
+    expect(mockComparisonPanel.open).not.toHaveBeenCalled();
+  });
+
+  it("shows an error when rendering the result throws", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    mockInferenceService.emitResult({
+      logits: new Float32Array(0),
+      modelKey: ModelKey.BVRA,
+    });
+
+    const status = document.querySelector("#status") as HTMLElement;
+    expect(status.textContent).toBe("Error displaying result.");
+  });
+
+  it("resets capture state when saving history fails", async () => {
+    const { saveIdentification } = await import("@/services/history");
+    vi.mocked(saveIdentification).mockRejectedValueOnce(new Error("db full"));
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const { modelRegistry } = await import("@/data/model-registry");
+    const model = modelRegistry[ModelKey.BVRA];
+    mockInferenceService.emitResult({
+      logits: new Float32Array(model.labels.length),
+      modelKey: ModelKey.BVRA,
+    });
+    await flushPromises();
+
+    const recaptureBtn = document.querySelector(
+      "#recapture-btn",
+    ) as HTMLButtonElement;
+    expect(recaptureBtn.hidden).toBe(false);
+  });
+
+  it("renders a data URL thumbnail and location link in history", async () => {
+    const { getHistory } = await import("@/services/history");
+    vi.mocked(getHistory).mockResolvedValue([
+      makeHistoryEntry({
+        id: "h-thumb",
+        thumbnail: "data:image/jpeg;base64,/9j/4AAQSkZJRg==",
+        location: { lat: 55.6761, lng: 12.5683 },
+      }),
+    ]);
+
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+    await flushPromises();
+
+    const list = document.querySelector("#history-list") as HTMLElement;
+    expect(list.querySelector("img")).not.toBeNull();
+    expect(
+      list.querySelector(".history-location")?.getAttribute("href"),
+    ).toMatch(/^geo:/);
+  });
+
+  it("logs a warning for invalid history thumbnails", async () => {
+    const { getHistory } = await import("@/services/history");
+    const warnSpy = vi
+      .spyOn(logger, "warn")
+      .mockImplementation(() => undefined);
+    vi.mocked(getHistory).mockResolvedValue([
+      makeHistoryEntry({
+        id: "h-bad-thumb",
+        thumbnail: "https://example.com/image.jpg",
+      }),
+    ]);
+
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+    await flushPromises();
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Ignoring non-data URL thumbnail"),
+      "h-bad-thumb",
+    );
+    warnSpy.mockRestore();
+  });
+
+  it("shows a load error when history rendering fails", async () => {
+    const { getHistory } = await import("@/services/history");
+    vi.mocked(getHistory).mockRejectedValueOnce(new Error("idb failed"));
+
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+    await flushPromises();
+
+    const list = document.querySelector("#history-list") as HTMLElement;
+    expect(list.textContent).toContain("Unable to load history");
+  });
+
+  it("returns early when the history list element is missing", async () => {
+    renderMinimalAppHTML();
+    const controller = new AppController();
+    await expect(controller.init()).resolves.toBeUndefined();
+  });
+
+  it("does not open history detail for an empty id", async () => {
+    const { getHistory } = await import("@/services/history");
+    vi.mocked(getHistory).mockResolvedValue([]);
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+    await flushPromises();
+
+    const list = document.querySelector("#history-list") as HTMLElement;
+    const entry = document.createElement("div");
+    entry.className = "history-entry";
+    list.appendChild(entry);
+    entry.click();
+    await flushPromises();
+
+    expect(mockHistoryDetailPanel.open).not.toHaveBeenCalled();
+  });
+
+  it("does not open history detail when the entry is not found", async () => {
+    const { getHistory } = await import("@/services/history");
+    vi.mocked(getHistory).mockResolvedValue([
+      makeHistoryEntry({ id: "h-real" }),
+    ]);
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+    await flushPromises();
+
+    const list = document.querySelector("#history-list") as HTMLElement;
+    const entryEl = list.querySelector(".history-entry") as HTMLElement;
+    entryEl.dataset["id"] = "missing";
+    entryEl.click();
+    await flushPromises();
+
+    expect(mockHistoryDetailPanel.open).not.toHaveBeenCalled();
+  });
+
+  it("logs an error when opening history detail fails", async () => {
+    const { getHistory } = await import("@/services/history");
+    const errorSpy = vi
+      .spyOn(logger, "error")
+      .mockImplementation(() => undefined);
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+    await flushPromises();
+
+    vi.mocked(getHistory).mockRejectedValueOnce(new Error("idb failed"));
+
+    const list = document.querySelector("#history-list") as HTMLElement;
+    const entry = document.createElement("div");
+    entry.className = "history-entry";
+    entry.dataset["id"] = "any";
+    list.appendChild(entry);
+    entry.click();
+    await flushPromises();
+
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("shows an error when exporting history fails", async () => {
+    const { exportHistory } = await import("@/services/history");
+    vi.mocked(exportHistory).mockRejectedValueOnce(new Error("export failed"));
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const exportBtn = document.querySelector("#history-export") as HTMLElement;
+    exportBtn.click();
+    await flushPromises();
+
+    const status = document.querySelector("#status") as HTMLElement;
+    expect(status.textContent).toBe("Failed to export history.");
+  });
+
+  it("shows an error when clearing history fails", async () => {
+    const { clearHistory } = await import("@/services/history");
+    vi.mocked(clearHistory).mockRejectedValueOnce(new Error("clear failed"));
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const clearBtn = document.querySelector("#history-clear") as HTMLElement;
+    clearBtn.click();
+    await flushPromises();
+
+    const status = document.querySelector("#status") as HTMLElement;
+    expect(status.textContent).toBe("Failed to clear history.");
+  });
+
+  it("does not terminate on a persisted pagehide event", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    window.dispatchEvent(
+      new PageTransitionEvent("pagehide", { persisted: true }),
+    );
+    expect(mockCamera.stop).not.toHaveBeenCalled();
+    expect(mockInferenceService.terminate).not.toHaveBeenCalled();
+  });
+
+  it("does not reinitialize on a non-persisted pageshow event", async () => {
+    renderAppHTML();
+    const controller = new AppController();
+    await controller.init();
+
+    const initCalls = mockInferenceService.initialize.mock.calls.length;
+    window.dispatchEvent(
+      new PageTransitionEvent("pageshow", { persisted: false }),
+    );
+    await flushPromises();
+
+    expect(mockInferenceService.initialize.mock.calls.length).toBe(initCalls);
+  });
+
+  it("captures location when the toggle is enabled and capture is pressed", async () => {
+    renderAppHTML();
+    const getCurrentPosition = vi.fn(
+      (
+        success: (position: {
+          coords: { latitude: number; longitude: number; accuracy: number };
+        }) => void,
+      ) => {
+        success({
+          coords: { latitude: 55.6761, longitude: 12.5683, accuracy: 5 },
+        });
+      },
+    );
+    Object.defineProperty(navigator, "geolocation", {
+      value: { getCurrentPosition },
+      configurable: true,
+      writable: true,
+    });
+    localStorage.setItem("ff:location-enabled-v1", "true");
+
+    const controller = new AppController();
+    await controller.init();
+
+    mockCamera.capture.mockReturnValue({
+      buffer: new ArrayBuffer(224 * 224 * 4),
+      width: 224,
+      height: 224,
+      thumbnail: "thumb",
+    } as CaptureResult);
+
+    const captureBtn = document.querySelector("#capture-btn") as HTMLElement;
+    captureBtn.click();
+    await flushPromises();
+
+    const locationStatus = document.querySelector(
+      "#location-status",
+    ) as HTMLElement;
+    expect(locationStatus.textContent).toContain("55.6761");
+    expect(locationStatus.textContent).toContain("12.5683");
+  });
+
+  it("shows location denied when geolocation permission is denied", async () => {
+    renderAppHTML();
+    const getCurrentPosition = vi.fn(
+      (_success: unknown, error: (err: { code: number }) => void) => {
+        error({ code: 1 });
+      },
+    );
+    Object.defineProperty(navigator, "geolocation", {
+      value: { getCurrentPosition },
+      configurable: true,
+      writable: true,
+    });
+    localStorage.setItem("ff:location-enabled-v1", "true");
+
+    const controller = new AppController();
+    await controller.init();
+
+    const toggle = document.querySelector(
+      "#location-toggle",
+    ) as HTMLInputElement;
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    await flushPromises();
+
+    const locationStatus = document.querySelector(
+      "#location-status",
+    ) as HTMLElement;
+    expect(locationStatus.textContent).toBe(
+      "Location denied — check device permissions.",
+    );
+  });
+
+  it("shows location unavailable when geolocation is not supported", async () => {
+    renderAppHTML();
+    Object.defineProperty(navigator, "geolocation", {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
+    localStorage.setItem("ff:location-enabled-v1", "true");
+
+    const controller = new AppController();
+    await controller.init();
+
+    const toggle = document.querySelector(
+      "#location-toggle",
+    ) as HTMLInputElement;
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    await flushPromises();
+
+    const locationStatus = document.querySelector(
+      "#location-status",
+    ) as HTMLElement;
+    expect(locationStatus.textContent).toBe("Location unavailable right now.");
+  });
+
+  it("shows location timeout when geolocation times out", async () => {
+    renderAppHTML();
+    const getCurrentPosition = vi.fn(
+      (_success: unknown, error: (err: { code: number }) => void) => {
+        error({ code: 3 });
+      },
+    );
+    Object.defineProperty(navigator, "geolocation", {
+      value: { getCurrentPosition },
+      configurable: true,
+      writable: true,
+    });
+    localStorage.setItem("ff:location-enabled-v1", "true");
+
+    const controller = new AppController();
+    await controller.init();
+
+    const toggle = document.querySelector(
+      "#location-toggle",
+    ) as HTMLInputElement;
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    await flushPromises();
+
+    const locationStatus = document.querySelector(
+      "#location-status",
+    ) as HTMLElement;
+    expect(locationStatus.textContent).toBe("Location took too long.");
+  });
+
+  it("keeps location disabled when the toggle is unchecked during capture", async () => {
+    renderAppHTML();
+    localStorage.setItem("ff:location-enabled-v1", "false");
+
+    const controller = new AppController();
+    await controller.init();
+
+    mockCamera.capture.mockReturnValue({
+      buffer: new ArrayBuffer(224 * 224 * 4),
+      width: 224,
+      height: 224,
+      thumbnail: "thumb",
+    } as CaptureResult);
+
+    const captureBtn = document.querySelector("#capture-btn") as HTMLElement;
+    captureBtn.click();
+    await flushPromises();
+
+    const locationStatus = document.querySelector(
+      "#location-status",
+    ) as HTMLElement;
+    expect(locationStatus.textContent).toBe("GPS tagging disabled.");
   });
 });
 

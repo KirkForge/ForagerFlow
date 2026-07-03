@@ -44,6 +44,23 @@ Copy `.env.example` to `.env` to set optional runtime values such as `VITE_TELEM
 - [Privacy policy](docs/privacy-policy.md)
 - [Accessibility statement](docs/accessibility-statement.md)
 - [Model card](docs/model-card.md)
+- [TWA packaging](docs/twa-packaging.md)
+- [Engineering guide](docs/engineering.md)
+
+## Trusted Web Activity (Android APK)
+
+The repo includes a minimal TWA shell under `twa/` that wraps the PWA as an installable Android app without any native runtime. See [`docs/twa-packaging.md`](docs/twa-packaging.md) for domain verification, signing, and Play Console steps.
+
+To build the unsigned release APK locally (requires Android SDK):
+
+```bash
+pnpm build
+TWA_HOST=foragerflow.example.com node scripts/generate-assetlinks.cjs
+TWA_HOST=foragerflow.example.com node scripts/build-twa.cjs
+# → dist/twa/foragerflow-release-unsigned.apk
+```
+
+The release workflow builds and uploads the APK automatically when a GitHub release is published.
 
 ## Cutting a release
 
@@ -101,13 +118,15 @@ pnpm format                 # prettier --write
 pnpm format:check           # prettier --check
 pnpm test                   # vitest run
 pnpm test:ci                # vitest run (CI mode)
+pnpm test:coverage          # vitest with 80% threshold enforcement
 pnpm build                  # vite build → dist/
 node scripts/verify-labels.cjs   # label/logit alignment + knowledge coverage
 pnpm verify:dist            # built-asset smoke checks
+pnpm verify:bundle          # main bundle gzip budget check
 pnpm e2e                    # playwright smoke tests
 pnpm e2e:ci                 # CI=true playwright chromium + firefox
 pnpm verify:inference       # real-ONNX sanity (requires export)
-pnpm verify                 # typecheck + lint + test:ci + build + verify:dist + verify:labels
+pnpm verify                 # typecheck + lint + test:ci + build + verify:dist + verify:labels + verify:bundle
 ```
 
 `verify:dist` checks the built bundle for required assets, `importScripts` worker loading, the `wasm` execution provider, and `wasm-unsafe-eval` in the CSP.

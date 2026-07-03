@@ -3,9 +3,12 @@ import "fake-indexeddb/auto";
 import {
   saveIdentification,
   getHistory,
+  searchHistory,
   clearHistory,
   exportHistory,
+  exportHistoryEncrypted,
   importHistory,
+  isEncryptedEnvelope,
   type HistoryEntry,
   type HistoryBackup,
 } from "@/services/history";
@@ -45,6 +48,15 @@ describe("history with IndexedDB", () => {
 
     const entries = await getHistory(10);
     expect(entries[0]!.thumbnail).toBe(thumbnail);
+  });
+
+  it("stores the provided geo location on the entry", async () => {
+    const report = makeReport();
+    const location = { lat: 55.6761, lng: 12.5683, accuracy: 10 };
+    await saveIdentification(report, ModelKey.BVRA, undefined, location);
+
+    const entries = await getHistory(10);
+    expect(entries[0]!.location).toEqual(location);
   });
 
   it("returns empty array when history is empty", async () => {
@@ -245,6 +257,7 @@ describe("history with IndexedDB", () => {
           top1Species: "Imported",
           top1Probability: 0.8,
           top1Edibility: Edibility.Unknown,
+          predictions: [{ label: "Imported", probability: 0.8 }],
         }),
       ],
     };
@@ -263,5 +276,311 @@ describe("history with IndexedDB", () => {
 
   it("throws when importing a backup with no entries", async () => {
     await expect(importHistory('{"version":1}')).rejects.toThrow("no entries");
+  });
+
+  it("round-trips an encrypted export through importHistory", async () => {
+    await saveIdentification(makeReport(), ModelKey.BVRA);
+
+    const envelope = await exportHistoryEncrypted("hunter2");
+    expect(isEncryptedEnvelope(envelope)).toBe(true);
+    // Plaintext export fields must not appear on the envelope.
+    const parsed = JSON.parse(envelope) as { entries?: unknown };
+    expect(parsed.entries).toBeUndefined();
+
+    await clearHistory();
+    expect(await getHistory(10)).toHaveLength(0);
+
+    const count = await importHistory(envelope, "hunter2");
+    expect(count).toBe(1);
+
+    const entries = await getHistory(10);
+    expect(entries[0]!.top1Species).toBe("Agaricus bisporus");
+  });
+
+  it("fails to import an encrypted envelope with the wrong passphrase", async () => {
+    const envelope = await exportHistoryEncrypted("right");
+    await expect(importHistory(envelope, "wrong")).rejects.toThrow(
+      /wrong passphrase|Could not decrypt/,
+    );
+  });
+
+  it("still imports plaintext backups when no passphrase is supplied", async () => {
+    const backup: HistoryBackup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries: [],
+    };
+    expect(await importHistory(JSON.stringify(backup))).toBe(0);
+  });
+
+  describe("searchHistory", () => {
+    beforeEach(async () => {
+      await saveIdentification(
+        makeReport({
+          top1Species: "Agaricus bisporus",
+          top1Knowledge: { edibility: Edibility.Edible, notes: "Button." },
+          predictions: [
+            { label: "Agaricus bisporus", probability: 0.95, index: 0 },
+            { label: "Amanita phalloides", probability: 0.03, index: 1 },
+          ],
+        }),
+        ModelKey.BVRA,
+      );
+      await sleep(10);
+      await saveIdentification(
+        makeReport({
+          top1Species: "Amanita muscaria",
+          top1Knowledge: {
+            edibility: Edibility.Poisonous,
+            notes: "Fly agaric.",
+          },
+          predictions: [
+            { label: "Amanita muscaria", probability: 0.91, index: 0 },
+            { label: "Russula emetica", probability: 0.05, index: 1 },
+          ],
+        }),
+        ModelKey.Dima806,
+      );
+    });
+
+    it("returns all entries when query is empty", async () => {
+      const entries = await searchHistory("");
+      expect(entries).toHaveLength(2);
+    });
+
+    it("filters by species case-insensitively", async () => {
+      const entries = await searchHistory("BISPORUS");
+      expect(entries).toHaveLength(1);
+      expect(entries[0]!.top1Species).toBe("Agaricus bisporus");
+    });
+
+    it("filters by edibility", async () => {
+      const entries = await searchHistory("poisonous");
+      expect(entries).toHaveLength(1);
+      expect(entries[0]!.top1Species).toBe("Amanita muscaria");
+    });
+
+    it("matches prediction labels that are not top-1", async () => {
+      const entries = await searchHistory("phalloides");
+      expect(entries).toHaveLength(1);
+      expect(entries[0]!.top1Species).toBe("Agaricus bisporus");
+    });
+
+    it("requires every token to match", async () => {
+      const entries = await searchHistory("agaricus edible");
+      expect(entries).toHaveLength(1);
+      expect(entries[0]!.top1Species).toBe("Agaricus bisporus");
+    });
+
+    it("returns empty array when nothing matches", async () => {
+      const entries = await searchHistory("boletus");
+      expect(entries).toEqual([]);
+    });
+
+    it("respects the limit", async () => {
+      await saveIdentification(
+        makeReport({ top1Species: "Agaricus augustus" }),
+        ModelKey.BVRA,
+      );
+      const entries = await searchHistory("Agaricus", { limit: 2 });
+      expect(entries).toHaveLength(2);
+    });
+
+    it("falls back to getHistory when query is empty or whitespace", async () => {
+      const empty = await searchHistory("");
+      const whitespace = await searchHistory("   ");
+      expect(empty.length).toBeGreaterThan(0);
+      expect(whitespace.length).toBeGreaterThan(0);
+    });
+
+    it("overwrites duplicate ids when importing", async () => {
+      const entry = makeHistoryEntry({
+        id: "dup-1",
+        top1Species: "Original",
+        predictions: [{ label: "Original", probability: 0.95 }],
+      });
+      const backup: HistoryBackup = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        entries: [entry],
+      };
+      await importHistory(JSON.stringify(backup));
+
+      const updated = makeHistoryEntry({
+        id: "dup-1",
+        top1Species: "Updated",
+        predictions: [{ label: "Updated", probability: 0.95 }],
+      });
+      const updatedBackup: HistoryBackup = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        entries: [updated],
+      };
+      await importHistory(JSON.stringify(updatedBackup));
+
+      const entries = await getHistory(10);
+      const imported = entries.find((e) => e.id === "dup-1");
+      expect(imported).toBeDefined();
+      expect(imported!.top1Species).toBe("Updated");
+    });
+  });
+
+  it("rejects imports with unsupported version", async () => {
+    const backup: HistoryBackup = {
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      entries: [],
+    };
+    await expect(importHistory(JSON.stringify(backup))).rejects.toThrow(
+      "unsupported",
+    );
+  });
+
+  it("rejects imports when the transaction errors", async () => {
+    const openDBSpy = vi.spyOn(historyDb, "openDB").mockResolvedValue({
+      transaction: vi.fn().mockReturnValue({
+        objectStore: vi.fn().mockReturnValue({
+          put: vi.fn().mockReturnValue({
+            set onerror(_: () => void) {},
+            set onabort(_: () => void) {},
+            set oncomplete(_: () => void) {},
+          }),
+        }),
+        set onerror(handler: () => void) {
+          handler();
+        },
+        set onabort(_: () => void) {},
+        set oncomplete(_: () => void) {},
+      }),
+      close: vi.fn(),
+    } as unknown as IDBDatabase);
+
+    const backup: HistoryBackup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries: [makeHistoryEntry({ id: "tx-err" })],
+    };
+
+    await expect(importHistory(JSON.stringify(backup))).rejects.toThrow(
+      "IDB import failed",
+    );
+    openDBSpy.mockRestore();
+  });
+
+  it("rejects imports when the transaction aborts", async () => {
+    const openDBSpy = vi.spyOn(historyDb, "openDB").mockResolvedValue({
+      transaction: vi.fn().mockReturnValue({
+        objectStore: vi.fn().mockReturnValue({
+          put: vi.fn().mockReturnValue({
+            set onerror(_: () => void) {},
+            set onabort(_: () => void) {},
+            set oncomplete(_: () => void) {},
+          }),
+        }),
+        set onerror(_: () => void) {},
+        set onabort(handler: () => void) {
+          handler();
+        },
+        set oncomplete(_: () => void) {},
+      }),
+      close: vi.fn(),
+    } as unknown as IDBDatabase);
+
+    const backup: HistoryBackup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries: [makeHistoryEntry({ id: "tx-abort" })],
+    };
+
+    await expect(importHistory(JSON.stringify(backup))).rejects.toThrow(
+      "IDB import aborted",
+    );
+    openDBSpy.mockRestore();
+  });
+
+  it("imports entries with non-string notes as empty notes", async () => {
+    const backup: HistoryBackup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries: [
+        makeHistoryEntry({
+          id: "notes-empty",
+          notes: 123 as unknown as string,
+        }),
+      ],
+    };
+
+    const count = await importHistory(JSON.stringify(backup));
+    expect(count).toBe(1);
+
+    const entries = await getHistory(10);
+    const imported = entries.find((e) => e.id === "notes-empty");
+    expect(imported).toBeDefined();
+    expect(imported!.notes).toBe("");
+  });
+
+  it("imports entries with invalid location as no location", async () => {
+    const backup: HistoryBackup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries: [
+        makeHistoryEntry({
+          id: "bad-loc",
+          location: { lat: 55, lng: 12, accuracy: -1 },
+        }),
+      ],
+    };
+
+    await importHistory(JSON.stringify(backup));
+    const entries = await getHistory(10);
+    const imported = entries.find((e) => e.id === "bad-loc");
+    expect(imported).toBeDefined();
+    expect(imported!.location).toBeUndefined();
+  });
+
+  it("rejects imports with invalid thumbnails", async () => {
+    const backup: HistoryBackup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries: [
+        makeHistoryEntry({
+          id: "bad-thumb",
+          thumbnail: "https://example.com/x.jpg",
+        }),
+      ],
+    };
+
+    await expect(importHistory(JSON.stringify(backup))).rejects.toThrow(
+      "invalid thumbnail",
+    );
+  });
+
+  it("rejects imports with mismatched top1 species", async () => {
+    const backup: HistoryBackup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries: [
+        makeHistoryEntry({
+          id: "mismatch",
+          top1Species: "Amanita phalloides",
+        }),
+      ],
+    };
+
+    await expect(importHistory(JSON.stringify(backup))).rejects.toThrow(
+      "top1Species does not match predictions",
+    );
+  });
+
+  it("rejects imports with an overly long id", async () => {
+    const backup: HistoryBackup = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries: [makeHistoryEntry({ id: "x".repeat(100) })],
+    };
+
+    await expect(importHistory(JSON.stringify(backup))).rejects.toThrow(
+      "invalid id",
+    );
   });
 });

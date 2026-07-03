@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, dev]
   pull_request:
-    branches: [main, master]
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -51,6 +51,15 @@ jobs:
 
       - name: Verify labels/knowledge
         run: pnpm verify:labels
+
+      - name: Generate TWA assetlinks placeholder
+        run: node scripts/generate-assetlinks.cjs
+
+      - name: Verify TWA skeleton files exist
+        run: |
+          test -f twa/app/build.gradle.kts
+          test -f twa/app/src/main/AndroidManifest.xml
+          test -x twa/gradlew
 
       - name: Install Playwright browsers and dependencies
         run: |

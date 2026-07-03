@@ -1,5 +1,6 @@
 import { getLocale } from "./index";
 import type { Locale } from "./types";
+import { hide, show } from "@/ui/utils";
 
 export interface SafetyLinks {
   mycologist: string;
@@ -38,9 +39,9 @@ export function applySafetyLinks(): void {
     if (links.poisonControl) {
       poison.href = links.poisonControl;
       poison.textContent = links.poisonControlLabel;
-      poison.style.display = "";
+      show(poison);
     } else {
-      poison.style.display = "none";
+      hide(poison);
     }
   }
 }

@@ -3,6 +3,7 @@ import type { InferenceService } from "@/inference/service";
 import { ModelKey } from "@/core/types";
 import { modelRegistry } from "@/data/model-registry";
 import { t } from "@/i18n";
+import { requireElement } from "@/ui/utils";
 
 const SAFETY_ACK_KEY = "ff:safety-ack-v1";
 const DIMA_CONFIRM_KEY = "ff:dima-confirm-v1";
@@ -29,6 +30,7 @@ export class SafetyUI {
     safetyContinue: HTMLButtonElement;
     modelConfirm: ConfirmModalElements;
     storageConfirm: ConfirmModalElements;
+    networkConfirm: ConfirmModalElements;
     clearConfirm: ConfirmModalElements;
     modelSelect: HTMLSelectElement;
   };
@@ -36,14 +38,31 @@ export class SafetyUI {
   constructor(opts: SafetyUIOptions) {
     this.opts = opts;
     this.els = {
-      safetyModal: this.req("#safety-modal"),
-      safetyForm: this.req<HTMLFormElement>("#safety-form"),
-      safetyAck: this.req<HTMLInputElement>("#safety-modal-ack"),
-      safetyContinue: this.req<HTMLButtonElement>("#safety-modal-continue"),
+      safetyModal: requireElement("#safety-modal", document, "SafetyUI"),
+      safetyForm: requireElement<HTMLFormElement>(
+        "#safety-form",
+        document,
+        "SafetyUI",
+      ),
+      safetyAck: requireElement<HTMLInputElement>(
+        "#safety-modal-ack",
+        document,
+        "SafetyUI",
+      ),
+      safetyContinue: requireElement<HTMLButtonElement>(
+        "#safety-modal-continue",
+        document,
+        "SafetyUI",
+      ),
       modelConfirm: this.confirmEls("#model-confirm-modal"),
       storageConfirm: this.confirmEls("#storage-confirm-modal"),
+      networkConfirm: this.confirmEls("#network-confirm-modal"),
       clearConfirm: this.confirmEls("#clear-confirm-modal"),
-      modelSelect: this.req<HTMLSelectElement>("#model-select"),
+      modelSelect: requireElement<HTMLSelectElement>(
+        "#model-select",
+        document,
+        "SafetyUI",
+      ),
     };
   }
 
@@ -51,6 +70,7 @@ export class SafetyUI {
     this.bindSafetyModal();
     this.bindModelConfirm();
     this.bindStorageConfirmFromService();
+    this.bindNetworkConfirmFromService();
 
     if (this.hasAcknowledged()) {
       return;
@@ -69,8 +89,8 @@ export class SafetyUI {
         } catch (err) {
           logger.warn("Could not persist safety acknowledgement:", err);
         }
-        this.els.safetyModal.removeEventListener("cancel", onCancel);
         this.els.safetyModal.close();
+        this.els.safetyModal.removeEventListener("cancel", onCancel);
         resolve();
       };
       const onCancel = (e: Event) => {
@@ -138,6 +158,7 @@ export class SafetyUI {
     const accepted = await this.showConfirmModal(this.els.modelConfirm);
     if (accepted) {
       this.markDima806Confirmed();
+      this.opts.inferenceService.preloadModel(ModelKey.Dima806);
       this.els.modelSelect.value = ModelKey.Dima806;
       this.els.modelSelect.dispatchEvent(new Event("change"));
     }
@@ -160,6 +181,21 @@ export class SafetyUI {
       void this.showConfirmModal(this.els.storageConfirm).then((accepted) => {
         if (accepted) {
           this.opts.inferenceService.resumeStorageConfirm();
+        }
+      });
+    });
+  }
+
+  private bindNetworkConfirmFromService(): void {
+    this.opts.inferenceService.onNetworkConfirm(() => {
+      void this.showConfirmModal(this.els.networkConfirm).then((accepted) => {
+        if (accepted) {
+          this.opts.inferenceService.resumeNetworkConfirm();
+        } else {
+          // ponytail: revert the selector to the model that was active before
+          // the switch attempt — the service never changed currentModelKey.
+          const revertTo = this.opts.inferenceService.cancelNetworkConfirm();
+          this.els.modelSelect.value = revertTo;
         }
       });
     });
@@ -200,25 +236,28 @@ export class SafetyUI {
   }
 
   private confirmEls(rootSelector: string): ConfirmModalElements {
-    const root = this.req<HTMLDialogElement>(rootSelector);
+    const root = requireElement<HTMLDialogElement>(
+      rootSelector,
+      document,
+      "SafetyUI",
+    );
     return {
       modal: root,
-      accept: this.req<HTMLButtonElement>("[value='accept']", root),
-      cancel: this.req<HTMLButtonElement>(
-        "[value='cancel'], button:not([value='accept'])",
+      accept: requireElement<HTMLButtonElement>(
+        "[value='accept']",
         root,
+        "SafetyUI",
       ),
-      defaultFocus: this.req<HTMLButtonElement>(
+      cancel: requireElement<HTMLButtonElement>(
         "[value='cancel'], button:not([value='accept'])",
         root,
+        "SafetyUI",
+      ),
+      defaultFocus: requireElement<HTMLButtonElement>(
+        "[value='cancel'], button:not([value='accept'])",
+        root,
+        "SafetyUI",
       ),
     };
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
-  private req<T extends HTMLElement>(sel: string, root?: HTMLElement): T {
-    const el = (root ?? document).querySelector(sel);
-    if (!el) throw new Error(`SafetyUI: required element not found: ${sel}`);
-    return el as T;
   }
 }

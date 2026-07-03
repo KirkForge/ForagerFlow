@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#0f1115" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; font-src 'self'"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; font-src 'self'"
     />
     <title>ForagerFlow</title>
     <link rel="manifest" href="/manifest.webmanifest" />
@@ -15,7 +15,7 @@
   <body>
     <div id="app" aria-label="ForagerFlow svampeidentifikation">
       <header role="banner">
-        <span aria-hidden="true" style="font-size: 20px">&#127812;</span>
+        <span aria-hidden="true" class="header-logo">&#127812;</span>
         <h1>ForagerFlow</h1>
         <span id="badge" class="badge" role="status" aria-live="polite"
           >Online</span
@@ -36,7 +36,7 @@
         id="last-result"
         role="region"
         aria-label="Seneste identifikation"
-        style="display: none"
+        class="hidden"
       ></div>
 
       <div id="camera-wrap" role="region" aria-label="Kameravisning">
@@ -47,6 +47,22 @@
           muted
           aria-label="Live kameravisning"
         ></video>
+        <div
+          id="focus-reticle"
+          role="status"
+          aria-live="polite"
+          data-i18n-key="camera.focusAria"
+          data-i18n-attr="aria-label"
+          hidden
+        ></div>
+        <button
+          id="torch-btn"
+          type="button"
+          aria-label="Tænd lommelygte"
+          hidden
+        >
+          🔦
+        </button>
         <button
           id="capture-btn"
           type="button"
@@ -56,7 +72,7 @@
           id="camera-error"
           role="alert"
           aria-live="assertive"
-          style="display: none"
+          class="hidden"
         >
           <p>Kameraet er ikke tilgængeligt.</p>
           <button
@@ -87,19 +103,32 @@
           Indlæser...
         </div>
         <div id="predictions" aria-label="Top forslag" aria-live="polite"></div>
+        <button
+          id="recapture-btn"
+          type="button"
+          data-i18n-key="camera.recapture"
+          hidden
+        ></button>
+        <div id="model-progress" class="model-progress" role="status" hidden>
+          <div class="model-progress-label">
+            <span id="model-progress-text"></span>
+            <span id="model-progress-pct"></span>
+          </div>
+          <div class="model-progress-track">
+            <div id="model-progress-bar" class="model-progress-bar"></div>
+          </div>
+        </div>
         <div
           id="knowledge"
-          class="knowledge"
+          class="knowledge hidden"
           role="region"
           aria-label="Artens detaljer"
-          style="display: none"
         ></div>
         <div
           id="warning"
-          class="warning"
+          class="warning hidden"
           role="alert"
           aria-live="assertive"
-          style="display: none"
         ></div>
       </div>
 
@@ -122,10 +151,32 @@
               id="history-import-input"
               accept="application/json"
               aria-label="Historik-sikkerhedskopi"
-              style="display: none"
+              hidden
             />
+            <label class="history-encrypt-toggle">
+              <input type="checkbox" id="history-encrypt-export" />
+              <span data-i18n-key="history.encryptExport">Kryptér</span>
+            </label>
           </div>
           <button id="history-clear" aria-label="Ryd al historik">Ryd</button>
+        </div>
+        <div class="history-search">
+          <input
+            type="search"
+            id="history-search"
+            aria-label="Søg i historik"
+            placeholder="Søg i historik..."
+            autocomplete="off"
+          />
+          <button
+            id="history-search-clear"
+            type="button"
+            class="history-search-clear"
+            aria-label="Ryd søgning"
+            hidden
+          >
+            ×
+          </button>
         </div>
         <div class="location-control">
           <label class="location-toggle">
@@ -166,7 +217,7 @@
         href="https://www.giftlinjen.dk/"
         target="_blank"
         rel="noopener noreferrer"
-        style="display: none"
+        class="hidden"
         >Giftlinjen</a
       >
     </div>
@@ -259,6 +310,30 @@
     </dialog>
 
     <dialog
+      id="network-confirm-modal"
+      aria-labelledby="network-confirm-title"
+      aria-describedby="network-confirm-body"
+    >
+      <form method="dialog" id="network-confirm-form">
+        <h2 id="network-confirm-title" data-i18n-key="networkConfirm.title">
+          Download over mobildata?
+        </h2>
+        <p id="network-confirm-body" data-i18n-key="networkConfirm.body">
+          Du er på en forbrugsbaseret mobilforbindelse. Modellen er stor og kan
+          bruge meget data. Vil du downloade nu?
+        </p>
+        <div class="safety-modal-actions">
+          <button type="button" id="network-confirm-cancel" value="cancel">
+            Annullér
+          </button>
+          <button type="button" id="network-confirm-accept" value="accept">
+            Download alligevel
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog
       id="clear-confirm-modal"
       aria-labelledby="clear-confirm-title"
       aria-describedby="clear-confirm-body"
@@ -278,6 +353,133 @@
           </button>
         </div>
       </form>
+    </dialog>
+
+    <dialog
+      id="passphrase-modal"
+      aria-labelledby="passphrase-modal-title"
+      aria-describedby="passphrase-modal-body"
+    >
+      <form method="dialog" id="passphrase-form">
+        <h2 id="passphrase-modal-title" data-i18n-key="passphrase.title">
+          Adgangskode
+        </h2>
+        <p id="passphrase-modal-body" data-i18n-key="passphrase.body">
+          Indtast en adgangskode for at kryptere sikkerhedskopien.
+        </p>
+        <input
+          type="password"
+          id="passphrase-input"
+          autocomplete="off"
+          aria-label="Adgangskode"
+        />
+        <div class="safety-modal-actions">
+          <button type="button" id="passphrase-cancel" value="cancel">
+            Annullér
+          </button>
+          <button type="submit" id="passphrase-accept" value="accept">
+            OK
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog
+      id="species-detail-modal"
+      aria-labelledby="species-detail-title"
+      aria-describedby="species-detail-body"
+    >
+      <div id="species-detail-content">
+        <div class="detail-header">
+          <h2 id="species-detail-title"></h2>
+          <button
+            id="species-detail-close"
+            type="button"
+            value="close"
+            aria-label="Luk artens detaljer"
+          >
+            ×
+          </button>
+        </div>
+        <div id="species-detail-body">
+          <div id="species-detail-meta" class="detail-meta"></div>
+          <p id="species-detail-notes" class="detail-notes"></p>
+          <p id="species-detail-safety" class="detail-safety"></p>
+          <a
+            id="species-detail-verify"
+            class="verify-link"
+            target="_blank"
+            rel="noopener noreferrer"
+            href="#"
+          >
+            Bekræft arten online →
+          </a>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog
+      id="comparison-modal"
+      aria-labelledby="comparison-title"
+      aria-describedby="comparison-body"
+    >
+      <div id="comparison-content">
+        <div class="detail-header">
+          <h2 id="comparison-title">Sammenlign arter</h2>
+          <button
+            id="comparison-close"
+            type="button"
+            value="close"
+            aria-label="Luk sammenligning"
+          >
+            ×
+          </button>
+        </div>
+        <div id="comparison-body">
+          <div id="comparison-grid" class="comparison-grid"></div>
+          <p id="comparison-safety" class="detail-safety"></p>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog
+      id="history-detail-modal"
+      aria-labelledby="history-detail-title"
+      aria-describedby="history-detail-body"
+    >
+      <div id="history-detail-content">
+        <div class="detail-header">
+          <h2 id="history-detail-title"></h2>
+          <button
+            id="history-detail-close"
+            type="button"
+            value="close"
+            aria-label="Luk historikdetaljer"
+          >
+            ×
+          </button>
+        </div>
+        <div id="history-detail-body">
+          <img
+            id="history-detail-thumbnail"
+            class="history-detail-thumbnail"
+            alt=""
+            hidden
+          />
+          <div id="history-detail-meta" class="detail-meta"></div>
+          <p id="history-detail-notes" class="detail-notes"></p>
+          <p id="history-detail-safety" class="detail-safety"></p>
+          <a
+            id="history-detail-verify"
+            class="verify-link"
+            target="_blank"
+            rel="noopener noreferrer"
+            href="#"
+          >
+            Bekræft arten online →
+          </a>
+        </div>
+      </div>
     </dialog>
 
     <script type="module" src="/main.ts"></script>

@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 
 const packageJson = JSON.parse(
   readFileSync(resolve(__dirname, "package.json"), "utf8"),
-);
+) as { version: string };
 
 export default defineConfig({
   resolve: {
@@ -22,12 +22,12 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
-      exclude: ["src/sw.ts", "src/vite-env.d.ts"],
+      exclude: ["src/sw.ts", "src/worker.ts", "src/vite-env.d.ts"],
       thresholds: {
-        branches: 70,
-        functions: 70,
-        lines: 70,
-        statements: 70,
+        branches: 80,
+        functions: 80,
+        lines: 80,
+        statements: 80,
       },
     },
   },

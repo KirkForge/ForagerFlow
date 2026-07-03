@@ -6,6 +6,9 @@ import type {
 } from "@/core/types";
 import { logger } from "@/core/logger";
 import { openDB, withTransaction, setMeta, STORE_NAME } from "./db";
+import { encryptBackup, decryptBackup, isEncryptedEnvelope } from "./crypto";
+
+export { isEncryptedEnvelope } from "./crypto";
 
 export interface GeoLocation {
   lat: number;
@@ -136,7 +139,12 @@ function validateHistoryEntry(raw: unknown, index: number): HistoryEntry {
   const entry = raw as Record<string, unknown>;
 
   const id = entry["id"];
-  if (typeof id !== "string" || id.length === 0) {
+  if (
+    typeof id !== "string" ||
+    id.length === 0 ||
+    id.length > 64 ||
+    !/^[\w-]+$/.test(id)
+  ) {
     throw new Error(`History entry ${String(index + 1)} has invalid id`);
   }
 
@@ -153,7 +161,11 @@ function validateHistoryEntry(raw: unknown, index: number): HistoryEntry {
   }
 
   const top1Species = entry["top1Species"];
-  if (typeof top1Species !== "string" || top1Species.length === 0) {
+  if (
+    typeof top1Species !== "string" ||
+    top1Species.length === 0 ||
+    top1Species.length > 128
+  ) {
     throw new Error(
       `History entry ${String(index + 1)} has invalid top1Species`,
     );
@@ -185,6 +197,20 @@ function validateHistoryEntry(raw: unknown, index: number): HistoryEntry {
     );
   }
 
+  if (predictions.length > 0) {
+    const top1 = predictions[0];
+    if (top1?.label !== top1Species) {
+      throw new Error(
+        `History entry ${String(index + 1)} top1Species does not match predictions[0]`,
+      );
+    }
+    if (Math.abs(top1.probability - top1Probability) > 1e-9) {
+      throw new Error(
+        `History entry ${String(index + 1)} top1Probability does not match predictions[0]`,
+      );
+    }
+  }
+
   const thumbnail = entry["thumbnail"];
   if (!isDataUrlThumbnail(thumbnail)) {
     throw new Error(
@@ -193,7 +219,7 @@ function validateHistoryEntry(raw: unknown, index: number): HistoryEntry {
   }
 
   const notes = entry["notes"];
-  const notesString = typeof notes === "string" ? notes : "";
+  const notesString = typeof notes === "string" ? notes.slice(0, 1000) : "";
 
   const location = entry["location"];
   const validLocation = isValidLocation(location) ? location : undefined;
@@ -252,6 +278,61 @@ export async function saveIdentification(
     logger.error("Failed to save identification:", err);
     throw err;
   }
+}
+
+export interface SearchHistoryOptions {
+  limit?: number;
+}
+
+function normalizeSearchText(value: string): string[] {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function buildSearchHaystack(entry: HistoryEntry): string {
+  const dateText = new Date(entry.timestamp).toLocaleDateString();
+  const parts = [
+    entry.top1Species,
+    entry.top1Edibility,
+    entry.modelKey,
+    entry.notes,
+    dateText,
+    ...entry.predictions.map((p) => p.label),
+  ];
+  return parts
+    .join(" ")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
+export async function searchHistory(
+  query: string,
+  options: SearchHistoryOptions = {},
+): Promise<HistoryEntry[]> {
+  const { limit = 50 } = options;
+  const tokens = normalizeSearchText(query);
+  if (tokens.length === 0) {
+    return getHistory(limit);
+  }
+
+  const entries = await getHistory(10_000);
+  const results: HistoryEntry[] = [];
+  for (const entry of entries) {
+    const haystack = buildSearchHaystack(entry);
+    if (tokens.every((token) => haystack.includes(token))) {
+      results.push(entry);
+      if (results.length >= limit) {
+        break;
+      }
+    }
+  }
+  return results;
 }
 
 export async function getHistory(limit = 50): Promise<HistoryEntry[]> {
@@ -315,10 +396,31 @@ export async function exportHistory(): Promise<string> {
   return JSON.stringify(backup);
 }
 
-export async function importHistory(json: string): Promise<number> {
+/**
+ * Encrypted variant of {@link exportHistory}. Emits a passphrase-protected
+ * AES-GCM envelope (species, confidence, timestamps, and any GPS stay
+ * confidential). Decryption needs the same passphrase via importHistory.
+ */
+export async function exportHistoryEncrypted(
+  passphrase: string,
+): Promise<string> {
+  return encryptBackup(await exportHistory(), passphrase);
+}
+
+export async function importHistory(
+  json: string,
+  passphrase?: string,
+): Promise<number> {
+  // Auto-detect encrypted envelopes and decrypt before parsing. This keeps a
+  // single import entry point: callers pass the file text (and a passphrase
+  // only when the UI detected an envelope).
+  const plaintext = isEncryptedEnvelope(json)
+    ? await decryptBackup(json, passphrase ?? "")
+    : json;
+
   let parsed: unknown;
   try {
-    parsed = JSON.parse(json);
+    parsed = JSON.parse(plaintext);
   } catch {
     throw new Error("Backup file is not valid JSON");
   }
@@ -340,13 +442,10 @@ export async function importHistory(json: string): Promise<number> {
   const tx = db.transaction(STORE_NAME, "readwrite");
   const store = tx.objectStore(STORE_NAME);
   let imported = 0;
-  for (const [index, raw] of entries.entries()) {
-    const entry = validateHistoryEntry(raw, index);
-    store.put(entry);
-    imported++;
-  }
 
-  await new Promise<void>((resolve, reject) => {
+  let rejectImport!: (reason: Error) => void;
+  const completion = new Promise<void>((resolve, reject) => {
+    rejectImport = reject;
     tx.oncomplete = () => {
       resolve();
     };
@@ -357,6 +456,19 @@ export async function importHistory(json: string): Promise<number> {
       reject(new Error("IDB import aborted"));
     };
   });
+
+  for (const [index, raw] of entries.entries()) {
+    const entry = validateHistoryEntry(raw, index);
+    const request = store.put(entry);
+    request.onerror = () => {
+      rejectImport(
+        new Error(request.error?.message ?? "IDB import put failed"),
+      );
+    };
+    imported++;
+  }
+
+  await completion;
 
   await recordBackupTimestamp(new Date().toISOString());
   return imported;

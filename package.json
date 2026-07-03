@@ -23,28 +23,33 @@
     "verify:labels": "node scripts/verify-labels.cjs",
     "verify:dist": "python3 scripts/test-dist.py",
     "verify:inference": "python3 scripts/test-inference.py smoke pwa/model/fungitastic.onnx pwa/model/fungitastic-classes.json pwa/model/dima806.onnx src/data/labels-dima806.json",
-    "verify": "pnpm typecheck && pnpm lint && pnpm test:ci && pnpm build && pnpm verify:dist && pnpm verify:labels"
+    "analyze:bundle": "ANALYZE=true pnpm build",
+    "verify:bundle": "node scripts/verify-bundle.cjs",
+    "generate:assetlinks": "node scripts/generate-assetlinks.cjs",
+    "build:twa": "node scripts/build-twa.cjs",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test:ci && pnpm build && pnpm verify:dist && pnpm verify:labels && pnpm verify:bundle"
   },
   "devDependencies": {
     "@eslint/js": "^9.24.0",
     "@playwright/test": "^1.61.0",
     "@types/eslint__js": "^9.14.0",
     "@types/node": "^25.6.2",
-    "@typescript-eslint/eslint-plugin": "^8.31.0",
-    "@typescript-eslint/parser": "^8.31.0",
+    "@typescript-eslint/eslint-plugin": "^8.62.0",
+    "@typescript-eslint/parser": "^8.62.0",
     "@vitest/coverage-v8": "^4.1.8",
-    "eslint": "^9.24.0",
+    "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-import": "^2.31.0",
     "fake-indexeddb": "^6.2.5",
     "globals": "^16.0.0",
     "jsdom": "^29.1.1",
     "prettier": "^3.5.3",
-    "tsx": "^4.19.4",
+    "rollup-plugin-visualizer": "^5.14.0",
+    "tsx": "^4.22.4",
     "typescript": "~5.8.3",
-    "typescript-eslint": "^8.59.2",
+    "typescript-eslint": "^8.62.0",
     "vite": "^6.4.3",
     "vite-plugin-pwa": "^0.21.2",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.9"
   }
 }

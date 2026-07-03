@@ -3,12 +3,15 @@ import { Edibility } from "@/core/types";
 import { softmax } from "@/inference/softmax";
 import type { ModelRegistryEntry } from "@/core/types";
 import { t } from "@/i18n";
+import type { CalibrationResult } from "./confidence";
+import { calibrateConfidence } from "./confidence";
 
 export interface PredictionReport {
   predictions: Prediction[];
   top1Species: string;
   top1Knowledge: SpeciesKnowledge;
   top1Probability: number;
+  confidence: CalibrationResult;
   hasRiskInTop3: boolean;
   requiresWarning: boolean;
   warningMessage: string | null;
@@ -34,6 +37,9 @@ export function generatePredictionReport(
   const top1 = top3[0];
   if (!top1) throw new Error("No predictions generated");
 
+  const top2 = top3[1] ?? { label: "Unknown", probability: 0, index: -1 };
+  const confidence = calibrateConfidence(top1.probability, top2.probability);
+
   const top1Knowledge =
     model.knowledge[top1.label] ?? missingKnowledgeFallback(top1.label);
 
@@ -46,7 +52,7 @@ export function generatePredictionReport(
   });
 
   const { requiresWarning, warningMessage } = computeWarning(
-    top1.probability,
+    confidence.score,
     top1Knowledge.edibility,
     hasRiskInTop3,
   );
@@ -56,6 +62,7 @@ export function generatePredictionReport(
     top1Species: top1.label,
     top1Knowledge,
     top1Probability: top1.probability,
+    confidence,
     hasRiskInTop3: hasRiskInTop3,
     requiresWarning,
     warningMessage,
@@ -69,36 +76,44 @@ function missingKnowledgeFallback(species: string): SpeciesKnowledge {
   };
 }
 
+const LOW_CONFIDENCE_THRESHOLD = 0.5;
+
 function computeWarning(
-  top1Prob: number,
+  calibratedScore: number,
   edibility: Edibility,
   hasRiskInTop3: boolean,
 ): { requiresWarning: boolean; warningMessage: string | null } {
-  if (top1Prob < 0.5) {
-    return {
-      requiresWarning: true,
-      warningMessage: t("warning.lowConfidence"),
-    };
-  }
-
-  if (hasRiskInTop3 && top1Prob < 0.85) {
-    return {
-      requiresWarning: true,
-      warningMessage: t("warning.toxicLookalike"),
-    };
-  }
-
-  if (edibility === Edibility.Poisonous && top1Prob >= 0.5) {
+  // Top-1 is a known poisonous species: warn regardless of model confidence.
+  if (edibility === Edibility.Poisonous) {
     return {
       requiresWarning: true,
       warningMessage: t("warning.poisonous"),
     };
   }
 
-  if (edibility === Edibility.Unknown && top1Prob >= 0.5) {
+  // Top-1 edibility is unknown: fail-closed and treat as potentially poisonous.
+  if (edibility === Edibility.Unknown) {
     return {
       requiresWarning: true,
       warningMessage: t("warning.unknown"),
+    };
+  }
+
+  // A poisonous or unknown species appears in the top-k. This is a toxic-
+  // lookalike scenario and must be surfaced even when top-1 is a confident
+  // edible prediction, because confidence in the edible class is not evidence
+  // against the dangerous neighbor.
+  if (hasRiskInTop3) {
+    return {
+      requiresWarning: true,
+      warningMessage: t("warning.toxicLookalike"),
+    };
+  }
+
+  if (calibratedScore < LOW_CONFIDENCE_THRESHOLD) {
+    return {
+      requiresWarning: true,
+      warningMessage: t("warning.lowConfidence"),
     };
   }
 

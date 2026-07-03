@@ -39,7 +39,7 @@ ForagerFlow bundles two independent image-classification models for mushroom ide
 
 - Models were trained on curated datasets and may fail on unusual lighting, angles, habitats, or species not in the training distribution.
 - Predictions below 50% confidence are flagged as low-confidence.
-- A poisonous or unknown species in the top-3 triggers an additional warning when top-1 confidence is below 85%.
+- A poisonous or unknown species in the top-3 always triggers an additional warning, regardless of top-1 confidence. (Fail-closed: a toxic lookalike near a confident edible prediction is still surfaced.)
 - Class list and knowledge data are verified at build time for label/logit alignment.
 
 ## Bias and safety notes

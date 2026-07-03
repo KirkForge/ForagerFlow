@@ -12,10 +12,17 @@ export const daMessages: Messages = {
   "model.ariaLabel": "Vælg identifikationsmodel",
   "model.bvra": "Specialist (215 arter, ~90 MB)",
   "model.dima806": "Generel (100 arter, ~330 MB)",
+  "model.progressLabel": "{{model}} — {{phase}}",
+  "model.progressDownload": "download",
+  "model.progressCompile": "kompilering",
 
   // Camera
   "camera.ariaLabel": "Live kameravisning",
   "capture.ariaLabel": "Tag billede og identificér svamp",
+  "camera.torchOn": "Sluk lommelygte",
+  "camera.torchOff": "Tænd lommelygte",
+  "camera.focusAria": "Fokuspunkt",
+  "camera.recapture": "Tag nyt billede",
   "camera.error": "Kameraet er ikke tilgængeligt.",
   "camera.retry": "Prøv kamera igen",
   "camera.choosePhoto": "Vælg et foto",
@@ -31,8 +38,14 @@ export const daMessages: Messages = {
   "status.clearHistoryError": "Kunne ikke rydde historikken.",
   "status.historyExported": "Historik eksporteret.",
   "status.exportHistoryError": "Kunne ikke eksportere historikken.",
+  "status.passphraseRequired":
+    "Indtast en adgangskode for at kryptere sikkerhedskopien.",
   "status.historyImported": "Importerede {{count}} historikposter.",
   "status.importHistoryError": "Kunne ikke importere historikken.",
+  "status.inferenceError": "Identifikation mislykkedes. Prøv igen.",
+  "status.modelLoadError": "Kunne ikke indlæse modellen. Tjek din forbindelse.",
+  "status.labelMismatchError":
+    "Modeloutput matcher ikke labels. Genindlæs venligst.",
 
   // Results
   "results.region": "Identifikationsresultater",
@@ -46,6 +59,27 @@ export const daMessages: Messages = {
   "prediction.edible": "Spiselig",
   "prediction.unknown": "Ukendt",
   "prediction.poisonous": "GIFTIG",
+  "prediction.openDetailsAria": "Vis detaljer for {{species}}",
+
+  // Detail panel
+  "detail.title": "Artens detaljer",
+  "detail.closeAria": "Luk artens detaljer",
+  "detail.confidence": "{{pct}}% rå sikkerhed",
+  "detail.calibratedScore": "{{pct}}% kalibreret",
+  "detail.edibility": "Spiselighed",
+  "detail.safetyReminder":
+    "Spis aldrig en vild svamp baseret udelukkende på denne app. Få altid bekræftet af en autoriseret svampekyndig.",
+  "confidence.reliabilityHigh": "Høj pålidelighed",
+  "confidence.reliabilityMedium": "Middel pålidelighed",
+  "confidence.reliabilityLow": "Lav pålidelighed",
+
+  // Comparison
+  "comparison.title": "Sammenlign arter",
+  "comparison.closeAria": "Luk sammenligning",
+  "comparison.toggle": "Sammenlign",
+  "comparison.show": "Vis sammenligning",
+  "comparison.selectAria": "Vælg {{species}} til sammenligning",
+  "comparison.maxReached": "Maks {{max}} arter",
 
   // Warnings
   "warning.lowConfidence": "Lav sikkerhed — handle ikke på dette resultat.",
@@ -71,13 +105,32 @@ export const daMessages: Messages = {
   "history.clearAria": "Ryd al historik",
   "history.exportAria": "Eksportér historik til fil",
   "history.importAria": "Importér historik fra fil",
+  "history.encryptExport": "Kryptér",
+  "history.encryptExportAria": "Kryptér eksporter med en adgangskode",
   "history.empty": "Ingen tidligere identifikationer endnu.",
+
+  // Passphrase modal (encrypted history export/import)
+  "passphrase.title": "Adgangskode",
+  "passphrase.body":
+    "Indtast en adgangskode for at kryptere sikkerhedskopien. Uden den kan filen ikke læses.",
+  "passphrase.inputAria": "Adgangskode",
+  "passphrase.accept": "OK",
+  "passphrase.cancel": "Annullér",
   "history.lastIdentification": "Seneste identifikation",
   "history.thumbnailAlt": "Miniaturebillede af {{species}}",
   "history.confidence": "{{prob}}% sikkerhed",
   "history.deleteEntryAria": "Slet denne post",
   "history.loadError": "Kunne ikke indlæse historikken.",
   "history.location": "Sted: {{lat}}, {{lng}}",
+  "history.detail.closeAria": "Luk historikdetaljer",
+  "history.detail.confidence": "Sikkerhed: {{prob}}%",
+  "history.detail.date": "Dato: {{date}}",
+  "history.detail.model": "Model: {{model}}",
+  "history.detail.location": "Sted: {{lat}}, {{lng}}",
+  "history.searchPlaceholder": "Søg i historik...",
+  "history.searchAria": "Søg i identifikationshistorik",
+  "history.searchClearAria": "Ryd søgning",
+  "history.noSearchResults": "Ingen historikposter matcher søgningen.",
 
   // Location toggle
   "location.enabled": "GPS-tagning aktiveret (kun lokalt).",
@@ -119,6 +172,13 @@ export const daMessages: Messages = {
     "Din enhed rapporterer {{freeMB}} MB ledig lagerplads. Den valgte model kræver {{modelSize}}. Fortsæt alligevel?",
   "storageConfirm.cancel": "Annullér",
   "storageConfirm.continue": "Fortsæt alligevel",
+
+  // Network (mobile data) confirm modal
+  "networkConfirm.title": "Download over mobildata?",
+  "networkConfirm.body":
+    "Du er på en forbrugsbaseret mobilforbindelse. Modellen er stor og kan bruge meget data. Vil du downloade nu?",
+  "networkConfirm.cancel": "Annullér",
+  "networkConfirm.accept": "Download alligevel",
 
   // Clear confirm modal
   "clearConfirm.title": "Ryd al historik?",

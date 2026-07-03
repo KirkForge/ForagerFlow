@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="da">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f1115" />
+    <title>ForagerFlow — Offline</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <style>
+      .offline-container {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        text-align: center;
+      }
+      .offline-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+      }
+      .offline-title {
+        margin: 0 0 0.5rem;
+      }
+      .offline-body {
+        max-width: 40ch;
+        margin: 0 0 1.5rem;
+        color: var(--muted, #9aa0a6);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="offline-container">
+      <div class="offline-icon" aria-hidden="true">&#127812;&#128246;</div>
+      <h1 class="offline-title">Du er offline</h1>
+      <p class="offline-body">
+        ForagerFlow virker bedst med en netværksforbindelse, men hvis du allerede
+        har downloadet en model, kan du stadig identificere svampe offline.
+      </p>
+      <button type="button" class="btn" onclick="location.reload()">Prøv igen</button>
+    </div>
+  </body>
+</html>

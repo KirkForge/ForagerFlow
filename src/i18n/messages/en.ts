@@ -12,10 +12,17 @@ export const enMessages: Messages = {
   "model.ariaLabel": "Select inference model",
   "model.bvra": "Specialist (215 classes, ~90 MB)",
   "model.dima806": "General (100 classes, ~330 MB)",
+  "model.progressLabel": "{{model}} — {{phase}}",
+  "model.progressDownload": "download",
+  "model.progressCompile": "compile",
 
   // Camera
   "camera.ariaLabel": "Live camera preview",
   "capture.ariaLabel": "Capture and identify mushroom",
+  "camera.torchOn": "Turn flashlight off",
+  "camera.torchOff": "Turn flashlight on",
+  "camera.focusAria": "Focus point",
+  "camera.recapture": "Take another photo",
   "camera.error": "Camera unavailable.",
   "camera.retry": "Retry camera",
   "camera.choosePhoto": "Choose a photo",
@@ -31,8 +38,13 @@ export const enMessages: Messages = {
   "status.clearHistoryError": "Failed to clear history.",
   "status.historyExported": "History exported.",
   "status.exportHistoryError": "Failed to export history.",
+  "status.passphraseRequired": "Enter a passphrase to encrypt the backup.",
   "status.historyImported": "Imported {{count}} history entries.",
   "status.importHistoryError": "Failed to import history.",
+  "status.inferenceError": "Identification failed. Please try again.",
+  "status.modelLoadError": "Could not load the model. Check your connection.",
+  "status.labelMismatchError":
+    "Model output does not match labels. Please reload.",
 
   // Results
   "results.region": "Inference results",
@@ -45,6 +57,27 @@ export const enMessages: Messages = {
   "prediction.edible": "Edible",
   "prediction.unknown": "Unknown",
   "prediction.poisonous": "POISONOUS",
+  "prediction.openDetailsAria": "Show details for {{species}}",
+
+  // Detail panel
+  "detail.title": "Species details",
+  "detail.closeAria": "Close species details",
+  "detail.confidence": "{{pct}}% raw confidence",
+  "detail.calibratedScore": "{{pct}}% calibrated",
+  "detail.edibility": "Edibility",
+  "detail.safetyReminder":
+    "Never eat a wild mushroom based solely on this app. Always verify with a certified mycologist.",
+  "confidence.reliabilityHigh": "High reliability",
+  "confidence.reliabilityMedium": "Medium reliability",
+  "confidence.reliabilityLow": "Low reliability",
+
+  // Comparison
+  "comparison.title": "Compare species",
+  "comparison.closeAria": "Close comparison",
+  "comparison.toggle": "Compare",
+  "comparison.show": "Show comparison",
+  "comparison.selectAria": "Select {{species}} for comparison",
+  "comparison.maxReached": "Max {{max}} species",
 
   // Warnings
   "warning.lowConfidence": "Low confidence — do not act on this prediction.",
@@ -70,13 +103,32 @@ export const enMessages: Messages = {
   "history.clearAria": "Clear all history",
   "history.exportAria": "Export history to file",
   "history.importAria": "Import history from file",
+  "history.encryptExport": "Encrypt",
+  "history.encryptExportAria": "Encrypt exports with a passphrase",
   "history.empty": "No past identifications yet.",
+
+  // Passphrase modal (encrypted history export/import)
+  "passphrase.title": "Passphrase",
+  "passphrase.body":
+    "Enter a passphrase to encrypt the backup. Without it the file cannot be read.",
+  "passphrase.inputAria": "Passphrase",
+  "passphrase.accept": "OK",
+  "passphrase.cancel": "Cancel",
   "history.lastIdentification": "Last identification",
   "history.thumbnailAlt": "Thumbnail for {{species}}",
   "history.confidence": "{{prob}}% confidence",
   "history.deleteEntryAria": "Delete this entry",
   "history.loadError": "Unable to load history.",
   "history.location": "Location: {{lat}}, {{lng}}",
+  "history.detail.closeAria": "Close history details",
+  "history.detail.confidence": "Confidence: {{prob}}%",
+  "history.detail.date": "Date: {{date}}",
+  "history.detail.model": "Model: {{model}}",
+  "history.detail.location": "Location: {{lat}}, {{lng}}",
+  "history.searchPlaceholder": "Search history...",
+  "history.searchAria": "Search identification history",
+  "history.searchClearAria": "Clear search",
+  "history.noSearchResults": "No history entries match your search.",
 
   // Location toggle
   "location.enabled": "GPS tagging enabled (local only).",
@@ -118,6 +170,13 @@ export const enMessages: Messages = {
     "Your device reports {{freeMB}} MB of free storage. The selected model needs {{modelSize}}. Continue anyway?",
   "storageConfirm.cancel": "Cancel",
   "storageConfirm.continue": "Continue anyway",
+
+  // Network (mobile data) confirm modal
+  "networkConfirm.title": "Download over mobile data?",
+  "networkConfirm.body":
+    "You are on a metered mobile connection. The model is large and may use significant data. Download now?",
+  "networkConfirm.cancel": "Cancel",
+  "networkConfirm.accept": "Download anyway",
 
   // Clear confirm modal
   "clearConfirm.title": "Clear all history?",

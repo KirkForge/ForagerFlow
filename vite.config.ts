@@ -1,10 +1,22 @@
 import { resolve } from "node:path";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import { readFileSync } from "node:fs";
+import { visualizer } from "rollup-plugin-visualizer";
+
+const analyze = process.env["ANALYZE"] === "true";
 
 export default defineConfig({
   root: "src",
   publicDir: "../public",
+  plugins: analyze
+    ? [
+        visualizer({
+          open: false,
+          filename: resolve(__dirname, "dist/stats.html"),
+          gzipSize: true,
+        }) as unknown as Plugin,
+      ]
+    : [],
   resolve: {
     alias: {
       "@": resolve(__dirname, "src"),
@@ -12,8 +24,11 @@ export default defineConfig({
   },
   define: {
     __APP_VERSION__: JSON.stringify(
-      JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8"))
-        .version,
+      (
+        JSON.parse(
+          readFileSync(resolve(__dirname, "package.json"), "utf8"),
+        ) as { version: string }
+      ).version,
     ),
   },
   build: {

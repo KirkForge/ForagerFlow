@@ -11,6 +11,7 @@ export enum ModelKey {
 
 export enum InferenceWorkerMessageType {
   Status = "status",
+  Progress = "progress",
   Result = "result",
   Error = "error",
 }
@@ -60,6 +61,13 @@ export interface WorkerStatusMessage {
   modelKey?: ModelKey;
 }
 
+export interface WorkerProgressMessage {
+  type: InferenceWorkerMessageType.Progress;
+  modelKey: ModelKey;
+  phase: "download" | "compile";
+  percent: number;
+}
+
 export interface WorkerResultMessage {
   type: InferenceWorkerMessageType.Result;
   logits: number[];
@@ -73,6 +81,7 @@ export interface WorkerErrorMessage {
 
 export type WorkerMessage =
   | WorkerStatusMessage
+  | WorkerProgressMessage
   | WorkerResultMessage
   | WorkerErrorMessage;
 
