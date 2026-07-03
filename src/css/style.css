@@ -52,7 +52,7 @@ header {
   display: flex;
   align-items: center;
   gap: 10px;
-  border-bottom: 1px solid #22262e;
+  border-bottom: 1px solid var(--border);
 }
 
 header h1 {
@@ -70,14 +70,14 @@ header .badge {
   font-size: 11px;
   padding: 4px 8px;
   border-radius: 999px;
-  background: #1f2937;
+  background: var(--surface-1);
   color: var(--text-muted);
 }
 
 #controls {
   padding: 8px 16px;
   background: var(--panel);
-  border-bottom: 1px solid #22262e;
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -90,9 +90,9 @@ header .badge {
 
 #controls select {
   flex: 1;
-  background: #1a1f26;
+  background: var(--surface-1);
   color: var(--text);
-  border: 1px solid #22262e;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 8px;
   font-size: 13px;
@@ -241,7 +241,7 @@ video {
 #camera-error label {
   background: var(--panel);
   color: var(--text);
-  border: 1px solid #22262e;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 16px;
   font-size: 13px;
@@ -265,7 +265,7 @@ video {
 
 #results {
   padding: 12px 16px 16px;
-  border-top: 1px solid #22262e;
+  border-top: 1px solid var(--border);
   background: var(--panel);
   overflow-y: auto;
 }
@@ -281,7 +281,7 @@ video {
   align-items: center;
   gap: 10px;
   padding: 8px 0;
-  border-bottom: 1px solid #22262e;
+  border-bottom: 1px solid var(--border);
 }
 
 .prediction:last-child {
@@ -309,7 +309,7 @@ video {
 }
 
 .knowledge[role="button"]:hover {
-  background: #22262e;
+  background: var(--border);
 }
 
 .knowledge[role="button"]:focus-visible {
@@ -335,7 +335,7 @@ video {
 .prediction .bar-wrap {
   flex: 1;
   height: 8px;
-  background: #22262e;
+  background: var(--border);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -370,7 +370,7 @@ video {
   margin-top: 10px;
   padding: 10px;
   border-radius: 8px;
-  background: #1a1f26;
+  background: var(--surface-1);
 }
 
 .knowledge h3 {
@@ -472,6 +472,12 @@ video {
     --accent: #15803d;
     --danger: #b91c1c;
     --warn: #b45309;
+    /* ponytail: surface-1 + border were missing from the light override, so
+       any element using var(--surface-1) (11 sites: search input, badges,
+       panels) rendered dark-on-dark in light mode — WCAG 1.4.3 contrast
+       failure. Override them here to fix all 11 at the root. */
+    --surface-1: #ffffff;
+    --border: #e5e7eb;
   }
 
   #controls {
