@@ -26,10 +26,15 @@ export default defineConfig({
       use: { ...devices["Desktop Firefox"] },
     },
     // WebKit needs system deps (libgstreamer-plugins-bad, libmanette).
-    // Enable locally once installed, or in GitHub Actions after `playwright install-deps`.
+    // It is also slower at startup and for axe-core scans, so run single-worker
+    // and with a longer action timeout to avoid flaky timeouts on modest CI/
+    // dev machines.
     {
       name: "webkit",
-      use: { ...devices["Desktop Safari"] },
+      use: {
+        ...devices["Desktop Safari"],
+        actionTimeout: 15_000,
+      },
     },
     {
       name: "mobile-chrome",

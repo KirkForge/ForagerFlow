@@ -69,8 +69,10 @@ jobs:
       - name: End-to-end tests (Chromium + Firefox)
         run: pnpm e2e:ci
 
+      # WebKit is slower to launch and the axe-core scan can be heavy, so run it
+      # single-worker to avoid flaky timeouts in GitHub Actions runners.
       - name: End-to-end tests (WebKit)
-        run: pnpm exec playwright test --project=webkit
+        run: pnpm exec playwright test --project=webkit --workers=1
 
       - name: Install TruffleHog
         run: |
