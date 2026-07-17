@@ -88,8 +88,7 @@ dist/           — Build output. The deployable.
 
 - [ ] `pnpm verify` passes (typecheck + lint + test:ci + build + verify:dist + verify:labels + verify:bundle)
 - [ ] `pnpm test:coverage` passes (80% thresholds)
-- [ ] Impact analysis run with GitNexus MCP for any changed symbols (see `CLAUDE.md` / `AGENTS.md`)
-- [ ] `detect_changes({scope: "compare", base_ref: "main"})` reviewed before commit
+- [ ] Shared-symbol changes covered by tests (add/adjust tests in `tests/` for any touched module)
 - [ ] Secret scan passes (`trufflehog filesystem . --only-verified --no-update --exclude-paths=.trufflehog-exclude.txt --fail`)
 - [ ] No secrets or large files committed
 - [ ] Commit messages follow `type(scope): message` format

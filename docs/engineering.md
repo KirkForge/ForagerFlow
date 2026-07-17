@@ -13,10 +13,9 @@ PWA/APK.
 4. [TypeScript and code quality](#typescript-and-code-quality)
 5. [Testing](#testing)
 6. [Verification pipeline](#verification-pipeline)
-7. [Code intelligence with GitNexus](#code-intelligence-with-gitnexus)
-8. [Internationalisation](#internationalisation)
-9. [Security and dependencies](#security-and-dependencies)
-10. [Where to start](#where-to-start)
+7. [Internationalisation](#internationalisation)
+8. [Security and dependencies](#security-and-dependencies)
+9. [Where to start](#where-to-start)
 
 ## Stack and layout
 
@@ -170,21 +169,6 @@ pnpm test:coverage      # with coverage report and threshold enforcement
 CI runs the same steps plus secret scanning, dependency audit, and Playwright
 E2E.
 
-## Code intelligence with GitNexus
-
-The repository is indexed by GitNexus as **ForagerFlow**. Use the GitNexus MCP
-tools for impact analysis and change detection.
-
-Workflow for edits:
-
-1. Before changing a symbol, run `impact({ target: "symbolName", direction:
-   "upstream" })` and report the blast radius.
-2. Do not proceed if the risk is HIGH or CRITICAL without a plan.
-3. Before committing, run `detect_changes({ scope: "compare", base_ref: "main" })`
-   to confirm the affected symbols match expectations.
-4. If the index feels stale, refresh it with `node .gitnexus/run.cjs analyze` or,
-if the runner is missing, `npx gitnexus analyze`.
-
 ## Internationalisation
 
 The app is **Danish-first**.
@@ -220,7 +204,7 @@ to satisfy the `local/no-raw-ui-strings` lint rule.
 - **Fixing a bug:** run `pnpm test:ci` first, add a failing test in `tests/`, fix
   the source, then run `pnpm verify`.
 - **Adding a feature:** open `src/app.ts` and the relevant `src/ui/` controller.
-  Check impact with GitNexus before changing shared symbols.
+  Run `pnpm test:ci` before and after changing shared symbols to catch regressions.
 - **Raising coverage:** find uncovered lines in the `pnpm test:coverage` report,
   add focused tests, and keep the 80% thresholds green.
 - **Danish copy:** edit `src/i18n/messages/da.ts`, mirror the change in
