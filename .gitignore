@@ -79,6 +79,11 @@ secrets*
 .pytest_cache/
 .ruff_cache/
 
+# --- Banned tool cruft (do not re-add) ---
+graphify-out/
+.gitnexusignore
+.gitnexus/
+
 # --- Security baseline (do not remove) ---
 token.json
 token_*.json

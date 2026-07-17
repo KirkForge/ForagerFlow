@@ -83,15 +83,13 @@ export default tseslint.config(
   },
   {
     // ponytail: *.js in flat-config doesn't cross /, so generated/vendored
-    // .js under subdirs must be ignored by directory. .gitnexus/ is tooling
-    // dropped by `gitnexus analyze`, coverage/ is vitest output, public/js/
-    // is the vendored ONNX runtime.
+    // .js under subdirs must be ignored by directory. coverage/ is vitest
+    // output, public/js/ is the vendored ONNX runtime.
     ignores: [
       "dist/",
       "node_modules/",
       "pwa/",
       "coverage/",
-      ".gitnexus/",
       "public/js/",
       "*.js",
       "eslint-rules/",
