@@ -88,6 +88,7 @@ export default tseslint.config(
     ignores: [
       "dist/",
       "node_modules/",
+      ".venv/",
       "pwa/",
       "coverage/",
       "public/js/",
