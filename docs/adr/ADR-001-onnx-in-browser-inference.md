@@ -22,5 +22,5 @@ ONNX Runtime Web (`onnxruntime-web`) running inside the PWA — fully in-browser
 
 - ONNX weights are large (~90–330 MB); managed via the release workflow (`release.yml`) rather than committed to git
 - First-load download is significant; mitigated by service worker caching after initial fetch
-- Inference is slower than native; acceptable for identification latency (< 2s on mid-range mobile)
+- Inference is slower than native; acceptable for identification latency (< 2.5s p95 on the CI runner CPU, gated in `release.yml`)
 - WebGL backend falls back to WASM if unavailable — WASM is the safe baseline

@@ -34,6 +34,7 @@ twa/local.properties
 test-results/
 playwright-report/
 coverage/
+latency-results.json
 
 # --- IDE ---
 .vscode/
