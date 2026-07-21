@@ -46,10 +46,13 @@ CACHEDIR.TAG
 
 # --- LLM planning / AI session notes ---
 llm/
-state.md
-AGENTS.md
 CLAUDE.md
 .claude/
+
+# --- Agent work files (per-session, not tracked) ---
+# NOTE: AGENTS.md and state.md are TRACKED — do not gitignore them.
+workplan.md
+lessons.md
 
 # --- Model snapshots from HuggingFace (generated) ---
 models--*/
