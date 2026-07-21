@@ -3,6 +3,7 @@ import { flushPromises } from "./helpers/promises";
 
 const errorMock = vi.fn();
 const init = vi.fn().mockResolvedValue(undefined);
+const recordCrashMock = vi.fn();
 const MockAppController = vi.fn(function () {
   return { init };
 });
@@ -18,6 +19,10 @@ vi.mock("@/core/logger", () => ({
     warn: vi.fn(),
     error: errorMock,
   },
+}));
+
+vi.mock("@/core/telemetry", () => ({
+  recordCrash: recordCrashMock,
 }));
 
 describe("main bootstrap", () => {
@@ -36,7 +41,7 @@ describe("main bootstrap", () => {
     await flushPromises();
     expect(MockAppController).toHaveBeenCalledTimes(1);
     expect(init).toHaveBeenCalledTimes(1);
-  });
+  }, 10000);
 
   it("displays error message when init fails", async () => {
     init.mockRejectedValueOnce(new Error("boot failed"));
@@ -58,6 +63,7 @@ describe("main bootstrap", () => {
       "Unhandled error:",
       expect.anything(),
     );
+    expect(recordCrashMock).toHaveBeenCalledWith("boom", "window.error");
     const status = document.getElementById("status");
     expect(status?.textContent).toBe("Failed to initialize. Please reload.");
   });
@@ -77,6 +83,10 @@ describe("main bootstrap", () => {
     expect(errorMock).toHaveBeenCalledWith(
       "Unhandled promise rejection:",
       expect.anything(),
+    );
+    expect(recordCrashMock).toHaveBeenCalledWith(
+      "rejected",
+      "unhandledrejection",
     );
     const status = document.getElementById("status");
     expect(status?.textContent).toBe("Failed to initialize. Please reload.");

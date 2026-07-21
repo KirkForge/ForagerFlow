@@ -13,8 +13,7 @@ jobs:
   release:
     # ponytail: gates #14 — required reviewers / wait timer are configured in
     # repo Settings → Environments → "production". The environment reference
-    # alone enforces whatever protection rules exist there (no protection
-    # configured yet = runs unrestricted until an admin adds them).
+    # alone enforces whatever protection rules exist there.
     environment: production
     runs-on: ubuntu-latest
     steps:
@@ -52,6 +51,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build
+        env:
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
         run: pnpm build
 
       - name: Copy models to dist
@@ -65,6 +66,23 @@ jobs:
 
       - name: Smoke-test inference shapes
         run: pnpm verify:inference
+
+      - name: Inference latency gate (p95 < 2500ms on CPU)
+        run: |
+          python3 scripts/test-latency.py \
+            pwa/model/fungitastic.onnx \
+            pwa/model/fungitastic-classes.json \
+            test-images \
+            2500 \
+            --warmup 3 \
+            --runs 20
+
+      - name: Upload latency artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: latency-results
+          path: latency-results.json
+          retention-days: 30
 
       - name: Generate assetlinks for TWA
         env:

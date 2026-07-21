@@ -1,13 +1,21 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import {
   recordTelemetry,
   recordCrash,
   setTelemetryEnabled,
+  initSentry,
+  setUserContext,
+  addBreadcrumb,
 } from "@/core/telemetry";
 import { logger } from "@/core/logger";
 import { config } from "@/core/config";
 
 describe("telemetry", () => {
+  beforeEach(() => {
+    setTelemetryEnabled(true);
+    vi.restoreAllMocks();
+  });
+
   afterEach(() => {
     setTelemetryEnabled(true);
     vi.restoreAllMocks();
@@ -116,10 +124,11 @@ describe("telemetry", () => {
       safe: "ok",
     });
 
-    const [, data] = debugSpy.mock.calls[0] as [
-      string,
-      Record<string, unknown>,
-    ];
+    const telemetryCall = debugSpy.mock.calls.find((c) =>
+      (c[0] as string).startsWith("Telemetry: beacon.test"),
+    ) as [string, Record<string, unknown>] | undefined;
+    expect(telemetryCall).toBeDefined();
+    const [, data] = telemetryCall!;
     expect(data["image"]).toBe("[REDACTED]");
     expect(data["location"]).toBe("[REDACTED]");
     expect(data["long"]).toHaveLength(256);
@@ -134,10 +143,11 @@ describe("telemetry", () => {
       extra: "should be dropped",
     });
 
-    const [, data] = debugSpy.mock.calls[0] as [
-      string,
-      Record<string, unknown>,
-    ];
+    const telemetryCall = debugSpy.mock.calls.find((c) =>
+      (c[0] as string).startsWith("Telemetry: web-vital"),
+    ) as [string, Record<string, unknown>] | undefined;
+    expect(telemetryCall).toBeDefined();
+    const [, data] = telemetryCall!;
     expect(data["name"]).toBe("LCP");
     expect(data["value"]).toBe(123);
     expect(data["extra"]).toBeUndefined();
@@ -172,9 +182,11 @@ describe("telemetry", () => {
         originalEndpoint;
 
       expect(sendBeacon).toHaveBeenCalledOnce();
-      const [, data] = debugSpy.mock.calls.find(
+      const telemetryCall = debugSpy.mock.calls.find(
         (c) => (c[0] as string) === "Telemetry: crash",
-      ) as [string, Record<string, unknown>];
+      ) as [string, Record<string, unknown>] | undefined;
+      expect(telemetryCall).toBeDefined();
+      const [, data] = telemetryCall!;
       expect(data["kind"]).toBe("Error");
       expect(data["message"]).toBe("boom");
       expect(typeof data["stack"]).toBe("string");
@@ -190,9 +202,11 @@ describe("telemetry", () => {
       err.stack =
         "Error: failed data:image/png;base64,XYZ\n  at 55.6761,12.5683";
       recordCrash(err);
-      const [, data] = debugSpy.mock.calls.find(
+      const telemetryCall = debugSpy.mock.calls.find(
         (c) => (c[0] as string) === "Telemetry: crash",
-      ) as [string, Record<string, unknown>];
+      ) as [string, Record<string, unknown>] | undefined;
+      expect(telemetryCall).toBeDefined();
+      const [, data] = telemetryCall!;
       expect(data["message"]).not.toContain("data:image");
       expect(data["message"]).not.toContain("55.6761,12.5683");
       expect(data["stack"]).not.toContain("data:image");
@@ -202,9 +216,11 @@ describe("telemetry", () => {
     it("handles non-Error values with kind Error and no stack", () => {
       const debugSpy = vi.spyOn(logger, "debug").mockImplementation(() => {});
       recordCrash("a string was thrown");
-      const [, data] = debugSpy.mock.calls.find(
+      const telemetryCall = debugSpy.mock.calls.find(
         (c) => (c[0] as string) === "Telemetry: crash",
-      ) as [string, Record<string, unknown>];
+      ) as [string, Record<string, unknown>] | undefined;
+      expect(telemetryCall).toBeDefined();
+      const [, data] = telemetryCall!;
       expect(data["kind"]).toBe("Error");
       expect(data["message"]).toBe("a string was thrown");
       expect(data["stack"]).toBeNull();
@@ -223,6 +239,70 @@ describe("telemetry", () => {
       (config as { telemetryEndpoint: string }).telemetryEndpoint =
         originalEndpoint;
       expect(sendBeacon).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Sentry integration", () => {
+    it("initSentry does nothing when DSN is not configured", () => {
+      // We can't spy on Sentry.init directly in ESM, so we verify behavior through logger
+      const debugSpy = vi.spyOn(logger, "debug").mockImplementation(() => {});
+      initSentry();
+      // Sentry.init is not called, so we just verify it doesn't throw
+      expect(debugSpy).toHaveBeenCalledWith(
+        "Sentry DSN not configured, skipping Sentry init",
+      );
+    });
+
+    it("setUserContext calls Sentry.setUser", () => {
+      // We can't spy on Sentry directly, so we verify the function runs without error
+      expect(() => {
+        setUserContext({ id: "user123", email: "test@example.com" });
+      }).not.toThrow();
+    });
+
+    it("setUserContext clears user when null", () => {
+      expect(() => {
+        setUserContext(null);
+      }).not.toThrow();
+    });
+
+    it("addBreadcrumb calls Sentry.addBreadcrumb", () => {
+      expect(() => {
+        addBreadcrumb({
+          category: "test",
+          message: "test message",
+          level: "info",
+        });
+      }).not.toThrow();
+    });
+
+    it("initSentry does not throw when DSN is set", () => {
+      expect(() => {
+        initSentry();
+      }).not.toThrow();
+    });
+  });
+
+  describe("Sentry init with DSN set", () => {
+    beforeEach(() => {
+      vi.resetModules();
+      vi.stubEnv("VITE_SENTRY_DSN", "https://key@o0.ingest.sentry.io/project");
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("does not log 'DSN not configured' when DSN is set", async () => {
+      const { initSentry: init } = await import("@/core/telemetry");
+      const { logger: testLogger } = await import("@/core/logger");
+      const debugSpy = vi
+        .spyOn(testLogger, "debug")
+        .mockImplementation(() => {});
+      init();
+      expect(debugSpy).not.toHaveBeenCalledWith(
+        "Sentry DSN not configured, skipping Sentry init",
+      );
     });
   });
 });

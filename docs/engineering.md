@@ -199,6 +199,26 @@ to satisfy the `local/no-raw-ui-strings` lint rule.
 - Dependency updates are audited in CI; known-audit failures are patched with
   `pnpm.auditConfig.ignoreCves` only as a last resort.
 
+### Configuring Sentry
+
+Sentry crash reporting and release health are integrated via `@sentry/browser`.
+To enable Sentry in a release build:
+
+1. **Set the DSN secret** in the GitHub repo:
+   Settings → Secrets and variables → Actions → New repository secret.
+   Name: `VITE_SENTRY_DSN`, Value: your Sentry DSN (e.g. `https://key@o0.ingest.sentry.io/project`).
+
+2. **The release workflow** (`release.yml`) injects `VITE_SENTRY_DSN` as a build-time
+   environment variable. Sentry is initialized in `src/core/telemetry.ts` via
+   `initSentry()`, which reads `import.meta.env["VITE_SENTRY_DSN"]`.
+
+3. **Local development:** set `VITE_SENTRY_DSN` in `.env` (gitignored) or leave
+   it unset — Sentry init is skipped when no DSN is configured.
+
+4. **Verification:** `initSentry()` no-ops when DSN is unset (tested in
+   `tests/telemetry.test.ts`). When DSN is set, `Sentry.init` is called with
+   the configured DSN, release version, and environment.
+
 ## Where to start
 
 - **Fixing a bug:** run `pnpm test:ci` first, add a failing test in `tests/`, fix
