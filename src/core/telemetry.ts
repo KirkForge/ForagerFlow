@@ -1,5 +1,11 @@
+import * as Sentry from "@sentry/browser";
+import type { ErrorEvent, EventHint } from "@sentry/browser";
 import { logger } from "./logger";
 import { config } from "./config";
+
+interface TransactionEvent extends Sentry.Event {
+  type: "transaction";
+}
 
 export interface TelemetryEvent {
   name: string;
@@ -8,17 +14,10 @@ export interface TelemetryEvent {
 }
 
 let telemetryEnabled = config.features.telemetry;
+let sentryInitialized = false;
 
 export function setTelemetryEnabled(enabled: boolean): void {
   telemetryEnabled = enabled;
-}
-
-function isBeaconSupported(): boolean {
-  return (
-    typeof globalThis !== "undefined" &&
-    "navigator" in globalThis &&
-    typeof globalThis.navigator.sendBeacon === "function"
-  );
 }
 
 const MAX_STRING_LENGTH = 256;
@@ -31,7 +30,6 @@ const KNOWN_EVENTS: Record<string, string[]> = {
 };
 
 function looksLikeSensitive(value: string): boolean {
-  // Data URLs and geo coordinates.
   return (
     value.startsWith("data:") || /^-?\d{1,3}\.\d+,-?\d{1,3}\.\d+/.test(value)
   );
@@ -72,7 +70,6 @@ function scrubRecord(
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(data)) {
-    // Drop keys that look like they could carry PII / free-form user input.
     const lower = key.toLowerCase();
     if (
       lower.includes("thumbnail") ||
@@ -92,11 +89,59 @@ function scrubRecord(
   return out;
 }
 
+export function initSentry(): void {
+  if (sentryInitialized || !telemetryEnabled) return;
+
+  const dsn = import.meta.env["VITE_SENTRY_DSN"] as string | undefined;
+  if (!dsn) {
+    logger.debug("Sentry DSN not configured, skipping Sentry init");
+    return;
+  }
+
+  Sentry.init({
+    dsn,
+    release: config.appVersion,
+    environment: import.meta.env.MODE,
+    tracePropagationTargets: ["localhost", /^\//],
+    beforeSend(event: ErrorEvent, _hint: EventHint): ErrorEvent | null {
+      return event;
+    },
+    beforeSendTransaction(
+      event: TransactionEvent,
+      _hint: EventHint,
+    ): TransactionEvent | null {
+      return event;
+    },
+    ignoreErrors: [
+      "ResizeObserver loop limit exceeded",
+      "ResizeObserver loop completed",
+    ],
+    debug: import.meta.env.DEV,
+  });
+
+  Sentry.setTag("app", "foragerflow");
+
+  sentryInitialized = true;
+  logger.debug("Sentry initialized", { release: config.appVersion });
+}
+
+function redactSensitiveSubstrings(value: string): string {
+  return value
+    .replace(/data:[^\s,]*/g, REDACTED)
+    .replace(/-?\d{1,3}\.\d+,-?\d{1,3}\.\d+/g, REDACTED);
+}
+
+function truncate(value: string, max: number): string {
+  return value.length > max ? `${value.slice(0, max)}…` : value;
+}
+
 export function recordTelemetry(
   name: string,
   data: Record<string, unknown> = {},
 ): void {
   if (!telemetryEnabled) return;
+
+  initSentry();
 
   const allowedKeys = KNOWN_EVENTS[name];
   const scoped = allowedKeys
@@ -115,6 +160,14 @@ export function recordTelemetry(
 
   logger.debug(`Telemetry: ${name}`, scrubbed);
 
+  Sentry.addBreadcrumb({
+    category: "telemetry",
+    message: name,
+    data: scrubbed,
+    level: "info",
+    timestamp: Date.now() / 1000,
+  });
+
   if (config.telemetryEndpoint && isBeaconSupported()) {
     try {
       const blob = new Blob([JSON.stringify(event)], {
@@ -127,27 +180,18 @@ export function recordTelemetry(
   }
 }
 
-function redactSensitiveSubstrings(value: string): string {
-  // Strip data: URIs and bare geo coordinates from free-form text so crash
-  // messages/stacks cannot leak a captured image or a user's location.
-  return value
-    .replace(/data:[^\s,]*/g, REDACTED)
-    .replace(/-?\d{1,3}\.\d+,-?\d{1,3}\.\d+/g, REDACTED);
+function isBeaconSupported(): boolean {
+  return (
+    typeof globalThis !== "undefined" &&
+    "navigator" in globalThis &&
+    typeof globalThis.navigator.sendBeacon === "function"
+  );
 }
 
-function truncate(value: string, max: number): string {
-  return value.length > max ? `${value.slice(0, max)}…` : value;
-}
-
-/**
- * Capture an unhandled error for remote crash reporting during beta. Reuses the
- * existing telemetry gate (VITE_FEATURE_TELEMETRY) and beacon transport, so it
- * only sends when VITE_TELEMETRY_ENDPOINT is configured — zero network by
- * default. Stack/message are redacted for data: URIs and geo coordinates and
- * length-capped; no image/location/user PII is carried.
- */
 export function recordCrash(error: unknown, context = ""): void {
   if (!telemetryEnabled) return;
+
+  initSentry();
 
   const isError = error instanceof Error;
   const message = redactSensitiveSubstrings(
@@ -174,6 +218,14 @@ export function recordCrash(error: unknown, context = ""): void {
 
   logger.debug("Telemetry: crash", data);
 
+  Sentry.captureException(error, {
+    extra: data,
+    tags: {
+      context,
+      appVersion: config.appVersion,
+    },
+  });
+
   if (config.telemetryEndpoint && isBeaconSupported()) {
     try {
       const blob = new Blob([JSON.stringify(event)], {
@@ -185,3 +237,27 @@ export function recordCrash(error: unknown, context = ""): void {
     }
   }
 }
+
+export function setUserContext(
+  user: { id: string; email?: string; username?: string } | null,
+): void {
+  if (!telemetryEnabled) return;
+  initSentry();
+  Sentry.setUser(user);
+}
+
+export function addBreadcrumb(breadcrumb: {
+  category: string;
+  message: string;
+  data?: Record<string, unknown>;
+  level?: "debug" | "info" | "warning" | "error";
+}): void {
+  if (!telemetryEnabled) return;
+  initSentry();
+  Sentry.addBreadcrumb({
+    ...breadcrumb,
+    timestamp: Date.now() / 1000,
+  });
+}
+
+export { Sentry };
