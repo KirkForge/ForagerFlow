@@ -71,6 +71,7 @@ pwa/model/*.onnx
 pwa/model/*.onnx.data
 pwa/model/*.onnx.external-data
 pwa/model/*-T.json
+pwa/model/*.provenance.json
 
 # --- Secrets & credentials ---
 *.pem

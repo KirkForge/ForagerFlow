@@ -3,6 +3,8 @@ import { t } from "@/i18n";
 import { isDataUrlThumbnail, isValidLocation } from "@/services/history";
 import type { HistoryEntry } from "@/services/history";
 import { createEl, requireElement } from "@/ui/utils";
+import { logger } from "@/core/logger";
+import { FeedbackPanel } from "./feedback";
 
 export class HistoryDetailPanel {
   private readonly modal: HTMLDialogElement;
@@ -13,6 +15,9 @@ export class HistoryDetailPanel {
   private readonly safety: HTMLParagraphElement;
   private readonly verify: HTMLAnchorElement;
   private readonly closeBtn: HTMLButtonElement;
+  private readonly feedbackBtn: HTMLButtonElement;
+  private readonly feedbackPanel: FeedbackPanel;
+  private currentEntry: HistoryEntry | null = null;
 
   constructor(root: HTMLElement | Document = document) {
     this.modal = requireElement(
@@ -55,11 +60,22 @@ export class HistoryDetailPanel {
       root,
       "HistoryDetailPanel",
     );
+    this.feedbackBtn = requireElement<HTMLButtonElement>(
+      "#history-detail-feedback",
+      root,
+      "HistoryDetailPanel",
+    );
+    this.feedbackPanel = new FeedbackPanel(root);
     this.bindClose();
     this.closeBtn.setAttribute("aria-label", t("history.detail.closeAria"));
+    this.feedbackBtn.setAttribute(
+      "aria-label",
+      t("history.detail.feedbackAria"),
+    );
   }
 
   open(entry: HistoryEntry): void {
+    this.currentEntry = entry;
     const label = entry.top1Species;
     this.title.textContent = label;
 
@@ -166,6 +182,20 @@ export class HistoryDetailPanel {
       if (!inDialog) {
         this.close();
       }
+    });
+    this.feedbackBtn.addEventListener("click", () => {
+      if (!this.currentEntry) return;
+      this.feedbackPanel.open(this.currentEntry, (id, feedback) => {
+        import("@/services/history")
+          .then(({ saveFeedback }) => {
+            saveFeedback(id, feedback).catch((err: unknown) => {
+              logger.error("Failed to save feedback:", err);
+            });
+          })
+          .catch((err: unknown) => {
+            logger.error("Failed to load history module:", err);
+          });
+      });
     });
   }
 

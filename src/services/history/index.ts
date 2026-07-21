@@ -27,6 +27,22 @@ export interface HistoryEntry {
   thumbnail: string;
   notes: string;
   location?: GeoLocation;
+  /** User-submitted correction feedback. */
+  feedback?: FeedbackEntry;
+  /** Model provenance triple at prediction time. */
+  provenance?: ProvenanceInfo;
+}
+
+export interface FeedbackEntry {
+  correctSpecies: string;
+  notes: string;
+  timestamp: string;
+}
+
+export interface ProvenanceInfo {
+  modelSourceHash: string;
+  onnxChecksum: string;
+  labelMapVersion: string;
 }
 
 export interface HistoryBackup {
@@ -251,8 +267,12 @@ export async function saveIdentification(
   modelKey: ModelKey,
   thumbnail?: string,
   location?: GeoLocation,
+  provenance?: ProvenanceInfo,
 ): Promise<string> {
   const entry = makeEntry(report, modelKey, thumbnail, location);
+  if (provenance) {
+    entry.provenance = provenance;
+  }
 
   try {
     const db = await openDB();
@@ -472,4 +492,33 @@ export async function importHistory(
 
   await recordBackupTimestamp(new Date().toISOString());
   return imported;
+}
+
+export async function saveFeedback(
+  entryId: string,
+  feedback: FeedbackEntry,
+): Promise<void> {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.get(entryId);
+    request.onsuccess = () => {
+      const entry = request.result as HistoryEntry | undefined;
+      if (!entry) return;
+      entry.feedback = feedback;
+      store.put(entry);
+    };
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => {
+        resolve();
+      };
+      tx.onerror = () => {
+        reject(new Error(tx.error?.message ?? "IDB feedback save failed"));
+      };
+    });
+  } catch (err) {
+    logger.error("Failed to save feedback:", err);
+    throw err;
+  }
 }

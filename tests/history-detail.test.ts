@@ -10,6 +10,7 @@ function renderDetailHTML(): void {
         <div class="detail-header">
           <h2 id="history-detail-title"></h2>
           <button id="history-detail-close" type="button" value="close">×</button>
+          <button id="history-detail-feedback" type="button">Feedback</button>
         </div>
         <div id="history-detail-body">
           <img id="history-detail-thumbnail" class="history-detail-thumbnail" alt="" hidden />
@@ -19,6 +20,14 @@ function renderDetailHTML(): void {
           <a id="history-detail-verify" class="verify-link" href="#"></a>
         </div>
       </div>
+    </dialog>
+    <dialog id="feedback-modal">
+      <form id="feedback-form">
+        <input id="feedback-species" />
+        <textarea id="feedback-notes"></textarea>
+        <button id="feedback-cancel" type="button">Cancel</button>
+        <button id="feedback-submit" type="submit">Submit</button>
+      </form>
     </dialog>
   `;
   const dialog = document.querySelector(
