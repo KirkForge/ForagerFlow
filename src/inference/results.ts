@@ -21,7 +21,11 @@ export function generatePredictionReport(
   logits: Float32Array,
   model: ModelRegistryEntry,
 ): PredictionReport {
-  const probs = softmax(logits);
+  const scaled = new Float32Array(logits.length);
+  for (let i = 0; i < logits.length; i++) {
+    scaled[i] = (logits[i] ?? 0) / model.temperature;
+  }
+  const probs = softmax(scaled);
   const ranked: Prediction[] = [];
 
   for (let i = 0; i < probs.length; i++) {

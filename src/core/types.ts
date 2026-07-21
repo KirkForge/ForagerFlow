@@ -42,6 +42,8 @@ export interface ModelConfig {
   mean: [number, number, number];
   std: [number, number, number];
   expectedLabelCount: number;
+  /** Temperature scaling factor for logits (fitted via scripts/calibrate.py). 1.0 = no scaling. */
+  temperature: number;
 }
 
 export interface Prediction {

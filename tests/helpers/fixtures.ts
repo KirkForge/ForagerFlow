@@ -14,6 +14,7 @@ export function makeMockModel(
     mean: [0.485, 0.456, 0.406],
     std: [0.229, 0.224, 0.225],
     expectedLabelCount: 3,
+    temperature: 1.0,
     knowledge: {
       "Agaricus bisporus": { edibility: Edibility.Edible, notes: "Safe." },
       "Amanita phalloides": {
