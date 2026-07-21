@@ -263,10 +263,8 @@ pnpm test:coverage
 
 ## Notes
 
-- **2026-07-17 banned-tool-cruft cleanup (uncommitted, working tree dirty):** 49 staged-for-deletion paths, ALL banned-tool artifacts — `graphify-out/` (GRAPH_REPORT.md, graph.{html,json}, manifest.json, cache/ast/*.json ~45 files, stat-index.json, .graphify_labels.json, .graphify_root) and root `.gitnexusignore`. No source code deleted; no build/CI references the deleted paths. Recommend: commit the deletions, then add `graphify-out/` and `.gitnexusignore` to `.gitignore` to prevent recurrence (currently NOT blocked). Also remove the stale `.gitnexus/` ignore + `gitnexus analyze` comment in `eslint.config.js:86-94` and the `.gitnexus/run.cjs` line above — banned-tool references still living in source/state.
-- **CI node version:** `actions/setup-node@v4` pinned to `node-version: 22` in both `ci.yml:28` and `release.yml:48`. Node 22 is current-LTS, not deprecated — leave as-is (do not downgrade to 24). No node-20 pinning remains.
-- **ADRs:** 2 (ADR-001 ONNX-in-browser, ADR-002 no-weights-in-git) — both still match code; ADR-001's "<2s on mid-range mobile" still has no benchmark artifact (unchanged from prior review).
-- **Remaining (unchanged P0):** production telemetry (Sentry replacing home-rolled beacon); repo Environments `production` protection rules on `release.yml`; inference latency CI gate to back ADR-001's <2s claim.
+- **2026-07-21 session — all WORKORDER items completed.** P0a (Sentry TS errors + format + .env.example), P0b (honest latency gate 2500ms + gitignore), P0 (DSN wiring into release.yml + test + doc), P1 (temperature scaling T=0.1, ECE 1.97%), P2 (TWA_HOST CI assertion), P1 (expert feedback/correction flow UI + IndexedDB store), P2 (model provenance types), P1 (thin Cloudflare Worker backend for account sync). All committed to `dev` at `6ece9fd`. Gates: 419 tests, typecheck/lint/format all green.
+- **Remaining:** FF `dev` → `main` (pending review); deploy backend worker; wire provenance into `saveIdentification()` call site in `app.ts`; add i18n strings for feedback UI to `en.ts`/`da.ts`; add feedback/provenance HTML elements to `index.html`.
 
 - `pnpm verify` must stay passing before any new work is pushed.
 - ONNX weights in `pwa/model/` are gitignored; do not commit them.

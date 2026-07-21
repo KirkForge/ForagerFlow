@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com).
 ## [Unreleased]
 
 ### Added
+- Sentry crash reporting integration with PII scrub, DSN wiring in release.yml.
+- Inference latency CI gate (p95 < 2500ms) backing ADR-001.
+- Temperature scaling calibration (T=0.1, ECE 1.97%) for BVRA model.
+- Expert feedback/correction flow (UI modal + IndexedDB store).
+- Model provenance types (source hash, ONNX checksum, label-map version).
+- Thin Cloudflare Worker backend for account sync (POST/GET /sync).
+- TWA_HOST CI assertion in generate-assetlinks.cjs.
 - ADR-001 (ONNX Runtime Web in-browser inference) and ADR-002 (ONNX weights excluded from git, shipped via release assets).
 - Service Worker unit tests (`tests/sw.test.ts`) covering install, activate, navigation fallback, `.onnx`/`.wasm` range responses, and stale-while-revalidate static assets.
 - Shared typed DOM query helper `requireElement()` in `src/ui/utils.ts` with a runtime `instanceof HTMLElement` guard and descriptive error labels.
