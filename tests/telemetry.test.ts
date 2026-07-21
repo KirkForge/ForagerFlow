@@ -275,5 +275,34 @@ describe("telemetry", () => {
         });
       }).not.toThrow();
     });
+
+    it("initSentry does not throw when DSN is set", () => {
+      expect(() => {
+        initSentry();
+      }).not.toThrow();
+    });
+  });
+
+  describe("Sentry init with DSN set", () => {
+    beforeEach(() => {
+      vi.resetModules();
+      vi.stubEnv("VITE_SENTRY_DSN", "https://key@o0.ingest.sentry.io/project");
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("does not log 'DSN not configured' when DSN is set", async () => {
+      const { initSentry: init } = await import("@/core/telemetry");
+      const { logger: testLogger } = await import("@/core/logger");
+      const debugSpy = vi
+        .spyOn(testLogger, "debug")
+        .mockImplementation(() => {});
+      init();
+      expect(debugSpy).not.toHaveBeenCalledWith(
+        "Sentry DSN not configured, skipping Sentry init",
+      );
+    });
   });
 });
