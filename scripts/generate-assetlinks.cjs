@@ -55,6 +55,12 @@ function generateAssetLinks() {
 }
 
 function main() {
+  if (!process.env["TWA_HOST"]) {
+    console.error(
+      "TWA_HOST is required. Set it as a repo variable: Settings → Secrets and variables → Actions → Variables → TWA_HOST",
+    );
+    process.exit(1);
+  }
   mkdirSync(OUT_DIR, { recursive: true });
   const content = generateAssetLinks();
   writeFileSync(OUT_FILE, `${content}\n`);
