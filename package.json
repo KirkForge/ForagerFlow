@@ -52,5 +52,9 @@
     "vite": "^6.4.3",
     "vite-plugin-pwa": "^0.21.2",
     "vitest": "^4.1.9"
+  },
+  "dependencies": {
+    "@sentry/browser": "^10.66.0",
+    "@sentry/vite-plugin": "^5.4.0"
   }
 }
