@@ -4,6 +4,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com).
 
 ## [Unreleased]
 
+### Changed
+- Verified P0a (Sentry telemetry) and P0b (honest latency gate 2500ms) landed and green.
+
 ### Added
 - Sentry crash reporting integration with PII scrub, DSN wiring in release.yml.
 - Inference latency CI gate (p95 < 2500ms) backing ADR-001.
