@@ -31,6 +31,7 @@ export type StatusHandler = (text: string) => void;
 export type ResultHandler = (result: {
   logits: Float32Array;
   modelKey: ModelKey;
+  provenance: import("@/services/history").ProvenanceInfo;
 }) => void;
 export type ErrorHandler = (error: InferenceError | LabelMismatchError) => void;
 export type StorageConfirmHandler = (payload: {
@@ -146,6 +147,7 @@ export class InferenceService {
             this.onResultHandler?.({
               logits: new Float32Array(e.data.logits),
               modelKey: e.data.modelKey,
+              provenance: e.data.provenance,
             });
             this.onStatusHandler?.("Done");
             break;

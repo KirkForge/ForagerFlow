@@ -123,6 +123,8 @@ jobs:
             "foragerflow-${{ github.ref_name }}.tar.gz" \
             "dist/twa/foragerflow-release-unsigned.apk" \
             "foragerflow-${{ github.ref_name }}-sbom.json" \
+            "pwa/model/fungitastic.provenance.json" \
+            "pwa/model/dima806.provenance.json" \
             --clobber
 
       # ── gap #5: APK signing + Play Console upload ───────────────────────────

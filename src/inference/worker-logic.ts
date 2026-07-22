@@ -4,6 +4,8 @@ import {
   ModelKey,
   WorkerCommandType,
 } from "@/core/types";
+import type { ProvenanceInfo } from "@/services/history";
+import { UNKNOWN_PROVENANCE } from "@/inference/results";
 
 export interface OrtTensor {
   data: Float32Array;
@@ -35,6 +37,7 @@ export interface SessionState {
   modelKey: string;
   mean: [number, number, number];
   std: [number, number, number];
+  provenance: ProvenanceInfo;
 }
 
 /**
@@ -318,7 +321,30 @@ export function createWorker(
         }
       }
 
-      state = { session: newSession, modelKey, mean, std };
+      // Fetch provenance JSON from the same directory as the model.
+      // ponytail: missing provenance is a safety signal, not a no-op — use the
+      // unknown sentinel so callers can distinguish "no data" from "not loaded".
+      let provenance: ProvenanceInfo = UNKNOWN_PROVENANCE;
+      try {
+        const provenanceUrl = modelPath.replace(/\.onnx$/, ".provenance.json");
+        const provenanceResp = await fetch(provenanceUrl);
+        if (provenanceResp.ok) {
+          const provenanceData =
+            (await provenanceResp.json()) as ProvenanceInfo;
+          if (
+            typeof provenanceData.modelSourceHash === "string" &&
+            typeof provenanceData.onnxChecksum === "string" &&
+            typeof provenanceData.labelMapVersion === "string"
+          ) {
+            provenance = provenanceData;
+          }
+        }
+      } catch {
+        // Network errors or parse failures are non-fatal — provenance degrades
+        // to the unknown sentinel, preserving the offline-first contract.
+      }
+
+      state = { session: newSession, modelKey, mean, std, provenance };
       self.postMessage({
         type: InferenceWorkerMessageType.Status,
         text: "Ready",
@@ -400,6 +426,7 @@ export function createWorker(
           type: InferenceWorkerMessageType.Result,
           logits: Array.from(logits),
           modelKey,
+          provenance: state.provenance,
         });
       } catch (err) {
         console.error("[FORAGERFLOW] Inference worker error:", err);

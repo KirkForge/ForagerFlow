@@ -196,10 +196,10 @@ export class AppController {
       this.updateModelProgress(progress);
     });
 
-    inferenceService.onResult(({ logits, modelKey }) => {
+    inferenceService.onResult(({ logits, modelKey, provenance }) => {
       try {
         const model = modelRegistry[modelKey];
-        const report = generatePredictionReport(logits, model);
+        const report = generatePredictionReport(logits, model, provenance);
         this.#lastReport = report;
         this.renderer.render(report, model);
         this.setCaptureBusy(false);
@@ -210,6 +210,7 @@ export class AppController {
           modelKey,
           this.#pendingThumbnail ?? undefined,
           this.#pendingLocation,
+          report.provenance,
         )
           .catch((_e: unknown) => {
             /* best-effort save */

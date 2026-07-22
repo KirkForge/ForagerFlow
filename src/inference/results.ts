@@ -1,10 +1,17 @@
 import type { SpeciesKnowledge, Prediction } from "@/core/types";
 import { Edibility } from "@/core/types";
+import type { ProvenanceInfo } from "@/services/history";
 import { softmax } from "@/inference/softmax";
 import type { ModelRegistryEntry } from "@/core/types";
 import { t } from "@/i18n";
 import type { CalibrationResult } from "./confidence";
 import { calibrateConfidence } from "./confidence";
+
+export const UNKNOWN_PROVENANCE: ProvenanceInfo = {
+  modelSourceHash: "unknown",
+  onnxChecksum: "unknown",
+  labelMapVersion: "unknown",
+};
 
 export interface PredictionReport {
   predictions: Prediction[];
@@ -15,11 +22,13 @@ export interface PredictionReport {
   hasRiskInTop3: boolean;
   requiresWarning: boolean;
   warningMessage: string | null;
+  provenance: ProvenanceInfo;
 }
 
 export function generatePredictionReport(
   logits: Float32Array,
   model: ModelRegistryEntry,
+  provenance: ProvenanceInfo = UNKNOWN_PROVENANCE,
 ): PredictionReport {
   const scaled = new Float32Array(logits.length);
   for (let i = 0; i < logits.length; i++) {
@@ -70,6 +79,7 @@ export function generatePredictionReport(
     hasRiskInTop3: hasRiskInTop3,
     requiresWarning,
     warningMessage,
+    provenance,
   };
 }
 

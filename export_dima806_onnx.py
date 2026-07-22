@@ -1,4 +1,6 @@
 import sys
+import json
+import hashlib
 from pathlib import Path
 import onnx
 import torch
@@ -50,3 +52,22 @@ if sidecar.exists():
 final_path = ROOT / "pwa/model/dima806.onnx"
 onnx.save(loaded, str(final_path), save_as_external_data=False)
 print(f"ONNX export complete (monolithic): {final_path}  ({final_path.stat().st_size} bytes)")
+
+# Write provenance JSON
+onnx_checksum = hashlib.sha256(final_path.read_bytes()).hexdigest()
+labels_path = ROOT / "src/data/labels-dima806.json"
+label_map_version = (
+    hashlib.sha256(labels_path.read_bytes()).hexdigest()[:12]
+    if labels_path.exists()
+    else "unknown"
+)
+model_source_hash = "hf:dima806/mushrooms_image_detection"
+provenance = {
+    "modelSourceHash": model_source_hash,
+    "onnxChecksum": f"sha256:{onnx_checksum}",
+    "labelMapVersion": label_map_version,
+}
+provenance_path = ROOT / "pwa/model/dima806.provenance.json"
+with open(provenance_path, "w") as f:
+    json.dump(provenance, f, indent=2)
+print(f"Provenance written: {provenance_path}")

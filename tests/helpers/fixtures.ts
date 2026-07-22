@@ -1,5 +1,5 @@
 import { Edibility, ModelKey, type ModelRegistryEntry } from "@/core/types";
-import type { PredictionReport } from "@/inference/results";
+import { UNKNOWN_PROVENANCE, type PredictionReport } from "@/inference/results";
 import type { HistoryEntry } from "@/services/history";
 
 export function makeMockModel(
@@ -43,6 +43,7 @@ export function makeReport(
     hasRiskInTop3: false,
     requiresWarning: false,
     warningMessage: null,
+    provenance: UNKNOWN_PROVENANCE,
     ...overrides,
   };
 }

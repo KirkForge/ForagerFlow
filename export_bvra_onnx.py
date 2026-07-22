@@ -1,4 +1,6 @@
 import sys
+import json
+import hashlib
 from pathlib import Path
 import onnx
 import torch
@@ -53,3 +55,25 @@ if sidecar.exists():
 final_path = ROOT / "pwa/model/fungitastic.onnx"
 onnx.save(loaded, str(final_path), save_as_external_data=False)
 print(f"ONNX export complete (monolithic): {final_path}  ({final_path.stat().st_size} bytes)")
+
+# Write provenance JSON
+onnx_checksum = hashlib.sha256(final_path.read_bytes()).hexdigest()
+labels_path = ROOT / "pwa/model/fungitastic-classes.json"
+label_map_version = (
+    hashlib.sha256(labels_path.read_bytes()).hexdigest()[:12]
+    if labels_path.exists()
+    else "unknown"
+)
+# modelSourceHash: hash of the PyTorch source checkpoint (not reproducible
+# without the weights, so we use the timm model identifier + commit as a
+# proxy). ponytail: this is a best-effort provenance marker.
+model_source_hash = f"timm:BVRA/resnext50_32x4d.in1k_ft_fungitastic-mini_224"
+provenance = {
+    "modelSourceHash": model_source_hash,
+    "onnxChecksum": f"sha256:{onnx_checksum}",
+    "labelMapVersion": label_map_version,
+}
+provenance_path = ROOT / "pwa/model/fungitastic.provenance.json"
+with open(provenance_path, "w") as f:
+    json.dump(provenance, f, indent=2)
+print(f"Provenance written: {provenance_path}")

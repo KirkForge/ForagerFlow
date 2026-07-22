@@ -74,6 +74,7 @@ export interface WorkerResultMessage {
   type: InferenceWorkerMessageType.Result;
   logits: number[];
   modelKey: ModelKey;
+  provenance: import("@/services/history").ProvenanceInfo;
 }
 
 export interface WorkerErrorMessage {
