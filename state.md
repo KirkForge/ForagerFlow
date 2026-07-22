@@ -263,6 +263,8 @@ pnpm test:coverage
 
 ## Notes
 
+- **2026-07-22 P0 verification session:** Verified P0a (Sentry telemetry) and P0b (honest latency gate) were already landed in commit `6a66a08`. All 4 TS errors fixed, `VITE_SENTRY_DSN` in `.env.example`, `latency-results.json` gitignored, `release.yml` threshold 2500ms, ADR-001 updated to "< 2.5s p95 on the CI runner CPU". Format fix for `assetlinks.test.ts` committed (`66a5f43`). Full gate green: typecheck ✓, lint ✓, format:check ✓, 419/419 tests pass. Known flaky: `history-crypto > rejects a wrong passphrase` (PBKDF2 100k iterations can exceed 5s vitest timeout under load — passes in isolation).
+
 - **2026-07-17 banned-tool-cruft cleanup (uncommitted, working tree dirty):** 49 staged-for-deletion paths, ALL banned-tool artifacts — `graphify-out/` (GRAPH_REPORT.md, graph.{html,json}, manifest.json, cache/ast/*.json ~45 files, stat-index.json, .graphify_labels.json, .graphify_root) and root `.gitnexusignore`. No source code deleted; no build/CI references the deleted paths. Recommend: commit the deletions, then add `graphify-out/` and `.gitnexusignore` to `.gitignore` to prevent recurrence (currently NOT blocked). Also remove the stale `.gitnexus/` ignore + `gitnexus analyze` comment in `eslint.config.js:86-94` and the `.gitnexus/run.cjs` line above — banned-tool references still living in source/state.
 - **CI node version:** `actions/setup-node@v4` pinned to `node-version: 22` in both `ci.yml:28` and `release.yml:48`. Node 22 is current-LTS, not deprecated — leave as-is (do not downgrade to 24). No node-20 pinning remains.
 - **ADRs:** 2 (ADR-001 ONNX-in-browser, ADR-002 no-weights-in-git) — both still match code; ADR-001's "<2s on mid-range mobile" still has no benchmark artifact (unchanged from prior review).

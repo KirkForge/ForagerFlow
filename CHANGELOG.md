@@ -4,6 +4,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com).
 
 ## [Unreleased]
 
+### Changed
+- Verified P0a (Sentry telemetry) and P0b (honest latency gate 2500ms) landed and green.
+
 ### Added
 - ADR-001 (ONNX Runtime Web in-browser inference) and ADR-002 (ONNX weights excluded from git, shipped via release assets).
 - Service Worker unit tests (`tests/sw.test.ts`) covering install, activate, navigation fallback, `.onnx`/`.wasm` range responses, and stale-while-revalidate static assets.
