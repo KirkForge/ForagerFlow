@@ -53,6 +53,8 @@ jobs:
         run: pnpm verify:labels
 
       - name: Generate TWA assetlinks placeholder
+        env:
+          TWA_HOST: ${{ vars.TWA_HOST }}
         run: node scripts/generate-assetlinks.cjs
 
       - name: Verify TWA skeleton files exist
