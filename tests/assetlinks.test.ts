@@ -54,11 +54,20 @@ describe("generate-assetlinks", () => {
 
   it("exits with error when TWA_HOST is not set", () => {
     delete process.env["TWA_HOST"];
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => undefined as never);
-    const { main } = require("../scripts/generate-assetlinks.cjs") as AssetLinksModule & { main: () => void };
+    const errorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const exitSpy = vi
+      .spyOn(process, "exit")
+      .mockImplementation(() => undefined as never);
+    const { main } =
+      require("../scripts/generate-assetlinks.cjs") as AssetLinksModule & {
+        main: () => void;
+      };
     main();
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("TWA_HOST is required"));
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("TWA_HOST is required"),
+    );
     expect(exitSpy).toHaveBeenCalledWith(1);
     errorSpy.mockRestore();
     exitSpy.mockRestore();
