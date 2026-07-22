@@ -39,6 +39,7 @@ export const modelRegistry: Record<ModelKey, ModelRegistryEntry> = {
     mean: [0.485, 0.456, 0.406],
     std: [0.229, 0.224, 0.225],
     expectedLabelCount: labelsBvra.length,
+    // Fitted via scripts/calibrate.py; provenance: tests/fixtures/bvra-T.json
     temperature: 0.1,
     knowledge: mergeLocalizedNotes(
       knowledgeBvra as Record<string, SpeciesKnowledge>,
@@ -54,6 +55,7 @@ export const modelRegistry: Record<ModelKey, ModelRegistryEntry> = {
     mean: [0.5, 0.5, 0.5],
     std: [0.5, 0.5, 0.5],
     expectedLabelCount: labelsDima806.length,
+    // No calibration run yet; T=1.0 means no scaling. provenance: tests/fixtures/dima806-T.json
     temperature: 1.0,
     knowledge: mergeLocalizedNotes(
       knowledgeDima806 as Record<string, SpeciesKnowledge>,

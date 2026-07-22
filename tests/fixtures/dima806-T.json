@@ -1,0 +1,10 @@
+{
+  "model": "dima806",
+  "temperature": 1.0,
+  "ece": 0.0,
+  "ece_uncalibrated": 0.0,
+  "n_samples": 0,
+  "n_images": 0,
+  "self_referential": true,
+  "note": "No calibration run yet; T=1.0 is a placeholder (no scaling)"
+}

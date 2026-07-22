@@ -41,7 +41,7 @@ ForagerFlow bundles two independent image-classification models for mushroom ide
 - Predictions below 50% confidence are flagged as low-confidence.
 - A poisonous or unknown species in the top-3 always triggers an additional warning, regardless of top-1 confidence. (Fail-closed: a toxic lookalike near a confident edible prediction is still surfaced.)
 - Class list and knowledge data are verified at build time for label/logit alignment.
-- **Calibration:** Temperature scaling is fitted per model via `scripts/calibrate.py`. The BVRA specialist model has T=0.1 with an Expected Calibration Error (ECE) of 1.97% (vs 64.69% uncalibrated) on the reference test set. The dima806 general model uses T=1.0 (no scaling) pending a calibration set.
+- **Calibration:** Temperature scaling is fitted per model via `scripts/calibrate.py`. The BVRA specialist model has T=0.1 with a self-referential ECE (upper bound on calibration quality) of 1.97% (vs 64.69% uncalibrated) on the reference test set — no labeled validation split was available, so this measures model self-consistency, not true calibration against ground truth. The dima806 general model uses T=1.0 (no scaling) pending a calibration set. See `tests/calibration.test.ts` for the fixture-verified assertion that calibrated ECE < uncalibrated ECE.
 
 ## Bias and safety notes
 

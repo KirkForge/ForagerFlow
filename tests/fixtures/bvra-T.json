@@ -1,0 +1,9 @@
+{
+  "model": "fungitastic",
+  "temperature": 0.1,
+  "ece": 0.0197,
+  "ece_uncalibrated": 0.6469,
+  "n_samples": 25,
+  "n_images": 5,
+  "self_referential": true
+}

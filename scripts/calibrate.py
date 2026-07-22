@@ -8,7 +8,15 @@ pwa/model/<model>-T.json.
 
 Usage:
   python3 scripts/calibrate.py pwa/model/fungitastic.onnx pwa/model/fungitastic-classes.json test-images --runs 5
+  python3 scripts/calibrate.py pwa/model/fungitastic.onnx pwa/model/fungitastic-classes.json test-images --runs 5 --labels-csv labels.csv
+
+Honesty note (ponytail:): When --labels-csv is NOT provided, ECE is computed
+against argmax-of-logits pseudo-labels (self-referential). Self-referential ECE
+is an UPPER BOUND on calibration quality, NOT a measurement of true calibration.
+The script prints a warning to this effect. When --labels-csv IS provided with
+ground-truth labels, true ECE is computed.
 """
+import csv
 import json
 import sys
 import time
@@ -67,6 +75,12 @@ def main() -> int:
     parser.add_argument("labels_path", type=str)
     parser.add_argument("image_dir", type=str)
     parser.add_argument("--runs", type=int, default=5, help="inference runs per image")
+    parser.add_argument(
+        "--labels-csv",
+        type=str,
+        default=None,
+        help="CSV with columns image_path,true_label_index for ground-truth calibration",
+    )
     args = parser.parse_args()
 
     model_path = args.model_path
@@ -100,8 +114,29 @@ def main() -> int:
     logits = np.array(all_logits)
     n = len(logits)
 
-    # Use argmax as pseudo-labels for calibration (no ground truth available)
-    labels = np.argmax(logits, axis=-1)
+    self_referential = True
+    if args.labels_csv:
+        labels_map = {}
+        with open(args.labels_csv, newline="") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if len(row) >= 2:
+                    labels_map[row[0]] = int(row[1])
+        labels = np.array(
+            [labels_map.get(str(img), np.argmax(logits[i], axis=-1)) for i, img in enumerate(images)]
+        )
+        self_referential = False
+    else:
+        # ponytail: self-referential ECE — argmax pseudo-labels
+        labels = np.argmax(logits, axis=-1)
+        print(
+            "WARNING: No --labels-csv provided. "
+            "Using argmax-of-logits as pseudo-labels (self-referential). "
+            "The ECE computed this way is an UPPER BOUND on calibration quality, "
+            "NOT a measurement of true calibration. "
+            "Provide --labels-csv with ground-truth labels for true ECE.",
+            file=sys.stderr,
+        )
 
     # Fit temperature via NLL minimization
     result = minimize_scalar(
@@ -124,6 +159,12 @@ def main() -> int:
     print(f"Uncalibrated ECE: {raw_ece:.4f} ({raw_ece * 100:.2f}%)")
     print(f"Calibrated ECE:   {ece:.4f} ({ece * 100:.2f}%)")
     print(f"ECE improvement:  {(raw_ece - ece) * 100:.2f}pp")
+    if self_referential:
+        print(
+            "NOTE: ECE is self-referential (upper bound on calibration quality), "
+            "not true calibration against ground truth.",
+            file=sys.stderr,
+        )
 
     # Write temperature file
     model_stem = Path(model_path).stem
@@ -135,6 +176,7 @@ def main() -> int:
         "ece_uncalibrated": raw_ece,
         "n_samples": n,
         "n_images": len(images),
+        "self_referential": self_referential,
     }
     with open(out_path, "w") as f:
         json.dump(artifact, f, indent=2)
