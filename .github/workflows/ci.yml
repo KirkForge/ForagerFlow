@@ -63,6 +63,22 @@ jobs:
           test -f twa/app/src/main/AndroidManifest.xml
           test -x twa/gradlew
 
+      - name: Verify TWA host placeholder not in source
+        run: |
+          # The source twa-config.xml must not contain the example domain.
+          # build-twa.cjs generates the real config from TWA_HOST at build time.
+          if grep -q "foragerflow.example.com" twa/app/src/main/res/values/twa-config.xml; then
+            echo "ERROR: foragerflow.example.com found in twa-config.xml source"
+            exit 1
+          fi
+          # The only foragerflow.example.com reference in twa/ should be the
+          # Gradle buildConfigField fallback in build.gradle.kts.
+          count=$(grep -rn "foragerflow.example.com" twa/ --include="*.kts" --include="*.xml" --include="*.java" | grep -v "build.gradle.kts" | wc -l)
+          if [ "$count" -gt 0 ]; then
+            echo "ERROR: foragerflow.example.com found outside build.gradle.kts fallback"
+            exit 1
+          fi
+
       - name: Install Playwright browsers and dependencies
         run: |
           pnpm exec playwright install chromium firefox webkit

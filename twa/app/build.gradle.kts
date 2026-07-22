@@ -12,6 +12,15 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "2.1.0"
+
+        val twaHost = project.findProperty("twaHost") as? String
+            ?: System.getenv("TWA_HOST")
+            ?: "foragerflow.example.com"
+        buildConfigField("String", "TWA_HOST", "\"$twaHost\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
