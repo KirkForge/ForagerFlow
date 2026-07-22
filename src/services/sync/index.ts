@@ -171,10 +171,15 @@ export async function pull(): Promise<void> {
     }
 
     await new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve();
-      tx.onerror = () =>
+      tx.oncomplete = () => {
+        resolve();
+      };
+      tx.onerror = () => {
         reject(new Error(tx.error?.message ?? "IDB sync merge failed"));
-      tx.onabort = () => reject(new Error("IDB sync merge aborted"));
+      };
+      tx.onabort = () => {
+        reject(new Error("IDB sync merge aborted"));
+      };
     });
 
     logger.info(`Sync pull: ${String(merged)} entries merged`);

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return -- vi.fn() mocks need any-return allowances */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ModelKey, Edibility } from "@/core/types";
 import type { HistoryEntry } from "@/services/history";
@@ -16,10 +17,10 @@ const mockEntries: HistoryEntry[] = [
   },
 ];
 
-const mockGetHistory = vi.fn().mockResolvedValue([]);
-const mockGetMeta = vi.fn().mockResolvedValue(undefined);
-const mockSetMeta = vi.fn().mockResolvedValue(undefined);
-const mockOpenDB = vi.fn().mockResolvedValue({});
+const mockGetHistory = vi.fn();
+const mockGetMeta = vi.fn();
+const mockSetMeta = vi.fn();
+const mockOpenDB = vi.fn();
 let mockSyncUrl = "";
 let mockSyncToken = "";
 
@@ -99,7 +100,7 @@ describe("SyncService", () => {
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const call = fetchSpy.mock.calls[0]!;
-    expect(call[1]?.headers).toHaveProperty(
+    expect(call[1]!.headers).toHaveProperty(
       "Authorization",
       "Bearer test-token",
     );
@@ -129,18 +130,22 @@ describe("SyncService", () => {
     mockGetHistory.mockResolvedValueOnce(mockEntries);
 
     let callCount = 0;
-    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(() => {
       callCount++;
       if (callCount === 1) {
-        return new Response(JSON.stringify({ error: "internal" }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        });
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: "internal" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
       }
-      return new Response(JSON.stringify({ ok: true, count: 1 }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+      return Promise.resolve(
+        new Response(JSON.stringify({ ok: true, count: 1 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
     });
 
     vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void) => {
@@ -209,19 +214,22 @@ describe("SyncService", () => {
     };
     mockGetHistory.mockResolvedValueOnce([entryWithThumb]);
 
-    let capturedBody: string | null = null;
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
-      capturedBody = (init?.body as string) ?? null;
-      return new Response(JSON.stringify({ ok: true, count: 1 }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+    let capturedBody: string | undefined;
+    vi.spyOn(globalThis, "fetch").mockImplementation((_url, init) => {
+      const body = init?.body;
+      capturedBody = typeof body === "string" ? body : undefined;
+      return Promise.resolve(
+        new Response(JSON.stringify({ ok: true, count: 1 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
     });
 
     const { push } = await import("@/services/sync");
     await push();
 
-    expect(capturedBody).not.toBeNull();
+    expect(capturedBody).toBeDefined();
     const parsed = JSON.parse(capturedBody!) as {
       entries: HistoryEntry[];
     };
