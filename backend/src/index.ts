@@ -38,10 +38,6 @@ interface SyncResponse {
   count: number;
 }
 
-interface ErrorResponse {
-  error: string;
-}
-
 async function verifyAuth(request: Request, env: Env): Promise<string | null> {
   const auth = request.headers.get("Authorization");
   if (!auth || !auth.startsWith("Bearer ")) return null;

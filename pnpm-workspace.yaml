@@ -1,5 +1,8 @@
+packages:
+  - backend
+
 allowBuilds:
-  '@sentry/cli': true
+  "@sentry/cli": true
   esbuild: false
 
 overrides:

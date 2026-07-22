@@ -1,0 +1,13 @@
+name = "foragerflow-sync"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+
+# KV namespace for sync data. Create with:
+#   wrangler kv:namespace create FORAGERFLOW_KV
+# Then replace the id below with the output.
+[[kv_namespaces]]
+binding = "FORAGERFLOW_KV"
+id = "placeholder_create_with_wrangler_kv_namespace_create"
+
+# SYNC_TOKEN secret — set via:
+#   wrangler secret put SYNC_TOKEN
