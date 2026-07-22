@@ -1,0 +1,230 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { ModelKey, Edibility } from "@/core/types";
+import type { HistoryEntry } from "@/services/history";
+
+const mockEntries: HistoryEntry[] = [
+  {
+    id: "entry-1",
+    timestamp: "2026-07-22T10:00:00.000Z",
+    modelKey: ModelKey.BVRA,
+    top1Species: "Amanita muscaria",
+    top1Probability: 0.95,
+    top1Edibility: Edibility.Poisonous,
+    predictions: [{ label: "Amanita muscaria", probability: 0.95 }],
+    thumbnail: "",
+    notes: "",
+  },
+];
+
+const mockGetHistory = vi.fn().mockResolvedValue([]);
+const mockGetMeta = vi.fn().mockResolvedValue(undefined);
+const mockSetMeta = vi.fn().mockResolvedValue(undefined);
+const mockOpenDB = vi.fn().mockResolvedValue({});
+let mockSyncUrl = "";
+let mockSyncToken = "";
+
+vi.mock("@/core/logger", () => ({
+  logger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    setLevel: vi.fn(),
+  },
+}));
+
+vi.mock("@/core/config", () => ({
+  get config() {
+    return {
+      syncUrl: mockSyncUrl,
+      syncToken: mockSyncToken,
+    };
+  },
+}));
+
+vi.mock("@/services/history", () => ({
+  getHistory: (...args: unknown[]) => mockGetHistory(...args),
+  isDataUrlThumbnail: (v: unknown) =>
+    typeof v === "string" && (v === "" || v.startsWith("data:image/")),
+  isValidLocation: () => false,
+}));
+
+vi.mock("@/services/history/db", () => ({
+  getMeta: (...args: unknown[]) => mockGetMeta(...args),
+  setMeta: (...args: unknown[]) => mockSetMeta(...args),
+  openDB: (...args: unknown[]) => mockOpenDB(...args),
+  STORE_NAME: "identifications",
+}));
+
+describe("SyncService", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    mockSyncUrl = "";
+    mockSyncToken = "";
+    mockGetHistory.mockResolvedValue([]);
+    mockGetMeta.mockResolvedValue(undefined);
+    mockSetMeta.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("is a no-op when VITE_SYNC_URL is unset", async () => {
+    mockSyncUrl = "";
+    mockSyncToken = "";
+
+    const { push, pull } = await import("@/services/sync");
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    await push();
+    await pull();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("POSTs entries with Authorization Bearer token", async () => {
+    mockSyncUrl = "https://sync.example.com";
+    mockSyncToken = "test-token";
+    mockGetHistory.mockResolvedValueOnce(mockEntries);
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ ok: true, count: 1 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const { push } = await import("@/services/sync");
+    await push();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const call = fetchSpy.mock.calls[0]!;
+    expect(call[1]?.headers).toHaveProperty(
+      "Authorization",
+      "Bearer test-token",
+    );
+  });
+
+  it("updates lastSyncAt on successful push", async () => {
+    mockSyncUrl = "https://sync.example.com";
+    mockSyncToken = "test-token";
+    mockGetHistory.mockResolvedValueOnce(mockEntries);
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ ok: true, count: 1 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const { push } = await import("@/services/sync");
+    await push();
+
+    expect(mockSetMeta).toHaveBeenCalledWith("lastSyncAt", expect.any(String));
+  });
+
+  it("retries on 5xx responses", async () => {
+    mockSyncUrl = "https://sync.example.com";
+    mockSyncToken = "test-token";
+    mockGetHistory.mockResolvedValueOnce(mockEntries);
+
+    let callCount = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        return new Response(JSON.stringify({ error: "internal" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ ok: true, count: 1 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void) => {
+      fn();
+      return 0 as unknown as NodeJS.Timeout;
+    }) as unknown as typeof setTimeout);
+
+    const { push } = await import("@/services/sync");
+    await push();
+
+    expect(callCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it("pulls server entries and merges into IDB", async () => {
+    mockSyncUrl = "https://sync.example.com";
+    mockSyncToken = "test-token";
+
+    const serverEntry = {
+      id: "server-1",
+      timestamp: "2026-07-22T12:00:00.000Z",
+      modelKey: ModelKey.BVRA,
+      top1Species: "Cantharellus cibarius",
+      top1Probability: 0.88,
+      top1Edibility: Edibility.Edible,
+      predictions: [{ label: "Cantharellus cibarius", probability: 0.88 }],
+      thumbnail: "",
+      notes: "",
+    };
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ entries: [serverEntry] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const { pull } = await import("@/services/sync");
+    await pull();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not throw on network error (logs and returns)", async () => {
+    mockSyncUrl = "https://sync.example.com";
+    mockSyncToken = "test-token";
+    mockGetHistory.mockResolvedValueOnce(mockEntries);
+
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network error"));
+
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void) => {
+      fn();
+      return 0 as unknown as NodeJS.Timeout;
+    }) as unknown as typeof setTimeout);
+
+    const { push } = await import("@/services/sync");
+    await expect(push()).resolves.toBeUndefined();
+  });
+
+  it("strips thumbnails from push payload", async () => {
+    mockSyncUrl = "https://sync.example.com";
+    mockSyncToken = "test-token";
+
+    const entryWithThumb: HistoryEntry = {
+      ...mockEntries[0]!,
+      thumbnail: "data:image/png;base64,abc123",
+    };
+    mockGetHistory.mockResolvedValueOnce([entryWithThumb]);
+
+    let capturedBody: string | null = null;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+      capturedBody = (init?.body as string) ?? null;
+      return new Response(JSON.stringify({ ok: true, count: 1 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+
+    const { push } = await import("@/services/sync");
+    await push();
+
+    expect(capturedBody).not.toBeNull();
+    const parsed = JSON.parse(capturedBody!) as {
+      entries: HistoryEntry[];
+    };
+    expect(parsed.entries[0]!.thumbnail).toBe("");
+  });
+});

@@ -19,6 +19,8 @@ declare global {
     readonly VITE_STORAGE_ESTIMATE_TIMEOUT_MS?: string;
     readonly VITE_TELEMETRY_ENDPOINT?: string;
     readonly VITE_FEATURE_TELEMETRY?: string;
+    readonly VITE_SYNC_URL?: string;
+    readonly VITE_SYNC_TOKEN?: string;
     readonly [key: string]: string | boolean | undefined;
   }
 

@@ -30,6 +30,7 @@ import {
   isValidLocation,
   isEncryptedEnvelope,
 } from "@/services/history";
+import { sync } from "@/services/sync";
 import type { HistoryEntry, GeoLocation } from "@/services/history";
 import { closeDB } from "@/services/history/db";
 import { initWebVitals } from "@/services/web-vitals";
@@ -498,6 +499,9 @@ export class AppController {
 
   handleOfflineChange(): void {
     updateOnlineStatus(this.badgeEl);
+    if (navigator.onLine) {
+      void sync();
+    }
   }
 
   private initLocationToggle(): void {

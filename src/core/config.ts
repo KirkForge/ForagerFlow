@@ -31,6 +31,8 @@ export const config = {
   ),
   swMinFreeBytes: envNumber("VITE_SW_MIN_FREE_BYTES", 100) * 1024 * 1024,
   telemetryEndpoint: envString("VITE_TELEMETRY_ENDPOINT", ""),
+  syncUrl: envString("VITE_SYNC_URL", ""),
+  syncToken: envString("VITE_SYNC_TOKEN", ""),
   features: {
     telemetry:
       (import.meta.env["VITE_FEATURE_TELEMETRY"] as string | undefined) !==
