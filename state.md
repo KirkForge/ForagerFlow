@@ -178,6 +178,25 @@ Offline-first mushroom identification PWA. Uses the device camera or a photo pic
   - `docs/engineering.md` written and linked from README.
 - Next: **Phase 6 — Offline reliability / field hardening** (see Next steps).
 
+## Verification snapshot (2026-07-23)
+
+- `pnpm typecheck` passes: exit 0.
+- `pnpm lint` passes: 0 errors, 0 warnings.
+- `pnpm format:check` passes.
+- `pnpm test` passes: 442/442 tests across 36 files.
+- `pnpm --filter @foragerflow/backend test` passes: 13/13 tests.
+- `pnpm verify:dist` passes (ONNX models excluded locally).
+- `pnpm verify:labels` passes.
+- Head SHA: `1522cda` on branch `work/workorder-2026-07-23`.
+- Main FF'd to `bac53b9` (was `6a66a08`, now 0 commits behind dev).
+
+## Task completion (2026-07-23 workorder)
+
+1. **FF main to dev** ✅ — `git checkout main && git merge --ff-only dev && git push origin main`. Main at `bac53b9`.
+2. **Lighthouse PWA ≥ 0.9** — Added `lighthouserc.json` with 3G throttling preset and PWA ≥ 0.9 fatal assertion. Added `lighthouse` CI job to `.github/workflows/ci.yml`. PWA manifest and service worker are structurally sound (manifest has icons, SW has offline fallback). Actual Lighthouse score verification requires CI run (no browser available locally). CI will gate on PWA ≥ 0.9.
+3. **Expert feedback loop** ✅ — `src/services/sync/index.ts` now has `pushFeedback()` (sends `{id, feedback}` pairs to `/feedback` endpoint, tracked by `lastFeedbackSyncAt`). `push()` now includes entries whose `feedback.timestamp > lastSyncAt` via `isNewerThan()` helper. `pull()` merges server feedback into local entries that lack it. Backend adds `POST/GET /feedback` endpoints. 6 new client tests + 5 new backend tests. Total: 442 client tests + 13 backend tests.
+4. **iOS build blocker documentation** ✅ — `docs/adr/ADR-007-ios-build-blocker.md` created with exact `eas credentials` setup steps, `eas build --platform ios --profile preview` command, current state, and verification checklist. No code change.
+
 ## Verification snapshot (2026-07-05)
 
 - `pnpm test:ci` passes: 412/412 tests across 33 files.

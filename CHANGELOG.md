@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com).
 
 ### Changed
 - Verified P0a (Sentry telemetry) and P0b (honest latency gate 2500ms) landed and green.
+- Moved `ProvenanceInfo` from `services/history` to `core/types` to resolve `consistent-type-imports` lint rule.
 
 ### Added
 - Sentry crash reporting integration with PII scrub, DSN wiring in release.yml.
@@ -14,6 +15,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com).
 - Expert feedback/correction flow (UI modal + IndexedDB store).
 - Model provenance types (source hash, ONNX checksum, label-map version).
 - Thin Cloudflare Worker backend for account sync (POST/GET /sync).
+- Feedback sync pipeline: `pushFeedback()` sends entries with new feedback to `/feedback` endpoint; pull merges server-side feedback into local entries.
+- Backend `/feedback` endpoint (POST/GET) for standalone feedback sync.
+- ADR-007 documenting the iOS build blocker (interactive Apple credentials setup).
+- Lighthouse CI job with PWA ≥ 0.9 fatal assertion on 3G throttled profile.
 - TWA_HOST CI assertion in generate-assetlinks.cjs.
 - ADR-001 (ONNX Runtime Web in-browser inference) and ADR-002 (ONNX weights excluded from git, shipped via release assets).
 - Service Worker unit tests (`tests/sw.test.ts`) covering install, activate, navigation fallback, `.onnx`/`.wasm` range responses, and stale-while-revalidate static assets.
