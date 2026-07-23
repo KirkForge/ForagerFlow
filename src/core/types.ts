@@ -1,3 +1,5 @@
+import type { ProvenanceInfo } from "@/services/history";
+
 export enum Edibility {
   Edible = "Edible",
   Poisonous = "Poisonous",
@@ -74,7 +76,7 @@ export interface WorkerResultMessage {
   type: InferenceWorkerMessageType.Result;
   logits: number[];
   modelKey: ModelKey;
-  provenance: import("@/services/history").ProvenanceInfo;
+  provenance: ProvenanceInfo;
 }
 
 export interface WorkerErrorMessage {

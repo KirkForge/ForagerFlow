@@ -1,4 +1,5 @@
 import type { ModelConfig, WorkerMessage, WorkerCommand } from "@/core/types";
+import type { ProvenanceInfo } from "@/services/history";
 import {
   ModelKey,
   InferenceWorkerMessageType,
@@ -31,7 +32,7 @@ export type StatusHandler = (text: string) => void;
 export type ResultHandler = (result: {
   logits: Float32Array;
   modelKey: ModelKey;
-  provenance: import("@/services/history").ProvenanceInfo;
+  provenance: ProvenanceInfo;
 }) => void;
 export type ErrorHandler = (error: InferenceError | LabelMismatchError) => void;
 export type StorageConfirmHandler = (payload: {
