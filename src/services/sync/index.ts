@@ -2,15 +2,22 @@ import { logger } from "@/core/logger";
 import { config } from "@/core/config";
 import { getHistory } from "@/services/history";
 import { setMeta, getMeta, openDB, STORE_NAME } from "@/services/history/db";
-import type { HistoryEntry } from "@/services/history";
+import type { HistoryEntry, FeedbackEntry } from "@/services/history";
 import { isDataUrlThumbnail, isValidLocation } from "@/services/history";
 
 const LAST_SYNC_KEY = "lastSyncAt";
+const LAST_FEEDBACK_SYNC_KEY = "lastFeedbackSyncAt";
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;
 
 function stripThumbnails(entries: HistoryEntry[]): HistoryEntry[] {
   return entries.map((entry) => ({ ...entry, thumbnail: "" }));
+}
+
+function isNewerThan(entry: HistoryEntry, cutoff: string): boolean {
+  if (entry.timestamp > cutoff) return true;
+  if (entry.feedback && entry.feedback.timestamp > cutoff) return true;
+  return false;
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -67,7 +74,7 @@ export async function push(): Promise<void> {
 
   const allEntries = await getHistory(10_000);
   const entriesToSync = lastSyncAt
-    ? allEntries.filter((e) => e.timestamp > lastSyncAt)
+    ? allEntries.filter((e) => isNewerThan(e, lastSyncAt))
     : allEntries;
 
   if (entriesToSync.length === 0) {
@@ -96,6 +103,59 @@ export async function push(): Promise<void> {
     logger.info(`Sync push: ${String(entriesToSync.length)} entries synced`);
   } catch (err) {
     logger.error("Sync push error:", err);
+  }
+}
+
+export async function pushFeedback(): Promise<void> {
+  const url = getSyncUrl();
+  const token = getSyncToken();
+  if (!url || !token) {
+    return;
+  }
+
+  const lastFeedbackSyncAt = (await getMeta(LAST_FEEDBACK_SYNC_KEY)) as
+    | string
+    | undefined;
+
+  const allEntries = await getHistory(10_000);
+  const feedbackEntries = allEntries.filter(
+    (e): e is HistoryEntry & { feedback: FeedbackEntry } =>
+      e.feedback !== undefined &&
+      (!lastFeedbackSyncAt || e.feedback.timestamp > lastFeedbackSyncAt),
+  );
+
+  if (feedbackEntries.length === 0) {
+    logger.debug("Sync pushFeedback: no new feedback since last sync");
+    return;
+  }
+
+  const payload: { id: string; feedback: FeedbackEntry }[] =
+    feedbackEntries.map((e) => ({
+      id: e.id,
+      feedback: e.feedback,
+    }));
+
+  try {
+    const response = await fetchWithRetry(`${url}/feedback`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ feedback: payload }),
+    });
+
+    if (!response.ok) {
+      logger.warn(`Sync pushFeedback failed: ${String(response.status)}`);
+      return;
+    }
+
+    await setMeta(LAST_FEEDBACK_SYNC_KEY, new Date().toISOString());
+    logger.info(
+      `Sync pushFeedback: ${String(feedbackEntries.length)} feedback entries synced`,
+    );
+  } catch (err) {
+    logger.error("Sync pushFeedback error:", err);
   }
 }
 
@@ -167,6 +227,10 @@ export async function pull(): Promise<void> {
         };
         store.put(updated);
         merged++;
+      } else if (raw.feedback && !entry.feedback) {
+        entry.feedback = raw.feedback;
+        store.put(entry);
+        merged++;
       }
     }
 
@@ -190,5 +254,6 @@ export async function pull(): Promise<void> {
 
 export async function sync(): Promise<void> {
   await push();
+  await pushFeedback();
   await pull();
 }

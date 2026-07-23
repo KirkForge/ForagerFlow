@@ -5,10 +5,23 @@
  * Deploy with `wrangler deploy`.
  *
  * Endpoints:
- *   POST /sync   — upsert history entries (authenticated)
- *   GET  /sync   — fetch all history entries for the user
- *   GET  /health — health check
+ *   POST /sync     — upsert history entries (authenticated)
+ *   GET  /sync     — fetch all history entries for the user
+ *   POST /feedback — upsert feedback entries (authenticated)
+ *   GET  /feedback — fetch all feedback entries for the user
+ *   GET  /health   — health check
  */
+
+interface FeedbackEntry {
+  correctSpecies: string;
+  notes: string;
+  timestamp: string;
+}
+
+interface FeedbackPayload {
+  id: string;
+  feedback: FeedbackEntry;
+}
 
 interface HistoryEntry {
   id: string;
@@ -34,6 +47,15 @@ interface SyncRequest {
 }
 
 interface SyncResponse {
+  ok: boolean;
+  count: number;
+}
+
+interface FeedbackRequest {
+  feedback: FeedbackPayload[];
+}
+
+interface FeedbackResponse {
   ok: boolean;
   count: number;
 }
@@ -117,6 +139,75 @@ async function handleSyncGet(
   });
 }
 
+async function handleFeedbackPost(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  const userId = await verifyAuth(request, env);
+  if (!userId) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const body = (await request.json()) as FeedbackRequest;
+  if (!body.feedback || !Array.isArray(body.feedback)) {
+    return new Response(JSON.stringify({ error: "Invalid payload" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const key = `sync:${userId}:feedback`;
+  const existing: FeedbackPayload[] = JSON.parse(
+    (await env.FORAGERFLOW_KV.get(key)) ?? "[]",
+  );
+
+  const incoming = new Map<string, FeedbackPayload>();
+  for (const entry of existing) {
+    incoming.set(entry.id, entry);
+  }
+  for (const entry of body.feedback) {
+    incoming.set(entry.id, entry);
+  }
+
+  const merged = [...incoming.values()].sort(
+    (a, b) =>
+      new Date(b.feedback.timestamp).getTime() -
+      new Date(a.feedback.timestamp).getTime(),
+  );
+
+  await env.FORAGERFLOW_KV.put(key, JSON.stringify(merged));
+
+  return new Response(
+    JSON.stringify({ ok: true, count: merged.length } satisfies FeedbackResponse),
+    { status: 200, headers: { "Content-Type": "application/json" } },
+  );
+}
+
+async function handleFeedbackGet(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  const userId = await verifyAuth(request, env);
+  if (!userId) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const key = `sync:${userId}:feedback`;
+  const data = await env.FORAGERFLOW_KV.get(key);
+  const feedback: FeedbackPayload[] = data ? JSON.parse(data) : [];
+
+  return new Response(JSON.stringify({ feedback }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 async function handleHealth(): Promise<Response> {
   return new Response(JSON.stringify({ status: "ok" }), {
     status: 200,
@@ -134,6 +225,12 @@ export default {
     }
     if (request.method === "GET" && path === "/sync") {
       return handleSyncGet(request, env);
+    }
+    if (request.method === "POST" && path === "/feedback") {
+      return handleFeedbackPost(request, env);
+    }
+    if (request.method === "GET" && path === "/feedback") {
+      return handleFeedbackGet(request, env);
     }
     if (request.method === "GET" && path === "/health") {
       return handleHealth();
