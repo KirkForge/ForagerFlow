@@ -3,6 +3,7 @@ import { ModelKey, Edibility } from "@/core/types";
 import type {
   ModelKey as ModelKeyType,
   Edibility as EdibilityType,
+  ProvenanceInfo,
 } from "@/core/types";
 import { logger } from "@/core/logger";
 import { openDB, withTransaction, setMeta, STORE_NAME } from "./db";
@@ -39,11 +40,7 @@ export interface FeedbackEntry {
   timestamp: string;
 }
 
-export interface ProvenanceInfo {
-  modelSourceHash: string;
-  onnxChecksum: string;
-  labelMapVersion: string;
-}
+export type { ProvenanceInfo } from "@/core/types";
 
 export interface HistoryBackup {
   version: number;

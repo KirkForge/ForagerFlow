@@ -1,5 +1,3 @@
-import type { ProvenanceInfo } from "@/services/history";
-
 export enum Edibility {
   Edible = "Edible",
   Poisonous = "Poisonous",
@@ -70,6 +68,12 @@ export interface WorkerProgressMessage {
   modelKey: ModelKey;
   phase: "download" | "compile";
   percent: number;
+}
+
+export interface ProvenanceInfo {
+  modelSourceHash: string;
+  onnxChecksum: string;
+  labelMapVersion: string;
 }
 
 export interface WorkerResultMessage {

@@ -1,5 +1,9 @@
-import type { ModelConfig, WorkerMessage, WorkerCommand } from "@/core/types";
-import type { ProvenanceInfo } from "@/services/history";
+import type {
+  ModelConfig,
+  WorkerMessage,
+  WorkerCommand,
+  ProvenanceInfo,
+} from "@/core/types";
 import {
   ModelKey,
   InferenceWorkerMessageType,
