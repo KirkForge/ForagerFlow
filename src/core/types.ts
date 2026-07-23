@@ -70,11 +70,17 @@ export interface WorkerProgressMessage {
   percent: number;
 }
 
+export interface ProvenanceInfo {
+  modelSourceHash: string;
+  onnxChecksum: string;
+  labelMapVersion: string;
+}
+
 export interface WorkerResultMessage {
   type: InferenceWorkerMessageType.Result;
   logits: number[];
   modelKey: ModelKey;
-  provenance: import("@/services/history").ProvenanceInfo;
+  provenance: ProvenanceInfo;
 }
 
 export interface WorkerErrorMessage {
