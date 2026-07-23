@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-return -- vi.fn() mocks need any-return allowances */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ModelKey, Edibility } from "@/core/types";
-import type { HistoryEntry } from "@/services/history";
+import type { HistoryEntry, FeedbackEntry } from "@/services/history";
 
 const mockEntries: HistoryEntry[] = [
   {
@@ -16,6 +16,15 @@ const mockEntries: HistoryEntry[] = [
     notes: "",
   },
 ];
+
+const mockFeedbackEntry: HistoryEntry = {
+  ...mockEntries[0]!,
+  feedback: {
+    correctSpecies: "Amanita gemmata",
+    notes: "Likely a lookalike",
+    timestamp: "2026-07-22T11:00:00.000Z",
+  },
+};
 
 const mockGetHistory = vi.fn();
 const mockGetMeta = vi.fn();
@@ -45,6 +54,7 @@ vi.mock("@/core/config", () => ({
 
 vi.mock("@/services/history", () => ({
   getHistory: (...args: unknown[]) => mockGetHistory(...args),
+  saveFeedback: vi.fn(),
   isDataUrlThumbnail: (v: unknown) =>
     typeof v === "string" && (v === "" || v.startsWith("data:image/")),
   isValidLocation: () => false,
@@ -234,5 +244,188 @@ describe("SyncService", () => {
       entries: HistoryEntry[];
     };
     expect(parsed.entries[0]!.thumbnail).toBe("");
+  });
+
+  it("includes entries with feedback newer than lastSyncAt in push", async () => {
+    mockSyncUrl = "https://sync.example.com";
+    mockSyncToken = "test-token";
+    mockGetMeta.mockImplementation((key: string) => {
+      if (key === "lastSyncAt")
+        return Promise.resolve("2026-07-22T09:00:00.000Z");
+      if (key === "lastFeedbackSyncAt") return Promise.resolve(undefined);
+      return Promise.resolve(undefined);
+    });
+    mockGetHistory.mockResolvedValueOnce([mockFeedbackEntry]);
+
+    let capturedBody: string | undefined;
+    vi.spyOn(globalThis, "fetch").mockImplementation((_url, init) => {
+      const body = init?.body;
+      capturedBody = typeof body === "string" ? body : undefined;
+      return Promise.resolve(
+        new Response(JSON.stringify({ ok: true, count: 1 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    });
+
+    const { push } = await import("@/services/sync");
+    await push();
+
+    expect(capturedBody).toBeDefined();
+    const parsed = JSON.parse(capturedBody!) as {
+      entries: HistoryEntry[];
+    };
+    expect(parsed.entries).toHaveLength(1);
+  });
+
+  it("pushFeedback POSTs feedback entries to /feedback endpoint", async () => {
+    mockSyncUrl = "https://sync.example.com";
+    mockSyncToken = "test-token";
+    mockGetMeta.mockImplementation((key: string) => {
+      if (key === "lastFeedbackSyncAt") return Promise.resolve(undefined);
+      return Promise.resolve(undefined);
+    });
+    mockGetHistory.mockResolvedValueOnce([mockFeedbackEntry]);
+
+    let capturedUrl: string | undefined;
+    let capturedBody: string | undefined;
+    vi.spyOn(globalThis, "fetch").mockImplementation((url, init) => {
+      capturedUrl = typeof url === "string" ? url : "";
+      const body = init?.body;
+      capturedBody = typeof body === "string" ? body : undefined;
+      return Promise.resolve(
+        new Response(JSON.stringify({ ok: true, count: 1 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    });
+
+    const { pushFeedback } = await import("@/services/sync");
+    await pushFeedback();
+
+    expect(capturedUrl).toBe("https://sync.example.com/feedback");
+    expect(capturedBody).toBeDefined();
+    const parsed = JSON.parse(capturedBody!) as {
+      feedback: { id: string; feedback: FeedbackEntry }[];
+    };
+    expect(parsed.feedback).toHaveLength(1);
+    expect(parsed.feedback[0]!.id).toBe("entry-1");
+    expect(parsed.feedback[0]!.feedback.correctSpecies).toBe("Amanita gemmata");
+  });
+
+  it("pushFeedback is a no-op when no feedback entries are new", async () => {
+    mockSyncUrl = "https://sync.example.com";
+    mockSyncToken = "test-token";
+    mockGetMeta.mockImplementation((key: string) => {
+      if (key === "lastFeedbackSyncAt")
+        return Promise.resolve("2026-07-22T12:00:00.000Z");
+      return Promise.resolve(undefined);
+    });
+    mockGetHistory.mockResolvedValueOnce([mockFeedbackEntry]);
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    const { pushFeedback } = await import("@/services/sync");
+    await pushFeedback();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("pushFeedback updates lastFeedbackSyncAt on success", async () => {
+    mockSyncUrl = "https://sync.example.com";
+    mockSyncToken = "test-token";
+    mockGetMeta.mockImplementation((key: string) => {
+      if (key === "lastFeedbackSyncAt") return Promise.resolve(undefined);
+      return Promise.resolve(undefined);
+    });
+    mockGetHistory.mockResolvedValueOnce([mockFeedbackEntry]);
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ ok: true, count: 1 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const { pushFeedback } = await import("@/services/sync");
+    await pushFeedback();
+
+    expect(mockSetMeta).toHaveBeenCalledWith(
+      "lastFeedbackSyncAt",
+      expect.any(String),
+    );
+  });
+
+  it("sync calls push, pushFeedback, and pull in order", async () => {
+    mockSyncUrl = "https://sync.example.com";
+    mockSyncToken = "test-token";
+    mockGetHistory.mockResolvedValue([mockFeedbackEntry]);
+    mockGetMeta.mockResolvedValue(undefined);
+
+    const callOrder: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation((url) => {
+      const path = typeof url === "string" ? new URL(url).pathname : "/";
+      callOrder.push(path);
+      if (
+        path === "/sync" &&
+        callOrder.filter((p) => p === "/sync").length === 1
+      ) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: true, count: 1 }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      if (path === "/feedback") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ ok: true, count: 1 }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ entries: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    });
+
+    const { sync } = await import("@/services/sync");
+    await sync();
+
+    expect(callOrder).toEqual(["/sync", "/feedback", "/sync"]);
+  });
+
+  it("pull fetches entries that may include feedback", async () => {
+    mockSyncUrl = "https://sync.example.com";
+    mockSyncToken = "test-token";
+
+    const entryWithFeedback = {
+      ...mockEntries[0]!,
+      feedback: {
+        correctSpecies: "Amanita gemmata",
+        notes: "Lookalike",
+        timestamp: "2026-07-22T11:00:00.000Z",
+      },
+    };
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ entries: [entryWithFeedback] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const { pull } = await import("@/services/sync");
+    await pull();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const callUrl = fetchSpy.mock.calls[0]![0] as string;
+    expect(callUrl).toContain("/sync");
   });
 });
