@@ -3,10 +3,9 @@
     "collect": {
       "url": ["http://localhost:4173/"],
       "startServerCommand": "pnpm preview",
-      "startServerReadyPattern": "Local",
+      "startServerReadyPattern": "Local:",
       "numberOfRuns": 3,
       "settings": {
-        "preset": "desktop",
         "throttling": {
           "rttMs": 150,
           "throughputKbps": 1638.4,

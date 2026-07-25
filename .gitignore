@@ -100,3 +100,4 @@ credentials.json
 *.db-shm
 *.db-wal
 *.sqlite
+.lighthouseci/
