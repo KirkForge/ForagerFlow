@@ -46,13 +46,14 @@ The codebase configuration for iOS is complete — `eas.json`, `app.json`/`app.c
 
 5. **Verify the build completes** — download the `.ipa` from the EAS dashboard and install on a test device.
 
-## Current state
+## Current state (verified 2026-07-25)
 
-- `eas.json`: configured with `preview` and `production` profiles
-- `app.json`/`app.config.ts`: bundle ID, version, and iOS capabilities set
-- PWA manifest: valid and servable
-- **Credentials**: not set up — the interactive Apple login is the only remaining step
-- **Apple Developer Program**: membership required ($99/yr) before `eas credentials` can run
+- `eas.json`: **NOT present** — Expo/EAS toolchain not yet initialized
+- `app.json`/`app.config.ts`: **NOT present** — no bundle ID or iOS capabilities configured
+- PWA manifest: valid and servable (`public/manifest.webmanifest`)
+- TWA Android build: configured (`twa/` directory, `build.gradle.kts`, `twa-config.xml`)
+- **Credentials**: not set up — Apple Developer Program membership ($99/yr) required first
+- **Gap is two-fold**: (1) EAS/iOS config files must be created, (2) interactive Apple credentials session needed
 
 ## Consequences
 
