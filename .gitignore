@@ -101,3 +101,4 @@ credentials.json
 *.db-wal
 *.sqlite
 .lighthouseci/
+labels-*.csv

@@ -12,11 +12,11 @@ export interface CalibrationResult {
 /**
  * Calibrate a raw top-1 softmax probability using the margin to the runner-up.
  *
- * The idea is simple: a narrow gap between top-1 and top-2 means the model is
- * internally uncertain, even if the raw probability looks high. We scale the
- * raw score by a factor derived from the gap, then cap at 1. This is a
- * lightweight heuristic — no temperature scaling or held-out calibration set —
- * so it stays offline and explainable.
+ * This heuristic runs AFTER temperature scaling (ModelConfig.temperature, fitted
+ * via scripts/calibrate.py — see ADR-008). A narrow gap between top-1 and top-2
+ * means the model is internally uncertain, even after temperature calibration.
+ * We scale the raw score by a factor derived from the gap, then cap at 1. This
+ * is a lightweight margin-based heuristic — it stays offline and explainable.
  */
 export function calibrateConfidence(
   top1Probability: number,
