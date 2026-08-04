@@ -155,6 +155,7 @@ vi.mock("@/services/history", async () => {
     ...actual,
     saveIdentification: vi.fn().mockResolvedValue("id-1"),
     getHistory: vi.fn().mockResolvedValue([]),
+    getHistoryById: vi.fn().mockResolvedValue(null),
     searchHistory: vi.fn().mockResolvedValue([]),
     clearHistory: vi.fn().mockResolvedValue(undefined),
     exportHistory: vi.fn().mockResolvedValue('{"version":1,"entries":[]}'),
@@ -598,12 +599,13 @@ describe("AppController", () => {
   });
 
   it("opens history detail when an entry is clicked", async () => {
-    const { getHistory } = await import("@/services/history");
+    const { getHistory, getHistoryById } = await import("@/services/history");
     const entry = makeHistoryEntry({
       id: "h-detail",
       top1Species: "Amanita muscaria",
     });
     vi.mocked(getHistory).mockResolvedValue([entry]);
+    vi.mocked(getHistoryById).mockResolvedValue(entry);
 
     const controller = new AppController();
     await controller.init();
@@ -1441,10 +1443,11 @@ describe("AppController additional coverage", () => {
   });
 
   it("does not open history detail when the entry is not found", async () => {
-    const { getHistory } = await import("@/services/history");
+    const { getHistory, getHistoryById } = await import("@/services/history");
     vi.mocked(getHistory).mockResolvedValue([
       makeHistoryEntry({ id: "h-real" }),
     ]);
+    vi.mocked(getHistoryById).mockResolvedValue(null);
     renderAppHTML();
     const controller = new AppController();
     await controller.init();
@@ -1460,7 +1463,7 @@ describe("AppController additional coverage", () => {
   });
 
   it("logs an error when opening history detail fails", async () => {
-    const { getHistory } = await import("@/services/history");
+    const { getHistoryById } = await import("@/services/history");
     const errorSpy = vi
       .spyOn(logger, "error")
       .mockImplementation(() => undefined);
@@ -1469,7 +1472,7 @@ describe("AppController additional coverage", () => {
     await controller.init();
     await flushPromises();
 
-    vi.mocked(getHistory).mockRejectedValueOnce(new Error("idb failed"));
+    vi.mocked(getHistoryById).mockRejectedValueOnce(new Error("idb failed"));
 
     const list = document.querySelector("#history-list") as HTMLElement;
     const entry = document.createElement("div");

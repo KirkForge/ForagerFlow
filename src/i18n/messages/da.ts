@@ -190,4 +190,14 @@ export const daMessages: Messages = {
   // Status / misc
   "status.error": "Fejl: {{message}}",
   "status.displayError": "Fejl ved visning af resultat.",
+
+  // Feedback
+  "feedback.title": "Giv feedback",
+  "feedback.body":
+    "Hvis denne identifikation er forkert, kan du angive den korrekte art nedenfor.",
+  "feedback.speciesLabel": "Korrekt art",
+  "feedback.notesLabel": "Noter (valgfrit)",
+  "feedback.submit": "Send",
+  "feedback.cancel": "Annullér",
+  "history.detail.feedbackAria": "Giv feedback på denne identifikation",
 };

@@ -483,8 +483,52 @@
           >
             Bekræft arten online →
           </a>
+          <button
+            id="history-detail-feedback"
+            type="button"
+            aria-label="Giv feedback på denne identifikation"
+          >
+            Giv feedback
+          </button>
         </div>
       </div>
+    </dialog>
+
+    <dialog
+      id="feedback-modal"
+      aria-labelledby="feedback-modal-title"
+      aria-describedby="feedback-modal-body"
+    >
+      <form method="dialog" id="feedback-form">
+        <h2 id="feedback-modal-title" data-i18n-key="feedback.title">
+          Giv feedback
+        </h2>
+        <p id="feedback-modal-body" data-i18n-key="feedback.body">
+          Hvis denne identifikation er forkert, kan du angive den korrekte art
+          nedenfor.
+        </p>
+        <label for="feedback-species" data-i18n-key="feedback.speciesLabel">
+          Korrekt art
+        </label>
+        <input
+          type="text"
+          id="feedback-species"
+          autocomplete="off"
+          aria-label="Korrekt art"
+        />
+        <label for="feedback-notes" data-i18n-key="feedback.notesLabel">
+          Noter (valgfrit)
+        </label>
+        <textarea id="feedback-notes" rows="3" aria-label="Noter"></textarea>
+        <div class="safety-modal-actions">
+          <button type="button" id="feedback-cancel" value="cancel">
+            Annullér
+          </button>
+          <button type="submit" id="feedback-submit" value="accept">
+            Send
+          </button>
+        </div>
+      </form>
     </dialog>
 
     <script type="module" src="/main.ts"></script>

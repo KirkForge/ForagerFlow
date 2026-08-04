@@ -338,18 +338,47 @@ export async function searchHistory(
     return getHistory(limit);
   }
 
-  const entries = await getHistory(10_000);
-  const results: HistoryEntry[] = [];
-  for (const entry of entries) {
-    const haystack = buildSearchHaystack(entry);
-    if (tokens.every((token) => haystack.includes(token))) {
-      results.push(entry);
-      if (results.length >= limit) {
-        break;
-      }
-    }
+  try {
+    const db = await openDB();
+    const results: HistoryEntry[] = [];
+    return await new Promise<HistoryEntry[]>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const index = store.index("timestamp");
+      const request = index.openCursor(null, "prev");
+
+      tx.oncomplete = () => {
+        resolve(results);
+      };
+      tx.onerror = () => {
+        reject(new Error(tx.error?.message ?? "IDB transaction failed"));
+      };
+      tx.onabort = () => {
+        reject(new Error("IDB transaction aborted"));
+      };
+
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        if (results.length >= limit) {
+          resolve(results);
+          return;
+        }
+        const entry = cursor.value as HistoryEntry;
+        const haystack = buildSearchHaystack(entry);
+        if (tokens.every((token) => haystack.includes(token))) {
+          results.push(entry);
+        }
+        cursor.continue();
+      };
+      request.onerror = () => {
+        reject(new Error(request.error?.message ?? "IDB request failed"));
+      };
+    });
+  } catch (err) {
+    logger.error("Failed to search history:", err);
+    return [];
   }
-  return results;
 }
 
 export async function getHistory(limit = 50): Promise<HistoryEntry[]> {
@@ -386,6 +415,27 @@ export async function getHistory(limit = 50): Promise<HistoryEntry[]> {
   } catch (err) {
     logger.error("Failed to load history:", err);
     return [];
+  }
+}
+
+export async function getHistoryById(id: string): Promise<HistoryEntry | null> {
+  try {
+    const db = await openDB();
+    return await new Promise<HistoryEntry | null>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.get(id);
+      request.onsuccess = () => {
+        const result = request.result as HistoryEntry | undefined;
+        resolve(result ?? null);
+      };
+      request.onerror = () => {
+        reject(new Error(request.error?.message ?? "IDB get failed"));
+      };
+    });
+  } catch (err) {
+    logger.error("Failed to get history entry by id:", err);
+    return null;
   }
 }
 

@@ -7,6 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com).
 ### Changed
 - Verified P0a (Sentry telemetry) and P0b (honest latency gate 2500ms) landed and green.
 - Moved `ProvenanceInfo` from `services/history` to `core/types` to resolve `consistent-type-imports` lint rule.
+- Test count updated to 443 (was 419).
 
 ### Added
 - Sentry crash reporting integration with PII scrub, DSN wiring in release.yml.
@@ -81,6 +82,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com).
 - Redundant `src/index.html` from `vitest.config.ts` coverage exclusions.
 
 ### Fixed
+- Feedback modal HTML missing from `src/index.html` causing app crash on load (P0).
+- 7 missing i18n keys (`history.detail.feedbackAria` + 6 feedback keys) in `da.ts` and `en.ts`.
+- `searchHistory()` loaded all IndexedDB entries into memory; replaced with cursor-based iteration.
+- Missing `getHistoryById()` for direct IDB key lookup used by history detail view.
+- `manifest.webmanifest` brand capitalization (`Foragerflow` → `ForagerFlow`).
 - Toxic-lookalike warning could be suppressed when top-1 was confident and edible; now it fires whenever a poisonous or unknown species appears in the top-3.
 - Missing `Content-Length` header in worker download progress no longer produces a silent NaN path; it uses `"0"` and falls back to untracked buffering.
 - Unhandled promise rejection inside the worker message handler now posts an error back to the main thread.

@@ -47,7 +47,7 @@ dist/           — Build output. The deployable.
 
 - **TypeScript strict mode** is enabled. All code must pass `pnpm typecheck`.
 - **ESLint** with `strictTypeChecked` + `stylisticTypeChecked` configs.
-- **Prettier** formatting. Run `pnpm lint:fix` before pushing.
+- **Prettier** formatting. Run `pnpm format` before pushing.
 - **Commit format**: `type(scope): message` — feat, fix, docs, refactor, test, chore, wip.
 - **Package manager**: Always use `pnpm`. Never use `npm install`.
 

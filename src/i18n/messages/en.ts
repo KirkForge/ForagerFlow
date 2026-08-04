@@ -188,4 +188,14 @@ export const enMessages: Messages = {
   // Status / misc
   "status.error": "Error: {{message}}",
   "status.displayError": "Error displaying result.",
+
+  // Feedback
+  "feedback.title": "Give feedback",
+  "feedback.body":
+    "If this identification is wrong, you can enter the correct species below.",
+  "feedback.speciesLabel": "Correct species",
+  "feedback.notesLabel": "Notes (optional)",
+  "feedback.submit": "Submit",
+  "feedback.cancel": "Cancel",
+  "history.detail.feedbackAria": "Give feedback on this identification",
 };

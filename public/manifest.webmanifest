@@ -1,7 +1,7 @@
 {
   "id": "foragerflow",
-  "name": "Foragerflow",
-  "short_name": "Foragerflow",
+  "name": "ForagerFlow",
+  "short_name": "ForagerFlow",
   "description": "Offline-first PWA for mushroom identification using ONNX models in the browser.",
   "start_url": "/",
   "scope": "/",

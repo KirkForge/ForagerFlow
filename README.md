@@ -102,7 +102,7 @@ Safety UI:
 - Clear-history confirmation.
 - Warnings for low confidence, poisonous top-1, and poisonous lookalikes in the top 3.
 - dima806 model gated by a first-use size warning and a storage-estimate confirmation.
-- Storage-estimate confirmation before large model downloads when free space is below 500 MB.
+- Storage-estimate confirmation before large model downloads when free space is below the per-model threshold (150 MB for BVRA, 500 MB for dima806).
 
 ## Models
 

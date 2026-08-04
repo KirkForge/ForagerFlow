@@ -21,6 +21,7 @@ import type { LoadProgress } from "@/inference/service";
 import {
   saveIdentification,
   getHistory,
+  getHistoryById,
   searchHistory,
   clearHistory,
   exportHistory,
@@ -487,8 +488,7 @@ export class AppController {
   private async openHistoryDetail(id: string): Promise<void> {
     if (!id) return;
     try {
-      const entries = await getHistory(20);
-      const entry = entries.find((e) => e.id === id);
+      const entry = await getHistoryById(id);
       if (entry) {
         this.historyDetailPanel.open(entry);
       }
