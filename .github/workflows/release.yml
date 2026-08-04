@@ -50,6 +50,17 @@ jobs:
       - name: Install JS dependencies
         run: pnpm install --frozen-lockfile
 
+      # Generate assetlinks.json BEFORE the vite build so the real signing
+      # fingerprint (not the committed placeholder) is copied from public/
+      # into dist/ by vite's public-dir pass-through, then shipped in the
+      # release tarball the web host serves. Generating it after the build
+      # left dist/ with a stale placeholder and broke TWA trust in prod.
+      - name: Generate assetlinks for TWA
+        env:
+          TWA_HOST: ${{ vars.TWA_HOST }}
+          TWA_SHA256_FINGERPRINT: ${{ secrets.TWA_SHA256_FINGERPRINT }}
+        run: node scripts/generate-assetlinks.cjs
+
       - name: Build
         env:
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
@@ -83,12 +94,6 @@ jobs:
           name: latency-results
           path: latency-results.json
           retention-days: 30
-
-      - name: Generate assetlinks for TWA
-        env:
-          TWA_HOST: ${{ vars.TWA_HOST }}
-          TWA_SHA256_FINGERPRINT: ${{ secrets.TWA_SHA256_FINGERPRINT }}
-        run: node scripts/generate-assetlinks.cjs
 
       - name: Set up JDK for Android build
         uses: actions/setup-java@v4

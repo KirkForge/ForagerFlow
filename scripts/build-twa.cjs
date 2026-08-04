@@ -50,15 +50,15 @@ function copyIcon(density, { source }) {
     throw new Error(`Missing source icon: ${srcPath}`);
   }
 
+  // density qualifier only — do NOT create mipmap-<density>-round dirs: the
+  // "round" qualifier must precede density (mipmap-round-<density>), and these
+  // PNGs are unused anyway because the manifest's roundIcon points at
+  // @mipmap/ic_launcher and mipmap-anydpi-v26/ic_launcher_round.xml handles
+  // Android 8+ adaptive icons.
   const dir = resolve(APP_RES, `mipmap-${density}`);
   ensureDir(dir);
   copyFileSync(srcPath, resolve(dir, "ic_launcher_foreground.png"));
   copyFileSync(srcPath, resolve(dir, "ic_launcher.png"));
-
-  const roundDir = resolve(APP_RES, `mipmap-${density}-round`);
-  ensureDir(roundDir);
-  copyFileSync(srcPath, resolve(roundDir, "ic_launcher_foreground.png"));
-  copyFileSync(srcPath, resolve(roundDir, "ic_launcher.png"));
 }
 
 function generateTwaConfig() {
@@ -72,10 +72,17 @@ function generateTwaConfig() {
     },
   ]);
 
+  // Escape JSON quotes for an Android <string> resource: each literal `"`
+  // must become `\"` so AAPT decodes it back to `"` at runtime. A lone `\`
+  // (the previous behaviour) produced invalid escapes such as `\r`/`\n`,
+  // garbling the asset_statements payload so Digital Asset Links never
+  // validated and the TWA silently fell back to a plain Custom Tab.
+  const assetStatementsEscaped = assetStatements.replace(/"/g, '\\"');
+
   const xml = `<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="defaultUrl" translatable="false">${DEFAULT_URL}</string>
-    <string name="assetStatements" translatable="false">${assetStatements.replace(/"/g, "\\")}</string>
+    <string name="assetStatements" translatable="false">${assetStatementsEscaped}</string>
 </resources>
 `;
   ensureDir(resolve(APP_RES, "values"));
@@ -123,10 +130,6 @@ function runGradle() {
 function cleanGeneratedResources() {
   for (const density of Object.keys(DENSITIES)) {
     rmSync(resolve(APP_RES, `mipmap-${density}`), {
-      recursive: true,
-      force: true,
-    });
-    rmSync(resolve(APP_RES, `mipmap-${density}-round`), {
       recursive: true,
       force: true,
     });

@@ -24,8 +24,13 @@ build/
 
 # --- TWA generated resources (produced by scripts/build-twa.cjs) ---
 twa/app/build/
-twa/app/src/main/res/mipmap-*/
-twa/app/src/main/res/mipmap-*-round/
+# Density-specific mipmap PNGs are generated from public/icons by build-twa.cjs.
+# mipmap-anydpi-v26/ is intentionally NOT ignored: it holds source adaptive-icon XMLs.
+twa/app/src/main/res/mipmap-mdpi/
+twa/app/src/main/res/mipmap-hdpi/
+twa/app/src/main/res/mipmap-xhdpi/
+twa/app/src/main/res/mipmap-xxhdpi/
+twa/app/src/main/res/mipmap-xxxhdpi/
 twa/app/src/main/res/values/twa-config.xml
 twa/.gradle/
 twa/local.properties

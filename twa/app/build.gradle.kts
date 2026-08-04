@@ -4,12 +4,12 @@ plugins {
 
 android {
     namespace = "com.kirkforge.foragerflow"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.kirkforge.foragerflow"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "2.1.0"
 
@@ -41,5 +41,5 @@ android {
 }
 
 dependencies {
-    implementation("com.google.androidbrowserhelper:androidbrowserhelper:2.5.0")
+    implementation("com.google.androidbrowserhelper:androidbrowserhelper:2.7.2")
 }
